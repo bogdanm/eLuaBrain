@@ -78,12 +78,13 @@ void term_putch( u8 ch )
 }
 
 // Write a string to the terminal
-void term_putstr( const char* str )
+void term_putstr( const char* str, unsigned size )
 {
-  while( *str )
+  while( size )
   {
     vram_putchar( *str );
     str ++;
+    size --;
   }
 }
  

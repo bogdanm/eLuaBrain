@@ -35,7 +35,7 @@ local menu =
       { { "Audience", "Público Alvo" }, "overview.html#audience" },
       { { "Authors", "Autores" }, "overview.html#authors" },
       { { "Contacts","Contatos" }, "overview.html#contacts" },
-      { { "License", "Licença" },"overview.html#license" }
+      { { "License", "Licença" },"overview.html#license" },
     }
   },
 
@@ -53,6 +53,9 @@ local menu =
 
   -- News
   { { "News", "Notícias" }, "news.html" },
+  
+  -- Media
+  { "Media", "media.html" },  
 
   -- "Status"
   { "Status", "status.html", 
@@ -99,6 +102,7 @@ local menu =
           { { "Over TCP/IP", "Console via TCP/IP" }, "using.html#tcpip" },
           { { "On PC", "Num PC" }, "using.html#pc" },
           { { "The shell", "O Shell" }, "using.html#shell" },
+          { "Linenoise", "linenoise.html" },
           { "Cross-compiling", "using.html#cross" },
           { "LuaRPC", "using.html#rpc" },
         },
@@ -111,7 +115,12 @@ local menu =
           { "R/W FAT FS in SD/MMC Cards", "fatfs.html" }
         }
       },
-      { "eLua interrupt handlers", "inthandlers.html" },
+      { "eLua interrupt handlers", "inthandlers.html",
+        {
+          { "In Lua", "inthandlers.html" },
+          { "In C", "inthandlers.html#cints" },
+        }
+      },
       { { "Building eLua", "Build de eLua" }, "building.html",
         {
           { "Building eLua in Linux", "building_unix.html" },
@@ -147,6 +156,11 @@ local menu =
       { { "Booting eLua", "O Boot de eLua" }, "arch_overview.html#boot" },
       { { "Platforms and ports", "Portabilização" }, "arch_overview.html#platforms" },
       { { "Adding a new port", "Portando eLua" }, "arch_newport.html" },
+      { "Implementing interrupts", "arch_ints.html",
+        {
+          { "Interrupt list", "arch_ints.html#intlist" }
+        }
+      }
     }
   },
 

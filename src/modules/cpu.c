@@ -81,24 +81,34 @@ static int cpu_r8( lua_State *L )
   return 1;
 }
 
-// Lua: cli()
-// Lua: cli() - to disable all interrupts
-// or cli( id1, resnum1, [resnum2], ..., [resnumn] ) - to disable a specific id/resnum(s)
-static int cpu_cli( lua_State *L )
+// cli helper, does either hw_cli (clear interrupt only in hardware) or full cli (also clear the Lua interrupt flag)
+// Lua: [hw_]cli() - to disable all interrupts
+// or [hw_]cli( id1, resnum1, [resnum2], ..., [resnumn] ) - to disable a specific id/resnum(s)
+static int cpuh_cli( lua_State *L, int hwmode )
 {
 #ifdef BUILD_LUA_INT_HANDLERS
   unsigned i;
   elua_int_id id;
   elua_int_resnum resnum;
+  int res;
 
   if( lua_gettop( L ) > 0 )
   {
     id = ( elua_int_id )luaL_checkinteger( L, 1 );
+    if( id < ELUA_INT_FIRST_ID || id > INT_ELUA_LAST )
+      return luaL_error( L, "invalid interrupt ID" );
     for( i = 2; i <= lua_gettop( L ); i ++ )
     {
       resnum = ( elua_int_resnum )luaL_checkinteger( L, i );
-      platform_cpu_set_interrupt( id, resnum, PLATFORM_CPU_DISABLE );
+      res = platform_cpu_set_interrupt( id, resnum, PLATFORM_CPU_DISABLE );
+      if( res == PLATFORM_INT_INVALID )
+        return luaL_error( L, "%d is not a valid interrupt ID", ( int )id );
+      else if( res == PLATFORM_INT_NOT_HANDLED )
+        return luaL_error( L, "cli operation not implemented for interrupt %d with resource %d", ( int )id, ( int )resnum );
+      else if( res == PLATFORM_INT_BAD_RESNUM )
+        return luaL_error( L, "resource %d not valid for interrupt %d", ( int )resnum, ( int )id );
     }
+    if( !hwmode )
     elua_int_disable( id );
   }
   else
@@ -111,23 +121,43 @@ static int cpu_cli( lua_State *L )
 }
 
 
-// Lua: sei() - to enable all interrupts
-// or sei( id1, resnum1, [resnum2], ..., [resnumn] ) - to enable a specific id/resnum(s)
-static int cpu_sei( lua_State *L )
+// sei helper, does either hw_sei (set interrupt only in hardware) or full sei (also set the Lua interrupt flag)
+// Lua: [hw_]sei() - to enable all interrupts
+// or [hw_]sei( id1, resnum1, [resnum2], ..., [resnumn] ) - to enable a specific id/resnum(s)
+static int cpuh_sei( lua_State *L, int hwmode )
 {
 #ifdef BUILD_LUA_INT_HANDLERS  
   unsigned i;
   elua_int_id id;
   elua_int_resnum resnum;  
+  int res;
 
   if( lua_gettop( L ) > 0 )
   {
     id = ( elua_int_id )luaL_checkinteger( L, 1 );
+    if( id < ELUA_INT_FIRST_ID || id > INT_ELUA_LAST )
+      return luaL_error( L, "invalid interrupt ID" );
+    if( !hwmode )
+    {
+      // Check if we have a handler for this interrupt
+      lua_rawgeti( L, LUA_REGISTRYINDEX, LUA_INT_HANDLER_KEY ); // inttable
+      lua_rawgeti( L, -1, id ); // inttable f
+      if( lua_isnil( L, -1 ) )
+        return luaL_error( L, "no handler is set for this interrupt, set a handler before enabling it.\n" );
+      lua_pop( L, 2 ); 
+    }
     for( i = 2; i <= lua_gettop( L ); i ++ )
     {
       resnum = ( elua_int_resnum )luaL_checkinteger( L, i );
-      platform_cpu_set_interrupt( id, resnum, PLATFORM_CPU_ENABLE );
+      res = platform_cpu_set_interrupt( id, resnum, PLATFORM_CPU_ENABLE );
+      if( res == PLATFORM_INT_INVALID )
+        return luaL_error( L, "%d is not a valid interrupt ID", ( int )id );
+      else if( res == PLATFORM_INT_NOT_HANDLED )
+        return luaL_error( L, "sei operation not implemented for interrupt %d with resnum %d", ( int )id, ( int )resnum );
+      else if( res == PLATFORM_INT_BAD_RESNUM )
+        return luaL_error( L, "resource %d not valid for interrupt %d", ( int )resnum, ( int )id );
     }
+    if( !hwmode )
     elua_int_enable( id );
   }
   else
@@ -137,6 +167,26 @@ static int cpu_sei( lua_State *L )
 #endif // #ifdef BUILD_LUA_INT_HANDLERS  
   platform_cpu_set_global_interrupts( PLATFORM_CPU_ENABLE );
   return 0;
+}
+
+static int cpu_cli( lua_State *L )
+{
+  return cpuh_cli( L, 0 );
+}
+
+static int cpu_hw_cli( lua_State *L )
+{
+  return cpuh_cli( L, 1 );
+}
+
+static int cpu_sei( lua_State *L )
+{
+  return cpuh_sei( L, 0 );
+}
+
+static int cpu_hw_sei( lua_State *L )
+{
+  return cpuh_sei( L, 1 );
 }
 
 // Lua: frequency = clock()
@@ -179,29 +229,73 @@ static int cpu_mt_index( lua_State *L )
 #endif
 
 #ifdef BUILD_LUA_INT_HANDLERS
-static u8 cpu_int_handler_active;
 
-u8 cpu_is_int_handler_active()
-{
-  return cpu_int_handler_active;
-}
-
-// lua: cpu.set_int_handler( f )
+// Lua: prevhandler = cpu.set_int_handler( id, f )
 static int cpu_set_int_handler( lua_State *L )
 {
-  if( lua_type( L, 1 ) == LUA_TNIL )
-    cpu_int_handler_active = 0;
-  else if( lua_type( L, 1 ) == LUA_TFUNCTION || lua_type( L, 1 ) == LUA_TLIGHTFUNCTION )
+  int id = ( int )luaL_checkinteger( L, 1 );
+
+  if( id < ELUA_INT_FIRST_ID || id > INT_ELUA_LAST )
+    return luaL_error( L, "invalid interrupt ID" );
+  if( lua_type( L, 2 ) == LUA_TFUNCTION || lua_type( L, 2 ) == LUA_TLIGHTFUNCTION || lua_type( L, 2 ) == LUA_TNIL )
   {
-    lua_settop( L, 1 );
-    lua_rawseti( L, LUA_REGISTRYINDEX, LUA_INT_HANDLER_KEY );
-    cpu_int_handler_active = 1;
+    if( lua_type( L, 2 ) == LUA_TNIL && elua_int_is_enabled( id ) )
+      return luaL_error( L, "interrupt is enabled, disable it before setting its handler to nil.\n" );
+    lua_settop( L, 2 ); // id f
+    lua_rawgeti( L, LUA_REGISTRYINDEX, LUA_INT_HANDLER_KEY ); // id f inttable
+    lua_rawgeti( L, -1, id ); // id f inttable prevf
+    lua_replace( L, 1 ); // prevf f inttable
+    lua_pushvalue( L, 2 ); // prevf f inttable f
+    lua_rawseti( L, -2, id ); // prevf f inttable
+    lua_pop( L, 2 ); // prevf
+    return 1;
   }
   else
-    return luaL_error( L, "invalid argument (must be a function or nil)" );
+    return luaL_error( L, "invalid handler type (must be a function or nil)" );
   return 0;
 }
-#endif
+
+// Lua: handler = cpu.get_int_handler( id )
+static int cpu_get_int_handler( lua_State *L )
+{
+  int id = ( int )luaL_checkinteger( L, 1 );
+
+  if( id < ELUA_INT_FIRST_ID || id > INT_ELUA_LAST )
+    return luaL_error( L, "invalid interrupt ID" );
+  lua_rawgeti( L, LUA_REGISTRYINDEX, LUA_INT_HANDLER_KEY );
+  lua_rawgeti( L, -1, id );
+  return 1;
+}
+
+// Lua: flag = get_int_flag( id, resnum, [clear] )
+// 'clear' default to true if not specified
+static int cpu_get_int_flag( lua_State *L )
+{
+  elua_int_id id;
+  elua_int_resnum resnum;  
+  int clear = 1;
+  int res;
+
+  id = ( elua_int_id )luaL_checkinteger( L, 1 );
+  resnum = ( elua_int_resnum )luaL_checkinteger( L, 2 );
+  if( lua_gettop( L ) >= 3 )
+  {
+    if( lua_isboolean( L, 3 ) )
+      clear = lua_toboolean( L, 3 );
+    else
+      return luaL_error( L, "expected a bool as the 3rd argument of this function" );
+  }
+  res = platform_cpu_get_interrupt_flag( id, resnum, clear );
+  if( res == PLATFORM_INT_INVALID )
+    return luaL_error( L, "%d is not a valid interrupt ID", ( int )id );
+  else if( res == PLATFORM_INT_NOT_HANDLED )
+    return luaL_error( L, "get flag operation not implemented for interrupt %d with resource %d", ( int )id, ( int )resnum );
+  else if( res == PLATFORM_INT_BAD_RESNUM )
+    return luaL_error( L, "resource %d not valid for interrupt %d", ( int )resnum, ( int )id );
+  lua_pushinteger( L, res );
+  return 1;
+}
+#endif // #ifdef BUILD_LUA_INT_HANDLERS
 
 // Module function map
 #define MIN_OPT_LEVEL 2
@@ -215,10 +309,14 @@ const LUA_REG_TYPE cpu_map[] =
   { LSTRKEY( "w8" ), LFUNCVAL( cpu_w8 ) },
   { LSTRKEY( "r8" ), LFUNCVAL( cpu_r8 ) },
   { LSTRKEY( "cli" ), LFUNCVAL( cpu_cli ) },
+  { LSTRKEY( "hw_cli" ), LFUNCVAL( cpu_hw_cli ) },
   { LSTRKEY( "sei" ), LFUNCVAL( cpu_sei ) },
+  { LSTRKEY( "hw_sei" ), LFUNCVAL( cpu_hw_sei ) },
   { LSTRKEY( "clock" ), LFUNCVAL( cpu_clock ) },
 #ifdef BUILD_LUA_INT_HANDLERS
   { LSTRKEY( "set_int_handler" ), LFUNCVAL( cpu_set_int_handler ) },
+  { LSTRKEY( "get_int_handler" ), LFUNCVAL( cpu_get_int_handler ) },
+  { LSTRKEY( "get_int_flag" ), LFUNCVAL( cpu_get_int_flag) },
 #endif
 #if defined( PLATFORM_CPU_CONSTANTS ) && LUA_OPTIMIZE_MEMORY > 0
   { LSTRKEY( "__metatable" ), LROVAL( cpu_map ) },
@@ -232,8 +330,11 @@ const LUA_REG_TYPE cpu_map[] =
 LUALIB_API int luaopen_cpu( lua_State *L )
 {
 #ifdef BUILD_LUA_INT_HANDLERS
-  cpu_int_handler_active = 0;
-#endif
+  // Create interrupt table
+  lua_newtable( L );
+  lua_rawseti( L, LUA_REGISTRYINDEX, LUA_INT_HANDLER_KEY );
+#endif //#ifdef BUILD_LUA_INT_HANDLERS
+
 #if LUA_OPTIMIZE_MEMORY > 0
   return 0;
 #else // #if LUA_OPTIMIZE_MEMORY > 0

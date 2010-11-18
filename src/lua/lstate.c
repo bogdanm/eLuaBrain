@@ -24,7 +24,12 @@
 #include "ltm.h"
 #include "platform_conf.h"
 // BogdanM: modified for Lua interrupt support
+#ifndef LUA_CROSS_COMPILER
 #include "elua_int.h"
+#include "platform.h"
+#endif
+// BogdanM: linenoise clenaup
+#include "linenoise.h"
 
 #define state_size(x)	(sizeof(x) + LUAI_EXTRASPACE)
 #define fromstate(l)	(cast(lu_byte *, (l)) - LUAI_EXTRASPACE)
@@ -226,6 +231,16 @@ lua_State *lua_getstate(void) {
   return lua_crtstate;
 }
 LUA_API void lua_close (lua_State *L) {
+#ifndef LUA_CROSS_COMPILER  
+  int oldstate = platform_cpu_set_global_interrupts( PLATFORM_CPU_DISABLE );
+  lua_sethook( L, NULL, 0, 0 );
+  lua_crtstate = NULL;
+  lua_pushnil( L );
+  lua_rawseti( L, LUA_REGISTRYINDEX, LUA_INT_HANDLER_KEY );
+  elua_int_cleanup();
+  platform_cpu_set_global_interrupts( oldstate );
+  linenoise_cleanup( LINENOISE_ID_LUA );
+#endif  
   L = G(L)->mainthread;  /* only the main thread can be closed */
   lua_lock(L);
   luaF_close(L, L->stack);  /* close all upvalues for this thread */
@@ -239,10 +254,5 @@ LUA_API void lua_close (lua_State *L) {
   lua_assert(G(L)->tmudata == NULL);
   luai_userstateclose(L);
   close_state(L);
-  // BogdanM: modified for eLua interrupt support
-#ifndef LUA_CROSS_COMPILER  
-  lua_crtstate = NULL;
-  elua_int_disable_all();
-#endif  
 }
 
