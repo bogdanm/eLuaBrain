@@ -150,7 +150,7 @@ static int linenoisePrompt(int id, char *buf, size_t buflen, const char *prompt)
     size_t len = 0;
     size_t cols = TERM_COLS;
     int history_index = 0;
-    
+
     buf[0] = '\0';
     buflen--; /* Make sure there is always space for the nulterm */
 

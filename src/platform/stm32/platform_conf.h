@@ -108,7 +108,7 @@
 // *****************************************************************************
 // Configuration data
 
-#define EGC_INITIAL_MODE      1
+//#define EGC_INITIAL_MODE      1
 
 // Virtual timers (0 if not used)
 #define VTMR_NUM_TIMERS       4
@@ -140,9 +140,6 @@
 #define RPC_UART_ID           CON_UART_ID
 #define RPC_TIMER_ID          CON_TIMER_ID
 #define RPC_UART_SPEED        CON_UART_SPEED
-
-
-
 
 // MMCFS Support (FatFs on SD/MMC)
 // For STM32F103RET6 - PA5 = CLK, PA6 = MISO, PA7 = MOSI, PA8 = CS

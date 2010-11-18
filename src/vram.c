@@ -44,7 +44,8 @@ enum
   ANSI_SEQ_DOWN,
   ANSI_SEQ_RIGHT,
   ANSI_SEQ_LEFT,
-  ANSI_SEQ_SETSGR
+  ANSI_SEQ_SETSGR,
+  ANSI_SEQ_GOTOCOL
 };
 
 // ANSI SGR data
@@ -105,6 +106,11 @@ static int vram_cvt_escape( const char* inbuf, vram_ansi_op* res )
       else
         res->p1 = res->p2 = 1;
       break;
+
+    case 'G': // go to column
+      res->op = ANSI_SEQ_GOTOCOL;
+      sscanf( p, "%d", &res->p1 );
+      break;
       
     case 'm': // SGR
       res->op = ANSI_SEQ_SETSGR;
@@ -157,6 +163,10 @@ static void vram_ansi_execute()
       case ANSI_SEQ_GOTOXY:
         *vram_p_cx = ( u8 )op.p1 - 1;
         *vram_p_cy = ( u8 )op.p2 - 1;
+        break;
+
+      case ANSI_SEQ_GOTOCOL:
+        *vram_p_cx = ( u8 )op.p1;        
         break;
 
       case ANSI_SEQ_UP:
