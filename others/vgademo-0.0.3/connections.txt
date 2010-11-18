@@ -1,0 +1,15 @@
+REQ  GND
+MISO MOSI
+CS   SCK
+
+Memory
+1 - CS      (PB12)
+2 - MISO    (PB14)
+3 - NC
+4 - VSS
+5 - MOSI    (PB15)
+6 - CLK     (PB13)
+7 - /HOLD
+8 - VCC
+
+REQ ->   PC5
