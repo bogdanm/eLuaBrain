@@ -1,0 +1,8 @@
+*.o
+*.elf
+*.bin
+*.pyc
+*.hex
+.sconsign.dblite
+config.log
+
