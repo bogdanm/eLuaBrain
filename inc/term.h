@@ -45,6 +45,32 @@ enum
   TERM_COL_WHITE
 };
 
+// Foregound colors
+#define TERM_PREFIX           "\x1b["
+#define TERM_FGCOL_OFFSET     30
+#define TERM_BGCOL_FFSET      40
+#define TERM_RESET_COL        TERM_PREFIX "0m"
+
+// Foreground colors
+#define TERM_FGCOL(x)               TERM_PREFIX x "m"
+#define TERM_FGCOL_HIGH( col )      TERM_PREFIX "1m" TERM_PREFIX col "m"
+#define TERM_FGCOL_BLACK            TERM_FGCOL( "30" )
+#define TERM_FGCOL_DARK_RED         TERM_FGCOL( "31" )
+#define TERM_FGCOL_DARK_GREEN       TERM_FGCOL( "32" )
+#define TERM_FGCOL_DARK_YELLOW      TERM_FGCOL( "33" )
+#define TERM_FGCOL_DARK_BLUE        TERM_FGCOL( "34" )
+#define TERM_FGCOL_DARK_MAGENTA     TERM_FGCOL( "35" )
+#define TERM_FGCOL_DARK_CYAN        TERM_FGCOL( "36" )
+#define TERM_FGCOL_LIGHT_GRAY       TERM_FGCOL( "37" )
+#define TERM_FGCOL_DARK_GRAY        TERM_FGCOL_HIGH( "30" )
+#define TERM_FGCOL_LIGHT_RED        TERM_FGCOL_HIGH( "31" )
+#define TERM_FGCOL_LIGHT_GREEN      TERM_FGCOL_HIGH( "32" )
+#define TERM_FGCOL_LIGHT_YELLOW     TERM_FGCOL_HIGH( "33" )
+#define TERM_FGCOL_LIGHT_BLUE       TERM_FGCOL_HIGH( "34" )
+#define TERM_FGCOL_LIGHT_MAGENTA    TERM_FGCOL_HIGH( "35" )
+#define TERM_FGCOL_LIGHT_CYAN       TERM_FGCOL_HIGH( "36" )
+#define TERM_FGCOL_WHITE            TERM_FGCOL_HIGH( "37" )
+
 // ****************************************************************************
 // Exported functions
 

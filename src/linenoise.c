@@ -80,6 +80,7 @@
 #include "term.h"
 #include "linenoise.h"
 #include "platform_conf.h"
+#include "shell.h"
 
 #ifdef BUILD_LINENOISE
 
@@ -87,9 +88,17 @@
 #define LINENOISE_PUSH_EMPTY                1
 #define LINENOISE_DONT_PUSH_EMPTY           0
 
+// Define prompt and command line colors here
+#define LUA_PROMPT_COLOR                    TERM_FGCOL_LIGHT_BLUE
+#define LUA_LINE_COLOR                      TERM_FGCOL_LIGHT_YELLOW
+#define SHELL_PROMPT_COLOR                  TERM_FGCOL_LIGHT_RED
+#define SHELL_LINE_COLOR                    TERM_FGCOL_LIGHT_GREEN
+
 static const int history_max_lengths[ LINENOISE_TOTAL_COMPONENTS ] = { LINENOISE_HISTORY_SIZE_LUA, LINENOISE_HISTORY_SIZE_SHELL };
 static int history_lengths[ LINENOISE_TOTAL_COMPONENTS ];
 static char **histories[ LINENOISE_TOTAL_COMPONENTS ];
+static const char* prompt_cols[ LINENOISE_TOTAL_COMPONENTS ] = { LUA_PROMPT_COLOR, SHELL_PROMPT_COLOR };
+static const char* line_cols[ LINENOISE_TOTAL_COMPONENTS ] = { LUA_LINE_COLOR, SHELL_LINE_COLOR }; 
 
 static int linenoise_internal_addhistory( int id, const char *line, int force_empty );
 
@@ -117,7 +126,7 @@ void linenoise_cleanup( int id )
 }
 
 #define MAX_SEQ_LEN           16
-static void refreshLine(const char *prompt, char *buf, size_t len, size_t pos, size_t cols) {
+static void refreshLine(int id, const char *prompt, char *buf, size_t len, size_t pos, size_t cols) {
     char seq[MAX_SEQ_LEN];
     size_t plen = strlen(prompt);
     
@@ -134,7 +143,9 @@ static void refreshLine(const char *prompt, char *buf, size_t len, size_t pos, s
     snprintf(seq,MAX_SEQ_LEN,"\x1b[0G");
     term_putstr( seq, strlen( seq ) );
     /* Write the prompt and the current buffer content */
+    term_putstr( prompt_cols[ id ], strlen( prompt_cols[ id ] ) );
     term_putstr( prompt, strlen( prompt ) );
+    term_putstr( line_cols[ id ], strlen( line_cols[ id ] ) );
     term_putstr( buf, len );
     /* Erase to right */
     snprintf(seq,MAX_SEQ_LEN,"\x1b[0K");
@@ -158,7 +169,9 @@ static int linenoisePrompt(int id, char *buf, size_t buflen, const char *prompt)
      * initially is just an empty string. */
     linenoise_internal_addhistory( id, "", LINENOISE_PUSH_EMPTY );
     
+    term_putstr( prompt_cols[ id ], strlen( SHELL_PROMPT_COLOR ) );
     term_putstr( prompt, plen );
+    term_putstr( line_cols[ id ], strlen( SHELL_COMMAND_COLOR ) );
     while(1) {
         int c;
 
@@ -184,7 +197,7 @@ static int linenoisePrompt(int id, char *buf, size_t buflen, const char *prompt)
               pos--;
               len--;
               buf[len] = '\0';
-              refreshLine(prompt,buf,len,pos,cols);
+              refreshLine(id,prompt,buf,len,pos,cols);
             }
             break;
              
@@ -196,7 +209,7 @@ static int linenoisePrompt(int id, char *buf, size_t buflen, const char *prompt)
                 buf[pos-1] = buf[pos];
                 buf[pos] = aux;
                 if (pos != len-1) pos++;
-                refreshLine(prompt,buf,len,pos,cols);
+                refreshLine(id,prompt,buf,len,pos,cols);
             }*/
             break;
             
@@ -205,7 +218,7 @@ static int linenoisePrompt(int id, char *buf, size_t buflen, const char *prompt)
             if (pos > 0) 
             {
               pos--;
-              refreshLine(prompt,buf,len,pos,cols);
+              refreshLine(id,prompt,buf,len,pos,cols);
             }
             break;
                 
@@ -214,7 +227,7 @@ static int linenoisePrompt(int id, char *buf, size_t buflen, const char *prompt)
             if (pos != len) 
             {
               pos++;
-              refreshLine(prompt,buf,len,pos,cols);
+              refreshLine(id,prompt,buf,len,pos,cols);
             }
             break;
                 
@@ -241,7 +254,7 @@ static int linenoisePrompt(int id, char *buf, size_t buflen, const char *prompt)
               strncpy(buf,histories[ id ][history_lengths[ id ]-1-history_index],buflen);
               buf[buflen] = '\0';
               len = pos = strlen(buf);
-              refreshLine(prompt,buf,len,pos,cols);
+              refreshLine(id,prompt,buf,len,pos,cols);
             }
             break;
                 
@@ -252,30 +265,30 @@ static int linenoisePrompt(int id, char *buf, size_t buflen, const char *prompt)
               memmove(buf+pos,buf+pos+1,len-pos-1);
               len--;
               buf[len] = '\0';
-              refreshLine(prompt,buf,len,pos,cols);
+              refreshLine(id,prompt,buf,len,pos,cols);
             }    
             break;
             
         case KC_HOME: /* Ctrl+a, go to the start of the line */
             pos = 0;
-            refreshLine(prompt,buf,len,pos,cols);
+            refreshLine(id,prompt,buf,len,pos,cols);
             break;
             
         case KC_END: /* ctrl+e, go to the end of the line */
             pos = len;
-            refreshLine(prompt,buf,len,pos,cols);
+            refreshLine(id,prompt,buf,len,pos,cols);
             break;
             
         case KC_CTRL_U: /* Ctrl+u, delete the whole line. */
             buf[0] = '\0';
             pos = len = 0;
-            refreshLine(prompt,buf,len,pos,cols);
+            refreshLine(id,prompt,buf,len,pos,cols);
             break;
             
         case KC_CTRL_K: /* Ctrl+k, delete from current to end of line. */
             buf[pos] = '\0';
             len = pos;
-            refreshLine(prompt,buf,len,pos,cols);
+            refreshLine(id,prompt,buf,len,pos,cols);
             break;
                         
         default:
@@ -295,7 +308,7 @@ static int linenoisePrompt(int id, char *buf, size_t buflen, const char *prompt)
                 } 
                 else 
                 {
-                  refreshLine(prompt,buf,len,pos,cols);
+                  refreshLine(id,prompt,buf,len,pos,cols);
                 }
               } 
               else 
@@ -305,7 +318,7 @@ static int linenoisePrompt(int id, char *buf, size_t buflen, const char *prompt)
                 len++;
                 pos++;
                 buf[len] = '\0';
-                refreshLine(prompt,buf,len,pos,cols);
+                refreshLine(id,prompt,buf,len,pos,cols);
               }
             }
             break;            
@@ -334,6 +347,7 @@ int linenoise_getline( int id, char* buffer, int maxinput, const char* prompt )
     {  
       if( count > 0 && buffer[ count ] != '\0' )
         buffer[ count ] = '\0';
+      term_putstr( TERM_RESET_COL, strlen( TERM_RESET_COL ) );
       return count;
     }
   }

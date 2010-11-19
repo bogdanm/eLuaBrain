@@ -127,6 +127,9 @@ static int vram_cvt_escape( const char* inbuf, vram_ansi_op* res )
       res->op = last - 'A' + ANSI_SEQ_UP;
       sscanf( p, "%d", &res->p1 );
       break;
+
+   default:
+     return 0;
   }
   return 1;
 }
@@ -174,11 +177,11 @@ static void vram_ansi_execute()
       case ANSI_SEQ_RIGHT:
       case ANSI_SEQ_DOWN:
         {
-          int xm = op.op == ANSI_SEQ_LEFT ? -1 : op.op == ANSI_SEQ_RIGHT ? 1 : 0;
-          int ym = op.op == ANSI_SEQ_UP ? -1 : op.op == ANSI_SEQ_DOWN ? 1 : 0;
+          int xm = op.op == ANSI_SEQ_LEFT ? -1 : ( op.op == ANSI_SEQ_RIGHT ? 1 : 0 );
+          int ym = op.op == ANSI_SEQ_UP ? -1 : ( op.op == ANSI_SEQ_DOWN ? 1 : 0 );
           vram_deltaxy( xm * op.p1, ym * op.p1 );
-          break;
         }
+        break;
         
       case ANSI_SEQ_SETSGR:
         {
@@ -190,8 +193,7 @@ static void vram_ansi_execute()
           }    
           else if( op.p1 == ANSI_SGR_BRIGHT || op.p1 == ANSI_SGR_FAINT )
           {
-            ft = vram_fg_col;
-            bt = vram_bg_col;
+            ft = bt = VRAM_COL_DONT_CHANGE;
             vram_ansi_brightness = op.p1;
           }       
           else 
@@ -393,7 +395,16 @@ void vram_clreol()
   unsigned i;
   u16 *pdata = ( u16* )vram_data + VRAM_CHARADDR( *vram_p_cx, *vram_p_cy );
   u16 fill = ( ' ' << 8 ) | MKCOL( vram_fg_col, vram_bg_col );
-     
+  int incr = *vram_p_cx & 1 ? 2 : -1; 
+    
   for( i = *vram_p_cx; i < VRAM_COLS; i ++ )
-    *pdata ++ = fill;
+  {
+    *pdata = fill;
+    pdata += incr;
+    if( incr == -1 )
+      incr = 2;
+    else if( incr == 2 )
+      incr = 1;
+  }
 }
+
