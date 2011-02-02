@@ -6,4 +6,4 @@
 .sconsign.dblite
 config.log
 inc/romfiles.h
-
+.sconf_temp
