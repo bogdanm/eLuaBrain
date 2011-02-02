@@ -150,6 +150,14 @@ static int luaterm_setcolor( lua_State *L )
   return 0;
 }
 
+static int luaterm_setcursor( lua_State *L )
+{
+  int type = luaL_checkinteger( L, 1 );
+
+  term_set_cursor( type );
+  return 0;
+}
+
 // Key codes by name
 #undef _D
 #define _D( x ) #x
@@ -196,6 +204,7 @@ const LUA_REG_TYPE term_map[] =
   { LSTRKEY( "getcy" ), LFUNCVAL( luaterm_getcy ) },
   { LSTRKEY( "getchar" ), LFUNCVAL( luaterm_getchar ) },
   { LSTRKEY( "setcolor" ), LFUNCVAL( luaterm_setcolor ) },
+  { LSTRKEY( "setcursor" ), LFUNCVAL( luaterm_setcursor ) },
 #if LUA_OPTIMIZE_MEMORY > 0
   { LSTRKEY( "__metatable" ), LROVAL( term_map ) },
   { LSTRKEY( "NOWAIT" ), LNUMVAL( TERM_INPUT_DONT_WAIT ) },
@@ -218,6 +227,9 @@ const LUA_REG_TYPE term_map[] =
   COLLINE( COL_LIGHT_MAGENTA ),
   COLLINE( COL_LIGHT_YELLOW ),
   COLLINE( COL_WHITE ),  
+  COLLINE( CURSOR_OFF ),
+  COLLINE( CURSOR_BLOCK ),
+  COLLINE( CURSOR_UNDERLINE ),
 #endif
   { LSTRKEY( "__index" ), LFUNCVAL( term_mt_index ) },
   { LNILKEY, LNILVAL }

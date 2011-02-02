@@ -57,5 +57,6 @@ void vram_deltaxy( int dx, int dy );
 u8 vram_get_cx();
 u8 vram_get_cy();
 void vram_clreol();
+void vram_set_cursor( int type );
 
 #endif

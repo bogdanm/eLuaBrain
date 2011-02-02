@@ -105,6 +105,11 @@ void term_set_color( int fgcol, int bgcol )
   vram_set_color( fgcol, bgcol );
 }
 
+void term_set_cursor( int type )
+{
+  vram_set_cursor( type );
+}
+
 // Return a char read from the terminal
 // If "mode" is TERM_INPUT_DONT_WAIT, return the char only if it is available,
 // otherwise return -1

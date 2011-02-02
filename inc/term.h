@@ -71,6 +71,14 @@ enum
 #define TERM_FGCOL_LIGHT_CYAN       TERM_FGCOL_HIGH( "36" )
 #define TERM_FGCOL_WHITE            TERM_FGCOL_HIGH( "37" )
 
+// Cursors
+enum
+{
+  TERM_CURSOR_OFF,
+  TERM_CURSOR_BLOCK,
+  TERM_CURSOR_UNDERLINE
+};
+
 // ****************************************************************************
 // Exported functions
 
@@ -93,6 +101,7 @@ void term_putstr( const char* str, unsigned size );
 unsigned term_get_cx();
 unsigned term_get_cy();
 void term_set_color( int fgcol, int bgcol );
+void term_set_cursor( int type );
 
 #define TERM_KEYCODES\
   _D( KC_UP ),\

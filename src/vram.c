@@ -408,3 +408,21 @@ void vram_clreol()
   }
 }
 
+void vram_set_cursor( int type )
+{
+  switch( type )
+  {
+    case TERM_CURSOR_OFF:
+      *vram_p_type = VRAM_CURSOR_OFF;
+      break;
+
+    case TERM_CURSOR_BLOCK:
+      *vram_p_type = VRAM_CURSOR_BLOCK_BLINK;
+      break;
+
+    case TERM_CURSOR_UNDERLINE:
+      *vram_p_type = VRAM_CURSOR_LINE_BLINK;
+      break;
+  }
+}
+
