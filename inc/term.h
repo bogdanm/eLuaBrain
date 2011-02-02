@@ -48,7 +48,7 @@ enum
 // Foregound colors
 #define TERM_PREFIX           "\x1b["
 #define TERM_FGCOL_OFFSET     30
-#define TERM_BGCOL_FFSET      40
+#define TERM_BGCOL_OFFSET     40
 #define TERM_RESET_COL        TERM_PREFIX "0m"
 
 // Foreground colors

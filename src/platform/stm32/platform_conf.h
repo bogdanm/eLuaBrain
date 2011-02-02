@@ -15,7 +15,8 @@
 #define BUILD_SHELL
 #define BUILD_ROMFS
 //#define BUILD_MMCFS
-#define BUILD_TERM_VRAM
+//#define BUILD_TERM_VRAM
+#define BUILD_TERM
 //#define BUILD_UIP
 //#define BUILD_DHCPC
 //#define BUILD_DNS
@@ -24,7 +25,7 @@
 #define BUILD_RPC
 //#define BUILD_RFS
 //#define BUILD_CON_TCP
-#define BUILD_VRAM
+//#define BUILD_VRAM
 #define BUILD_LINENOISE
 
 // *****************************************************************************

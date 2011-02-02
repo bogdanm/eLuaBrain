@@ -145,6 +145,15 @@ int term_getch( int mode )
     return term_translate( ch );
 }
 
+void term_set_color( int fgcol, int bgcol )
+{
+  term_ansi( "%d;%dm", fgcol + TERM_FGCOL_OFFSET, bgcol + TERM_BGCOL_OFFSET );
+}
+
+void term_set_cursor( int type )
+{
+}
+
 void term_init( unsigned lines, unsigned cols, p_term_out term_out_func, 
                 p_term_in term_in_func, p_term_translate term_translate_func )
 {
