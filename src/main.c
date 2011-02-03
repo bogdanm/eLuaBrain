@@ -18,8 +18,6 @@
 #include "hostif.h"
 #endif
 
-#ifdef 
-
 // Validate eLua configuratin options
 #include "validate.h"
 
