@@ -94,9 +94,12 @@ int platform_init()
   }
   
   FSMC_SRAM_Init();
-  
+
   cmn_platform_init();
+
+#ifdef BUILD_VRAM
   vram_transfer_init();
+#endif  
   
   // All done
   return PLATFORM_OK;
@@ -138,7 +141,6 @@ NVIC_InitTypeDef nvic_init_structure_adc;
 static void NVIC_Configuration(void)
 {
   NVIC_InitTypeDef nvic_init_structure;
-  
 
 #ifdef  VECT_TAB_RAM
   /* Set the Vector Table base location at 0x20000000 */
@@ -172,6 +174,7 @@ static void NVIC_Configuration(void)
   NVIC_Init(&nvic_init_structure);
 #endif
 
+#ifdef BUILD_VRAM
   nvic_init_structure.NVIC_IRQChannel = EXTI1_IRQn;
   nvic_init_structure.NVIC_IRQChannelSubPriority = 0;
   nvic_init_structure.NVIC_IRQChannelCmd = ENABLE;
@@ -181,6 +184,7 @@ static void NVIC_Configuration(void)
   nvic_init_structure.NVIC_IRQChannelSubPriority = 2; 
   nvic_init_structure.NVIC_IRQChannelCmd = ENABLE; 
   NVIC_Init( &nvic_init_structure );  
+#endif  
 }
 
 // ****************************************************************************

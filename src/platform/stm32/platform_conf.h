@@ -14,7 +14,7 @@
 #define BUILD_XMODEM
 #define BUILD_SHELL
 #define BUILD_ROMFS
-//#define BUILD_MMCFS
+#define BUILD_MMCFS
 //#define BUILD_TERM_VRAM
 #define BUILD_TERM
 //#define BUILD_UIP
@@ -27,6 +27,8 @@
 //#define BUILD_CON_TCP
 //#define BUILD_VRAM
 #define BUILD_LINENOISE
+
+#define MMCFS_SDIO_STM32
 
 // *****************************************************************************
 // UART/Timer IDs configuration data (used in main.c)
@@ -180,6 +182,8 @@ u32 platform_s_cpu_get_frequency();
 #define EXTSRAM_SIZE          ( 512 * 2 * 1024 )
 #define MEM_START_ADDRESS     { ( void* )end, ( void* )EXTSRAM_START }
 #define MEM_END_ADDRESS       { ( void* )( SRAM_BASE + SRAM_SIZE - STACK_SIZE_TOTAL - 1 ), ( void* )( EXTSRAM_START + EXTSRAM_SIZE - 1 ) }
+//#define MEM_START_ADDRESS     { ( void* )end }
+//#define MEM_END_ADDRESS       { ( void* )( SRAM_BASE + SRAM_SIZE - STACK_SIZE_TOTAL - 1 ) }
 
 #endif // #ifndef __PLATFORM_CONF_H__
 

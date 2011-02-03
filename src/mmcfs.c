@@ -222,7 +222,11 @@ static int mmcfs_closedir_r( struct _reent *r, void *d )
 // MMC device descriptor structure
 static DM_DEVICE mmcfs_device =
 {
+#ifdef MMCFS_SDIO_STM32
+  "/nand",
+#else
   "/mmc",
+#endif  
   mmcfs_open_r,         // open
   mmcfs_close_r,        // close
   mmcfs_write_r,        // write

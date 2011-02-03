@@ -18,6 +18,8 @@
 #include "hostif.h"
 #endif
 
+#ifdef 
+
 // Validate eLua configuratin options
 #include "validate.h"
 
@@ -31,6 +33,8 @@ char *boot_order[] = {
 #if defined(BUILD_MMCFS)
 	"/mmc/autorun.lua",
 	"/mmc/autorun.lc",
+  "/nand/autorun.lua",
+  "/nand/autorun.lc",
 #endif
 #if defined(BUILD_ROMFS)
 	"/rom/autorun.lua",

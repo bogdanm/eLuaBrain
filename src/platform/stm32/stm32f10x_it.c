@@ -22,8 +22,10 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "stm32f10x_it.h"
+#include "sdcard.h"
 #include <stdio.h>
 #include "platform.h"
+
 /** @addtogroup Template_Project
   * @{
   */
@@ -189,6 +191,11 @@ void PendSV_Handler(void)
 {
 }
 
+void SDIO_IRQHandler(void)
+{
+  /* Process All SDIO Interrupt Sources */
+  SD_ProcessIRQSrc();
+}
 
 /******************************************************************************/
 /*                 STM32F10x Peripherals Interrupt Handlers                   */
