@@ -71,7 +71,7 @@ DSTATUS disk_initialize (
   SD_Init();
   SD_GetCardInfo(&SDCardInfo2);
   SD_SelectDeselect((uint32_t) (SDCardInfo2.RCA << 16));
-  SD_SetDeviceMode(SD_DMA_MODE);
+  SD_SetDeviceMode(SD_INTERRUPT_MODE);
   NVIC_InitTypeDef nvic_init_structure;
   nvic_init_structure.NVIC_IRQChannel = SDIO_IRQn;
   nvic_init_structure.NVIC_IRQChannelPreemptionPriority = 0;
@@ -109,19 +109,20 @@ DRESULT disk_read (
 	BYTE count			/* Sector count (1..255) */
 )
 {
-	uint16_t Transfer_Length;
-	uint32_t Memory_Offset;
-
-	Transfer_Length =  count * 512;
-	Memory_Offset = sector * 512;
-
 #ifdef USESDIO
-	SD_ReadBlock(Memory_Offset, (uint32_t *)buff, Transfer_Length);
-#else  
-	NAND_Read(Memory_Offset, (uint32_t *)buff, Transfer_Length);
-#endif
-
+  while( count )
+  {
+    if( SD_ReadBlock(sector * 512, (uint32_t *)buff, 512) != SD_OK )
+      return RES_ERROR;    
+    sector ++;
+    count --;
+    buff += 512;
+  }
 	return RES_OK;
+#else  
+	NAND_Read(sector * 512, (uint32_t *)buff, ( u16 )count * 512);
+	return RES_OK;
+#endif
 }
 
 
@@ -143,14 +144,21 @@ DRESULT disk_write (
 	Memory_Offset = sector * 512;
 
 #ifdef USESDIO
-  SD_WriteBlock(Memory_Offset, ( uint32_t* )buff, Transfer_Length);
+  while( count )
+  {
+    if( SD_WriteBlock(sector * 512, (uint32_t *)buff, 512) != SD_OK )
+      return RES_ERROR;    
+    sector ++;
+    count --;
+    buff += 512;
+  }
+	return RES_OK;
 #else
-	NAND_Write(Memory_Offset, (uint32_t *)buff, Transfer_Length);
+	NAND_Write(sector * 512, (uint32_t *)buff, ( u16 )count * 512);
 #endif
 	
 	return RES_OK;
 }
-
 
 /*-----------------------------------------------------------------------*/
 /* Get current time                                                      */
