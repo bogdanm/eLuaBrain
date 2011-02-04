@@ -660,8 +660,6 @@ static void uarts_init()
   RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART2, ENABLE);
   RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART3, ENABLE);
   RCC_APB1PeriphClockCmd(RCC_APB1Periph_UART4, ENABLE);
-  // NOTE: for whatever reason the next line messes up the SDIO on STM32F103ZE. So
-  // it's left commented out for now.
   // RCC_APB1PeriphClockCmd(RCC_APB1Periph_UART5, ENABLE);
 
   // Configure the U(S)ART
