@@ -46,9 +46,9 @@
 
 // Define this when SDIO will actually work; until then everything will 
 // happen in the (slow) internal NAND
-//#define USESDIO
+#define USESDIO
 
-#ifdef USDSDIO
+#ifdef USESDIO
 static SD_CardInfo SDCardInfo2;
 #endif
 
@@ -70,9 +70,7 @@ DSTATUS disk_initialize (
 #ifdef USESDIO
   SD_Init();
   SD_GetCardInfo(&SDCardInfo2);
-  printf( "Capacity: %d Block size: %d\n", SDCardInfo2.CardCapacity, SDCardInfo2.CardBlockSize );
   SD_SelectDeselect((uint32_t) (SDCardInfo2.RCA << 16));
-  SD_EnableWideBusOperation(SDIO_BusWide_4b);
   SD_SetDeviceMode(SD_DMA_MODE);
   NVIC_InitTypeDef nvic_init_structure;
   nvic_init_structure.NVIC_IRQChannel = SDIO_IRQn;
@@ -181,11 +179,12 @@ DRESULT disk_ioctl (
 	void *buff		// Buffer to send/receive control data
 )
 {		
-	DRESULT res = RES_OK;
+	DRESULT res= RES_OK;
+#ifdef USESDIO  
 	uint32_t status = SD_NO_TRANSFER;
-	//uint32_t status = NAND_READY;
-	
-
+#else  
+	uint32_t status = NAND_READY;
+#endif
 
 		switch (ctrl) {
 		case CTRL_SYNC :		/// Make sure that no pending write process
@@ -196,12 +195,17 @@ DRESULT disk_ioctl (
 			status = FSMC_NAND_GetStatus();
 			if (status == NAND_READY)
 #endif      
-				{res = RES_OK;}
-			else{res = RES_ERROR;}
+		    res = RES_OK;        
+			else
+        res = RES_ERROR;
 			break;
 
 		case GET_SECTOR_COUNT :	  // Get number of sectors on the disk (DWORD)
+#ifdef USESDIO    
 			*(DWORD*)buff = 131072;	// 4*1024*32 = 131072
+#else
+      *(DWORD*)buff = 65536  // 64M
+#endif      
 			res = RES_OK;
 			break;
 

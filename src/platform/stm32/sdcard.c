@@ -86,8 +86,8 @@
 #define SDIO_SEND_IF_COND               ((u32)0x00000008)
 
 #define SDIO_INIT_CLK_DIV                  ((u8)0xB2)
-#define SDIO_TRANSFER_CLK_DIV              ((u8)0x1) 
-
+#define SDIO_CARD_SPEED_MHZ                4
+#define SDIO_TRANSFER_CLK_DIV              ((u8)((72/SDIO_CARD_SPEED_MHZ)-2))
 typedef int bool;
 
 /* Private macro -------------------------------------------------------------*/
@@ -169,7 +169,7 @@ SD_Error SD_Init(void)
   SDIO_InitStructure.SDIO_ClockBypass = SDIO_ClockBypass_Disable;
   SDIO_InitStructure.SDIO_ClockPowerSave = SDIO_ClockPowerSave_Disable;
   SDIO_InitStructure.SDIO_BusWide = SDIO_BusWide_1b;
-  SDIO_InitStructure.SDIO_HardwareFlowControl = SDIO_HardwareFlowControl_Disable;
+  SDIO_InitStructure.SDIO_HardwareFlowControl = SDIO_HardwareFlowControl_Enable;
   SDIO_Init(&SDIO_InitStructure);
 
   return(errorstatus);
@@ -197,7 +197,7 @@ SD_Error SD_PowerON(void)
   SDIO_InitStructure.SDIO_ClockBypass = SDIO_ClockBypass_Disable;
   SDIO_InitStructure.SDIO_ClockPowerSave = SDIO_ClockPowerSave_Disable;
   SDIO_InitStructure.SDIO_BusWide = SDIO_BusWide_1b;
-  SDIO_InitStructure.SDIO_HardwareFlowControl = SDIO_HardwareFlowControl_Disable;
+  SDIO_InitStructure.SDIO_HardwareFlowControl = SDIO_HardwareFlowControl_Enable;
   SDIO_Init(&SDIO_InitStructure);
 
   /* Set Power State to ON */
@@ -679,7 +679,7 @@ SD_Error SD_EnableWideBusOperation(u32 WideMode)
         SDIO_InitStructure.SDIO_ClockBypass = SDIO_ClockBypass_Disable;
         SDIO_InitStructure.SDIO_ClockPowerSave = SDIO_ClockPowerSave_Disable;
         SDIO_InitStructure.SDIO_BusWide = SDIO_BusWide_4b;
-        SDIO_InitStructure.SDIO_HardwareFlowControl = SDIO_HardwareFlowControl_Disable;
+        SDIO_InitStructure.SDIO_HardwareFlowControl = SDIO_HardwareFlowControl_Enable;
         SDIO_Init(&SDIO_InitStructure);
       }
     }
@@ -695,7 +695,7 @@ SD_Error SD_EnableWideBusOperation(u32 WideMode)
         SDIO_InitStructure.SDIO_ClockBypass = SDIO_ClockBypass_Disable;
         SDIO_InitStructure.SDIO_ClockPowerSave = SDIO_ClockPowerSave_Disable;
         SDIO_InitStructure.SDIO_BusWide = SDIO_BusWide_1b;
-        SDIO_InitStructure.SDIO_HardwareFlowControl = SDIO_HardwareFlowControl_Disable;
+        SDIO_InitStructure.SDIO_HardwareFlowControl = SDIO_HardwareFlowControl_Enable;
         SDIO_Init(&SDIO_InitStructure);
       }
     }
