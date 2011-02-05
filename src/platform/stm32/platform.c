@@ -26,6 +26,9 @@
 #include "stm32f10x_exti.h"
 #include "stm32f10x_dma.h"
 #include "stm32f10x_spi.h"
+#include "lua.h"
+#include "lauxlib.h"
+#include "lrotable.h"
 
 // Clock data
 // IMPORTANT: if you change these, make sure to modify RCC_Configuration() too!
@@ -141,7 +144,7 @@ NVIC_InitTypeDef nvic_init_structure_adc;
 static void NVIC_Configuration(void)
 {
   NVIC_InitTypeDef nvic_init_structure;
-
+  
 #ifdef  VECT_TAB_RAM
   /* Set the Vector Table base location at 0x20000000 */
   NVIC_SetVectorTable(NVIC_VectTab_RAM, 0x0);
@@ -152,27 +155,6 @@ static void NVIC_Configuration(void)
 
   /* Configure the NVIC Preemption Priority Bits */
   NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2);
-
-#ifdef BUILD_ADC  
-  nvic_init_structure_adc.NVIC_IRQChannel = DMA1_Channel1_IRQn; 
-  nvic_init_structure_adc.NVIC_IRQChannelPreemptionPriority = 1; 
-  nvic_init_structure_adc.NVIC_IRQChannelSubPriority = 3; 
-  nvic_init_structure_adc.NVIC_IRQChannelCmd = DISABLE; 
-  NVIC_Init(&nvic_init_structure_adc);
-#endif
-
-#if defined( BUF_ENABLE_UART ) && defined( CON_BUF_SIZE )
-  /* Enable the USART1 Interrupt */
-  // [TODO]: this is hardcoded, and it shouldn't be
-  nvic_init_structure.NVIC_IRQChannel = USART3_IRQn;
-  nvic_init_structure.NVIC_IRQChannelSubPriority = 3;
-  nvic_init_structure.NVIC_IRQChannelCmd = ENABLE;
-  NVIC_Init(&nvic_init_structure);
-  nvic_init_structure.NVIC_IRQChannel = USART1_IRQn;
-  nvic_init_structure.NVIC_IRQChannelSubPriority = 3;
-  nvic_init_structure.NVIC_IRQChannelCmd = ENABLE;
-  NVIC_Init(&nvic_init_structure);
-#endif
 
 #ifdef BUILD_VRAM
   nvic_init_structure.NVIC_IRQChannel = EXTI1_IRQn;
@@ -185,6 +167,14 @@ static void NVIC_Configuration(void)
   nvic_init_structure.NVIC_IRQChannelCmd = ENABLE; 
   NVIC_Init( &nvic_init_structure );  
 #endif  
+
+#ifdef BUILD_ADC  
+  nvic_init_structure_adc.NVIC_IRQChannel = DMA1_Channel1_IRQn; 
+  nvic_init_structure_adc.NVIC_IRQChannelPreemptionPriority = 0; 
+  nvic_init_structure_adc.NVIC_IRQChannelSubPriority = 2; 
+  nvic_init_structure_adc.NVIC_IRQChannelCmd = DISABLE; 
+  NVIC_Init(&nvic_init_structure_adc);
+#endif
 }
 
 // ****************************************************************************
@@ -400,12 +390,12 @@ void platform_can_send( unsigned id, u32 canid, u8 idtype, u8 len, const u8 *dat
   
   switch( idtype )
   {
-    case 0: /* Standard ID Type  */
+    case ELUA_CAN_ID_STD:
       TxMessage.IDE = CAN_ID_STD;
       TxMessage.StdId = canid;
       break;
-    case 1: /* Extended ID Type */
-      TxMessage.IDE=CAN_ID_EXT;
+    case ELUA_CAN_ID_EXT:
+      TxMessage.IDE = CAN_ID_EXT;
       TxMessage.ExtId = canid;
       break;
   }
@@ -445,39 +435,36 @@ void USB_LP_CAN_RX0_IRQHandler(void)
   }*/
 }
 
-void platform_can_recv( unsigned id, u32 *canid, u8 *idtype, u8 *len, u8 *data )
+int platform_can_recv( unsigned id, u32 *canid, u8 *idtype, u8 *len, u8 *data )
 {
   CanRxMsg RxMessage;
   const char *s;
   char *d;
-  u32 i = 0;
-  
-  // Check up to 256 times for message
-  while( ( CAN_MessagePending(CAN1, CAN_FIFO0) < 1 ) && ( i++ != 0xFF ) );
-    
-  RxMessage.StdId=0x00;
-  RxMessage.IDE=CAN_ID_STD;
-  RxMessage.DLC=0;
-  RxMessage.Data[0]=0x00;
-  RxMessage.Data[1]=0x00;
-  CAN_Receive(CAN1, CAN_FIFO0, &RxMessage);
-  
-  if( RxMessage.IDE == CAN_ID_STD )
+
+  if( CAN_MessagePending( CAN1, CAN_FIFO0 ) > 0 )
   {
-    *canid = ( u32 )RxMessage.StdId;
-    *idtype = 0;
+    CAN_Receive(CAN1, CAN_FIFO0, &RxMessage);
+
+    if( RxMessage.IDE == CAN_ID_STD )
+    {
+      *canid = ( u32 )RxMessage.StdId;
+      *idtype = ELUA_CAN_ID_STD;
+    }
+    else
+    {
+      *canid = ( u32 )RxMessage.ExtId;
+      *idtype = ELUA_CAN_ID_EXT;
+    }
+
+    *len = RxMessage.DLC;
+
+    s = ( const char * )RxMessage.Data;
+    d = ( char* )data;
+    DUFF_DEVICE_8( RxMessage.DLC,  *d++ = *s++ );
+    return PLATFORM_OK;
   }
   else
-  {
-    *canid = ( u32 )RxMessage.ExtId;
-    *idtype = 1;
-  }
-  
-  *len = RxMessage.DLC;
-  
-  s = ( const char * )RxMessage.Data;
-  d = ( char* )data;
-  DUFF_DEVICE_8( RxMessage.DLC,  *d++ = *s++ );
+    return PLATFORM_UNDERFLOW;
 }
 
 // ****************************************************************************
@@ -585,42 +572,14 @@ void platform_spi_select( unsigned id, int is_select )
 // TODO: Support timeouts.
 
 // All possible STM32 uarts defs
-static USART_TypeDef *const usart[] =          { USART1, USART2, USART3, UART4, UART5 };
+USART_TypeDef *const stm32_usart[] =          { USART1, USART2, USART3, UART4, UART5 };
 static GPIO_TypeDef *const usart_gpio_rx_port[] = { GPIOA, GPIOA, GPIOB, GPIOC, GPIOD };
 static GPIO_TypeDef *const usart_gpio_tx_port[] = { GPIOA, GPIOA, GPIOB, GPIOC, GPIOC };
 static const u16 usart_gpio_rx_pin[] = { GPIO_Pin_10, GPIO_Pin_3, GPIO_Pin_11, GPIO_Pin_11, GPIO_Pin_2 };
 static const u16 usart_gpio_tx_pin[] = { GPIO_Pin_9, GPIO_Pin_2, GPIO_Pin_10, GPIO_Pin_10, GPIO_Pin_12 };
-
-#ifdef BUF_ENABLE_UART
-static void all_usart_irqhandler( int usart_id )
-{
-  int c;
-
-  if( USART_GetITStatus( usart[ usart_id ], USART_IT_RXNE ) != RESET )
-  {
-    /* Read one byte from the receive data register */
-    c = USART_ReceiveData( usart[ usart_id ] );
-    buf_write( BUF_ID_UART, usart_id, ( t_buf_data* )&c );
-  }
-}
-
-void USART1_IRQHandler( void )
-{
-  all_usart_irqhandler( 0 );
-}
-
-void USART2_IRQHandler(void)
-{
-  all_usart_irqhandler( 1 );
-}
-
-void USART3_IRQHandler(void)
-{
-  all_usart_irqhandler( 2 );
-}
-#endif
-
-
+static GPIO_TypeDef *const usart_gpio_hwflow_port[] = { GPIOA, GPIOA, GPIOB };
+static const u16 usart_gpio_cts_pin[] = { GPIO_Pin_11, GPIO_Pin_0, GPIO_Pin_13 };
+static const u16 usart_gpio_rts_pin[] = { GPIO_Pin_12, GPIO_Pin_1, GPIO_Pin_14 };
 
 static void usart_init(u32 id, USART_InitTypeDef * initVals)
 {
@@ -639,43 +598,19 @@ static void usart_init(u32 id, USART_InitTypeDef * initVals)
   GPIO_Init(usart_gpio_rx_port[id], &GPIO_InitStructure);
 
   /* Configure USART */
-  USART_Init(usart[id], initVals);
-  
-#if defined( BUF_ENABLE_UART ) && defined( CON_BUF_SIZE )
-  /* Enable USART1 Receive and Transmit interrupts */
-  USART_ITConfig(usart[id], USART_IT_RXNE, ENABLE);
-  //USART_ITConfig(usart[id], USART_IT_TXE, ENABLE);
-#endif
+  USART_Init(stm32_usart[id], initVals);
 
   /* Enable USART */
-  USART_Cmd(usart[id], ENABLE);
+  USART_Cmd(stm32_usart[id], ENABLE);
 }
 
 static void uarts_init()
 {
-  USART_InitTypeDef USART_InitStructure;
-
   // Enable clocks.
   RCC_APB2PeriphClockCmd(RCC_APB2Periph_USART1, ENABLE);
   RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART2, ENABLE);
   RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART3, ENABLE);
   RCC_APB1PeriphClockCmd(RCC_APB1Periph_UART4, ENABLE);
-  // RCC_APB1PeriphClockCmd(RCC_APB1Periph_UART5, ENABLE);
-
-  // Configure the U(S)ART
-  USART_InitStructure.USART_BaudRate = CON_UART_SPEED;
-  USART_InitStructure.USART_WordLength = USART_WordLength_8b;
-  USART_InitStructure.USART_StopBits = USART_StopBits_1;
-  USART_InitStructure.USART_Parity = USART_Parity_No;
-  USART_InitStructure.USART_HardwareFlowControl = USART_HardwareFlowControl_None;
-  USART_InitStructure.USART_Mode = USART_Mode_Rx | USART_Mode_Tx;
-
-#if defined( BUF_ENABLE_UART ) && defined( CON_BUF_SIZE )
-  buf_set( BUF_ID_UART, CON_UART_ID, CON_BUF_SIZE, BUF_DSIZE_U8 );
-#endif
-
-  usart_init(CON_UART_ID, &USART_InitStructure);
-
 }
 
 u32 platform_uart_setup( unsigned id, u32 baud, int databits, int parity, int stopbits )
@@ -734,27 +669,62 @@ u32 platform_uart_setup( unsigned id, u32 baud, int databits, int parity, int st
   return TRUE;
 }
 
-void platform_uart_send( unsigned id, u8 data )
+void platform_s_uart_send( unsigned id, u8 data )
 {
-  while(USART_GetFlagStatus(usart[id], USART_FLAG_TXE) == RESET)
+  while(USART_GetFlagStatus(stm32_usart[id], USART_FLAG_TXE) == RESET)
   {
   }
-  USART_SendData(usart[id], data);
+  USART_SendData(stm32_usart[id], data);
 }
 
 int platform_s_uart_recv( unsigned id, s32 timeout )
 {
   if( timeout == 0 )
   {
-    if (USART_GetFlagStatus(usart[id], USART_FLAG_RXNE) == RESET)
+    if (USART_GetFlagStatus(stm32_usart[id], USART_FLAG_RXNE) == RESET)
       return -1;
     else
-      return USART_ReceiveData(usart[id]);
+      return USART_ReceiveData(stm32_usart[id]);
   }
   // Receive char blocking
-  while(USART_GetFlagStatus(usart[id], USART_FLAG_RXNE) == RESET);
-  return USART_ReceiveData(usart[id]);
+  while(USART_GetFlagStatus(stm32_usart[id], USART_FLAG_RXNE) == RESET);
+  return USART_ReceiveData(stm32_usart[id]);
 }
+
+int platform_s_uart_set_flow_control( unsigned id, int type )
+{
+  USART_TypeDef *usart = stm32_usart[ id ]; 
+  int temp = 0;
+  GPIO_InitTypeDef GPIO_InitStructure;
+
+  if( id >= 3 ) // on STM32 only USART1 through USART3 have hardware flow control ([TODO] but only on high density devices?)
+    return PLATFORM_ERR;  
+  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING;  
+  if( type == PLATFORM_UART_FLOW_NONE )
+  {
+    usart->CR3 &= ~USART_HardwareFlowControl_RTS_CTS;
+    GPIO_InitStructure.GPIO_Pin = usart_gpio_rts_pin[ id ] | usart_gpio_cts_pin[ id ];
+    GPIO_Init( usart_gpio_hwflow_port[ id ], &GPIO_InitStructure );      
+    return PLATFORM_OK;
+  }
+  if( type & PLATFORM_UART_FLOW_RTS )
+  {
+    temp |= USART_HardwareFlowControl_RTS;
+    GPIO_InitStructure.GPIO_Speed = usart_gpio_rts_pin[ id ];
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP;
+    GPIO_Init( usart_gpio_hwflow_port[ id ], &GPIO_InitStructure );
+  }
+  if( type & PLATFORM_UART_FLOW_CTS )
+  {
+    temp |= USART_HardwareFlowControl_CTS;
+    GPIO_InitStructure.GPIO_Speed = usart_gpio_cts_pin[ id ];
+    GPIO_Init( usart_gpio_hwflow_port[ id ], &GPIO_InitStructure );
+  }
+  usart->CR3 |= temp;
+  return PLATFORM_OK;
+}
+
 
 // ****************************************************************************
 // Timers
@@ -790,9 +760,7 @@ static void timers_init()
 
   // Configure timers
   for( i = 0; i < NUM_TIMER; i ++ )
-  {
     timer_set_clock( i, TIM_STARTUP_CLOCK );
-  }
 }
 
 static u32 timer_get_clock( unsigned id )
@@ -869,6 +837,33 @@ u32 platform_s_timer_op( unsigned id, int op, u32 data )
   return res;
 }
 
+int platform_s_timer_set_match_int( unsigned id, u32 period_us, int type )
+{
+  return PLATFORM_TIMER_INT_INVALID_ID;
+}
+
+// ****************************************************************************
+// Quadrature Encoder Support (uses timers)
+// No pin configuration, many of the timers should work with default config if
+// pins aren't reconfigured for another peripheral
+
+void stm32_enc_init( unsigned id )
+{
+  TIM_TypeDef *ptimer = timer[ id ];
+
+  TIM_Cmd( ptimer, DISABLE );
+  TIM_DeInit( ptimer );
+  TIM_SetCounter( ptimer, 0 );
+  TIM_EncoderInterfaceConfig( ptimer, TIM_EncoderMode_TI12, TIM_ICPolarity_Rising, TIM_ICPolarity_Rising);
+  TIM_Cmd( ptimer, ENABLE );
+}
+
+void stm32_enc_set_counter( unsigned id, unsigned count )
+{
+  TIM_TypeDef *ptimer = timer[ id ];
+  
+  TIM_SetCounter( ptimer, ( u16 )count );
+}
 
 // ****************************************************************************
 // PWMs
@@ -1361,3 +1356,46 @@ static void vram_transfer_init()
   platform_pio_op( TIME_PORT, 1 << TIME_PIN, PLATFORM_IO_PIN_CLEAR );
   platform_pio_op( TIME_PORT, 1 << TIME_PIN, PLATFORM_IO_PIN_DIR_OUTPUT );  
 }
+
+// ****************************************************************************
+// Platform specific modules go here
+
+#ifdef ENABLE_ENC
+
+#define MIN_OPT_LEVEL 2
+#include "lrodefs.h"
+extern const LUA_REG_TYPE enc_map[];
+
+const LUA_REG_TYPE platform_map[] =
+{
+#if LUA_OPTIMIZE_MEMORY > 0
+  { LSTRKEY( "enc" ), LROVAL( enc_map ) },
+#endif
+  { LNILKEY, LNILVAL }
+};
+
+LUALIB_API int luaopen_platform( lua_State *L )
+{
+#if LUA_OPTIMIZE_MEMORY > 0
+  return 0;
+#else // #if LUA_OPTIMIZE_MEMORY > 0
+  luaL_register( L, PS_LIB_TABLE_NAME, platform_map );
+
+  // Setup the new tables inside platform table
+  lua_newtable( L );
+  luaL_register( L, NULL, enc_map );
+  lua_setfield( L, -2, "enc" );
+
+  return 1;
+#endif // #if LUA_OPTIMIZE_MEMORY > 0
+}
+
+#else // #ifdef ENABLE_ENC
+
+LUALIB_API int luaopen_platform( lua_State *L )
+{
+  return 0;
+}
+
+#endif // #ifdef ENABLE_ENC
+

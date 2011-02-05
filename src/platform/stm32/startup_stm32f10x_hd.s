@@ -28,8 +28,6 @@
  * <h2><center>&copy; COPYRIGHT 2009 STMicroelectronics</center></h2>
  */	
     
-#include "stacks.h" 
-    
     .syntax unified
 	.cpu cortex-m3
 	.fpu softvfp
@@ -52,10 +50,7 @@ defined in linker script */
 .word	_ebss
 /* stack used for SystemInit_ExtMemCtl; always internal RAM used */
 
-#define SRAM_ORIGIN           0x20000000
-#define SRAM_SIZE             ( 64 * 1024 )
-#define Initial_spTop         ( SRAM_ORIGIN + SRAM_SIZE )
-
+.equ  Initial_spTop,  0x20000400 
 .equ  BootRAM,        0xF1E0F85F
 /**
  * @brief  This is the code that gets called when the processor first

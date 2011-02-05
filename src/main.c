@@ -108,14 +108,15 @@ int main( void )
   dm_register( remotefs_init() );
 
   // Search for autorun files in the defined order and execute the 1st if found
-  for( i = 0; i < sizeof( boot_order )/sizeof( *boot_order ); i++ ){
-    if( ( fp = fopen( boot_order[i], "r" ) ) != NULL )
-	{
-	  fclose( fp );
-	  char* lua_argv[] = { "lua", boot_order[i], NULL };
-	  lua_main( 2, lua_argv );
-	  break; // autoruns only the first found
-	}
+  for( i = 0; i < sizeof( boot_order ) / sizeof( *boot_order ); i++ )
+  {
+    if( ( fp = fopen( boot_order[ i ], "r" ) ) != NULL )
+    {
+      fclose( fp );
+      char* lua_argv[] = { "lua", boot_order[i], NULL };
+      lua_main( 2, lua_argv );
+      break; // autoruns only the first found
+    }
   }
 
 #ifdef ELUA_BOOT_RPC
@@ -125,7 +126,6 @@ int main( void )
   // Run the shell
   if( shell_init() == 0 )
   {
-    printf( "Unable to initialize the eLua shell!\n" );
     // Start Lua directly
     char* lua_argv[] = { "lua", NULL };
     lua_main( 1, lua_argv );

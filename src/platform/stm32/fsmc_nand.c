@@ -1,8 +1,8 @@
-/******************** (C) COPYRIGHT 2008 STMicroelectronics ********************
+/******************** (C) COPYRIGHT 2009 STMicroelectronics ********************
 * File Name          : fsmc_nand.c
 * Author             : MCD Application Team
-* Version            : V1.1.2
-* Date               : 09/22/2008
+* Version            : V2.0.0
+* Date               : 04/27/2009
 * Description        : This file provides a set of functions needed to drive the
 *                      NAND512W3A2 memory mounted on STM3210E-EVAL board.
 ********************************************************************************
@@ -21,7 +21,7 @@
 
 #define FSMC_Bank_NAND     FSMC_Bank2_NAND
 #define Bank_NAND_ADDR     Bank2_NAND_ADDR 
-#define Bank2_NAND_ADDR    ((u32)0x70000000)
+#define Bank2_NAND_ADDR    ((uint32_t)0x70000000)
 
 /* Private macro -------------------------------------------------------------*/
 #define ROW_ADDRESS (Address.Page + (Address.Block + (Address.Zone * NAND_ZONE_SIZE)) * NAND_BLOCK_SIZE)
@@ -85,7 +85,6 @@ void FSMC_NAND_Init(void)
   FSMC_NANDInitStructure.FSMC_MemoryDataWidth = FSMC_MemoryDataWidth_8b;
   FSMC_NANDInitStructure.FSMC_ECC = FSMC_ECC_Enable;
   FSMC_NANDInitStructure.FSMC_ECCPageSize = FSMC_ECCPageSize_512Bytes;
-  FSMC_NANDInitStructure.FSMC_AddressLowMapping = FSMC_AddressLowMapping_Direct;
   FSMC_NANDInitStructure.FSMC_TCLRSetupTime = 0x00;
   FSMC_NANDInitStructure.FSMC_TARSetupTime = 0x00;
   FSMC_NANDInitStructure.FSMC_CommonSpaceTimingStruct = &p;
@@ -107,14 +106,14 @@ void FSMC_NAND_Init(void)
 *******************************************************************************/
 void FSMC_NAND_ReadID(NAND_IDTypeDef* NAND_ID)
 {
-  u32 data = 0;
+  uint32_t data = 0;
 
   /* Send Command to the command area */ 	
-  *(vu8 *)(Bank_NAND_ADDR | CMD_AREA) = 0x90;
-  *(vu8 *)(Bank_NAND_ADDR | ADDR_AREA) = 0x00;
+  *(__IO uint8_t *)(Bank_NAND_ADDR | CMD_AREA) = 0x90;
+  *(__IO uint8_t *)(Bank_NAND_ADDR | ADDR_AREA) = 0x00;
 
    /* Sequence to read ID from NAND flash */	
-   data = *(vu32 *)(Bank_NAND_ADDR | DATA_AREA);
+   data = *(__IO uint32_t *)(Bank_NAND_ADDR | DATA_AREA);
 
    NAND_ID->Maker_ID   = ADDR_1st_CYCLE (data);
    NAND_ID->Device_ID  = ADDR_2nd_CYCLE (data);
@@ -137,21 +136,21 @@ void FSMC_NAND_ReadID(NAND_IDTypeDef* NAND_ID)
 *                  - NAND_VALID_ADDRESS: When the new address is valid address
 *                  - NAND_INVALID_ADDRESS: When the new address is invalid address
 *******************************************************************************/
-u32 FSMC_NAND_WriteSmallPage(u8 *pBuffer, NAND_ADDRESS Address, u32 NumPageToWrite)
+uint32_t FSMC_NAND_WriteSmallPage(uint8_t *pBuffer, NAND_ADDRESS Address, uint32_t NumPageToWrite)
 {
-  u32 index = 0x00, numpagewritten = 0x00, addressstatus = NAND_VALID_ADDRESS;
-  u32 status = NAND_READY, size = 0x00;
+  uint32_t index = 0x00, numpagewritten = 0x00, addressstatus = NAND_VALID_ADDRESS;
+  uint32_t status = NAND_READY, size = 0x00;
 
   while((NumPageToWrite != 0x00) && (addressstatus == NAND_VALID_ADDRESS) && (status == NAND_READY))
   {
     /* Page write command and address */
-    *(vu8 *)(Bank_NAND_ADDR | CMD_AREA) = NAND_CMD_AREA_A;
-    *(vu8 *)(Bank_NAND_ADDR | CMD_AREA) = NAND_CMD_WRITE0;
+    *(__IO uint8_t *)(Bank_NAND_ADDR | CMD_AREA) = NAND_CMD_AREA_A;
+    *(__IO uint8_t *)(Bank_NAND_ADDR | CMD_AREA) = NAND_CMD_WRITE0;
 
-    *(vu8 *)(Bank_NAND_ADDR | ADDR_AREA) = 0x00;  
-    *(vu8 *)(Bank_NAND_ADDR | ADDR_AREA) = ADDR_1st_CYCLE(ROW_ADDRESS);  
-    *(vu8 *)(Bank_NAND_ADDR | ADDR_AREA) = ADDR_2nd_CYCLE(ROW_ADDRESS);  
-    *(vu8 *)(Bank_NAND_ADDR | ADDR_AREA) = ADDR_3rd_CYCLE(ROW_ADDRESS);  
+    *(__IO uint8_t *)(Bank_NAND_ADDR | ADDR_AREA) = 0x00;  
+    *(__IO uint8_t *)(Bank_NAND_ADDR | ADDR_AREA) = ADDR_1st_CYCLE(ROW_ADDRESS);  
+    *(__IO uint8_t *)(Bank_NAND_ADDR | ADDR_AREA) = ADDR_2nd_CYCLE(ROW_ADDRESS);  
+    *(__IO uint8_t *)(Bank_NAND_ADDR | ADDR_AREA) = ADDR_3rd_CYCLE(ROW_ADDRESS);  
 
     /* Calculate the size */
     size = NAND_PAGE_SIZE + (NAND_PAGE_SIZE * numpagewritten);
@@ -159,10 +158,10 @@ u32 FSMC_NAND_WriteSmallPage(u8 *pBuffer, NAND_ADDRESS Address, u32 NumPageToWri
     /* Write data */
     for(; index < size; index++)
     {
-      *(vu8 *)(Bank_NAND_ADDR | DATA_AREA) = pBuffer[index];
+      *(__IO uint8_t *)(Bank_NAND_ADDR | DATA_AREA) = pBuffer[index];
     }
     
-    *(vu8 *)(Bank_NAND_ADDR | CMD_AREA) = NAND_CMD_WRITE_TRUE1;
+    *(__IO uint8_t *)(Bank_NAND_ADDR | CMD_AREA) = NAND_CMD_WRITE_TRUE1;
 
     /* Check status for successful operation */
     status = FSMC_NAND_GetStatus();
@@ -197,22 +196,22 @@ u32 FSMC_NAND_WriteSmallPage(u8 *pBuffer, NAND_ADDRESS Address, u32 NumPageToWri
 *                  - NAND_VALID_ADDRESS: When the new address is valid address
 *                  - NAND_INVALID_ADDRESS: When the new address is invalid address
 *******************************************************************************/
-u32 FSMC_NAND_ReadSmallPage(u8 *pBuffer, NAND_ADDRESS Address, u32 NumPageToRead)
+uint32_t FSMC_NAND_ReadSmallPage(uint8_t *pBuffer, NAND_ADDRESS Address, uint32_t NumPageToRead)
 {
-  u32 index = 0x00, numpageread = 0x00, addressstatus = NAND_VALID_ADDRESS;
-  u32 status = NAND_READY, size = 0x00;
+  uint32_t index = 0x00, numpageread = 0x00, addressstatus = NAND_VALID_ADDRESS;
+  uint32_t status = NAND_READY, size = 0x00;
 
   while((NumPageToRead != 0x0) && (addressstatus == NAND_VALID_ADDRESS))
   {	   
     /* Page Read command and page address */
-    *(vu8 *)(Bank_NAND_ADDR | CMD_AREA) = NAND_CMD_AREA_A; 
+    *(__IO uint8_t *)(Bank_NAND_ADDR | CMD_AREA) = NAND_CMD_AREA_A; 
    
-    *(vu8 *)(Bank_NAND_ADDR | ADDR_AREA) = 0x00; 
-    *(vu8 *)(Bank_NAND_ADDR | ADDR_AREA) = ADDR_1st_CYCLE(ROW_ADDRESS); 
-    *(vu8 *)(Bank_NAND_ADDR | ADDR_AREA) = ADDR_2nd_CYCLE(ROW_ADDRESS); 
-    *(vu8 *)(Bank_NAND_ADDR | ADDR_AREA) = ADDR_3rd_CYCLE(ROW_ADDRESS); 
+    *(__IO uint8_t *)(Bank_NAND_ADDR | ADDR_AREA) = 0x00; 
+    *(__IO uint8_t *)(Bank_NAND_ADDR | ADDR_AREA) = ADDR_1st_CYCLE(ROW_ADDRESS); 
+    *(__IO uint8_t *)(Bank_NAND_ADDR | ADDR_AREA) = ADDR_2nd_CYCLE(ROW_ADDRESS); 
+    *(__IO uint8_t *)(Bank_NAND_ADDR | ADDR_AREA) = ADDR_3rd_CYCLE(ROW_ADDRESS); 
     
-    *(vu8 *)(Bank_NAND_ADDR | CMD_AREA) = NAND_CMD_AREA_TRUE1; 
+    *(__IO uint8_t *)(Bank_NAND_ADDR | CMD_AREA) = NAND_CMD_AREA_TRUE1; 
 
     /* Calculate the size */
     size = NAND_PAGE_SIZE + (NAND_PAGE_SIZE * numpageread);
@@ -220,7 +219,7 @@ u32 FSMC_NAND_ReadSmallPage(u8 *pBuffer, NAND_ADDRESS Address, u32 NumPageToRead
     /* Get Data into Buffer */    
     for(; index < size; index++)
     {
-      pBuffer[index]= *(vu8 *)(Bank_NAND_ADDR | DATA_AREA);
+      pBuffer[index]= *(__IO uint8_t *)(Bank_NAND_ADDR | DATA_AREA);
     }
 
     numpageread++;
@@ -252,21 +251,21 @@ u32 FSMC_NAND_ReadSmallPage(u8 *pBuffer, NAND_ADDRESS Address, u32 NumPageToRead
 *                  - NAND_VALID_ADDRESS: When the new address is valid address
 *                  - NAND_INVALID_ADDRESS: When the new address is invalid address
 *******************************************************************************/
-u32 FSMC_NAND_WriteSpareArea(u8 *pBuffer, NAND_ADDRESS Address, u32 NumSpareAreaTowrite)
+uint32_t FSMC_NAND_WriteSpareArea(uint8_t *pBuffer, NAND_ADDRESS Address, uint32_t NumSpareAreaTowrite)
 {
-  u32 index = 0x00, numsparesreawritten = 0x00, addressstatus = NAND_VALID_ADDRESS;
-  u32 status = NAND_READY, size = 0x00; 
+  uint32_t index = 0x00, numsparesreawritten = 0x00, addressstatus = NAND_VALID_ADDRESS;
+  uint32_t status = NAND_READY, size = 0x00; 
 
   while((NumSpareAreaTowrite != 0x00) && (addressstatus == NAND_VALID_ADDRESS) && (status == NAND_READY))
   {
     /* Page write Spare area command and address */
-    *(vu8 *)(Bank_NAND_ADDR | CMD_AREA) = NAND_CMD_AREA_C;
-    *(vu8 *)(Bank_NAND_ADDR | CMD_AREA) = NAND_CMD_WRITE0;
+    *(__IO uint8_t *)(Bank_NAND_ADDR | CMD_AREA) = NAND_CMD_AREA_C;
+    *(__IO uint8_t *)(Bank_NAND_ADDR | CMD_AREA) = NAND_CMD_WRITE0;
 
-    *(vu8 *)(Bank_NAND_ADDR | ADDR_AREA) = 0x00; 
-    *(vu8 *)(Bank_NAND_ADDR | ADDR_AREA) = ADDR_1st_CYCLE(ROW_ADDRESS); 
-    *(vu8 *)(Bank_NAND_ADDR | ADDR_AREA) = ADDR_2nd_CYCLE(ROW_ADDRESS); 
-    *(vu8 *)(Bank_NAND_ADDR | ADDR_AREA) = ADDR_3rd_CYCLE(ROW_ADDRESS); 
+    *(__IO uint8_t *)(Bank_NAND_ADDR | ADDR_AREA) = 0x00; 
+    *(__IO uint8_t *)(Bank_NAND_ADDR | ADDR_AREA) = ADDR_1st_CYCLE(ROW_ADDRESS); 
+    *(__IO uint8_t *)(Bank_NAND_ADDR | ADDR_AREA) = ADDR_2nd_CYCLE(ROW_ADDRESS); 
+    *(__IO uint8_t *)(Bank_NAND_ADDR | ADDR_AREA) = ADDR_3rd_CYCLE(ROW_ADDRESS); 
 
     /* Calculate the size */ 
     size = NAND_SPARE_AREA_SIZE + (NAND_SPARE_AREA_SIZE * numsparesreawritten);
@@ -274,10 +273,10 @@ u32 FSMC_NAND_WriteSpareArea(u8 *pBuffer, NAND_ADDRESS Address, u32 NumSpareArea
     /* Write the data */ 
     for(; index < size; index++)
     {
-      *(vu8 *)(Bank_NAND_ADDR | DATA_AREA) = pBuffer[index];
+      *(__IO uint8_t *)(Bank_NAND_ADDR | DATA_AREA) = pBuffer[index];
     }
     
-    *(vu8 *)(Bank_NAND_ADDR | CMD_AREA) = NAND_CMD_WRITE_TRUE1;
+    *(__IO uint8_t *)(Bank_NAND_ADDR | CMD_AREA) = NAND_CMD_WRITE_TRUE1;
 
     /* Check status for successful operation */
     status = FSMC_NAND_GetStatus();
@@ -312,22 +311,22 @@ u32 FSMC_NAND_WriteSpareArea(u8 *pBuffer, NAND_ADDRESS Address, u32 NumSpareArea
 *                  - NAND_VALID_ADDRESS: When the new address is valid address
 *                  - NAND_INVALID_ADDRESS: When the new address is invalid address
 *******************************************************************************/
-u32 FSMC_NAND_ReadSpareArea(u8 *pBuffer, NAND_ADDRESS Address, u32 NumSpareAreaToRead)
+uint32_t FSMC_NAND_ReadSpareArea(uint8_t *pBuffer, NAND_ADDRESS Address, uint32_t NumSpareAreaToRead)
 {
-  u32 numsparearearead = 0x00, index = 0x00, addressstatus = NAND_VALID_ADDRESS;
-  u32 status = NAND_READY, size = 0x00;
+  uint32_t numsparearearead = 0x00, index = 0x00, addressstatus = NAND_VALID_ADDRESS;
+  uint32_t status = NAND_READY, size = 0x00;
 
   while((NumSpareAreaToRead != 0x0) && (addressstatus == NAND_VALID_ADDRESS))
   {     
     /* Page Read command and page address */     
-    *(vu8 *)(Bank_NAND_ADDR | CMD_AREA) = NAND_CMD_AREA_C;
+    *(__IO uint8_t *)(Bank_NAND_ADDR | CMD_AREA) = NAND_CMD_AREA_C;
 
-    *(vu8 *)(Bank_NAND_ADDR | ADDR_AREA) = 0x00; 
-    *(vu8 *)(Bank_NAND_ADDR | ADDR_AREA) = ADDR_1st_CYCLE(ROW_ADDRESS);     
-    *(vu8 *)(Bank_NAND_ADDR | ADDR_AREA) = ADDR_2nd_CYCLE(ROW_ADDRESS);     
-    *(vu8 *)(Bank_NAND_ADDR | ADDR_AREA) = ADDR_3rd_CYCLE(ROW_ADDRESS);    
+    *(__IO uint8_t *)(Bank_NAND_ADDR | ADDR_AREA) = 0x00; 
+    *(__IO uint8_t *)(Bank_NAND_ADDR | ADDR_AREA) = ADDR_1st_CYCLE(ROW_ADDRESS);     
+    *(__IO uint8_t *)(Bank_NAND_ADDR | ADDR_AREA) = ADDR_2nd_CYCLE(ROW_ADDRESS);     
+    *(__IO uint8_t *)(Bank_NAND_ADDR | ADDR_AREA) = ADDR_3rd_CYCLE(ROW_ADDRESS);    
 
-    *(vu8 *)(Bank_NAND_ADDR | CMD_AREA) = NAND_CMD_AREA_TRUE1;
+    *(__IO uint8_t *)(Bank_NAND_ADDR | CMD_AREA) = NAND_CMD_AREA_TRUE1;
 
     /* Data Read */
     size = NAND_SPARE_AREA_SIZE +  (NAND_SPARE_AREA_SIZE * numsparearearead);
@@ -335,7 +334,7 @@ u32 FSMC_NAND_ReadSpareArea(u8 *pBuffer, NAND_ADDRESS Address, u32 NumSpareAreaT
     /* Get Data into Buffer */
     for ( ;index < size; index++)
     {
-      pBuffer[index] = *(vu8 *)(Bank_NAND_ADDR | DATA_AREA);
+      pBuffer[index] = *(__IO uint8_t *)(Bank_NAND_ADDR | DATA_AREA);
     }
     
     numsparearearead++;
@@ -361,15 +360,15 @@ u32 FSMC_NAND_ReadSpareArea(u8 *pBuffer, NAND_ADDRESS Address, u32 NumSpareAreaT
 *                     a Timeout error
 *                   - NAND_READY: when memory is ready for the next operation 
 *******************************************************************************/
-u32 FSMC_NAND_EraseBlock(NAND_ADDRESS Address)
+uint32_t FSMC_NAND_EraseBlock(NAND_ADDRESS Address)
 {
-  *(vu8 *)(Bank_NAND_ADDR | CMD_AREA) = NAND_CMD_ERASE0;
+  *(__IO uint8_t *)(Bank_NAND_ADDR | CMD_AREA) = NAND_CMD_ERASE0;
 
-  *(vu8 *)(Bank_NAND_ADDR | ADDR_AREA) = ADDR_1st_CYCLE(ROW_ADDRESS);
-  *(vu8 *)(Bank_NAND_ADDR | ADDR_AREA) = ADDR_2nd_CYCLE(ROW_ADDRESS);
-  *(vu8 *)(Bank_NAND_ADDR | ADDR_AREA) = ADDR_3rd_CYCLE(ROW_ADDRESS);
+  *(__IO uint8_t *)(Bank_NAND_ADDR | ADDR_AREA) = ADDR_1st_CYCLE(ROW_ADDRESS);
+  *(__IO uint8_t *)(Bank_NAND_ADDR | ADDR_AREA) = ADDR_2nd_CYCLE(ROW_ADDRESS);
+  *(__IO uint8_t *)(Bank_NAND_ADDR | ADDR_AREA) = ADDR_3rd_CYCLE(ROW_ADDRESS);
 		
-  *(vu8 *)(Bank_NAND_ADDR | CMD_AREA) = NAND_CMD_ERASE1; 
+  *(__IO uint8_t *)(Bank_NAND_ADDR | CMD_AREA) = NAND_CMD_ERASE1; 
 
   return (FSMC_NAND_GetStatus());
 }
@@ -381,9 +380,9 @@ u32 FSMC_NAND_EraseBlock(NAND_ADDRESS Address)
 * Output         : None
 * Return         : NAND_READY
 *******************************************************************************/
-u32 FSMC_NAND_Reset(void)
+uint32_t FSMC_NAND_Reset(void)
 {
-  *(vu8 *)(Bank_NAND_ADDR | CMD_AREA) = NAND_CMD_RESET;
+  *(__IO uint8_t *)(Bank_NAND_ADDR | CMD_AREA) = NAND_CMD_RESET;
 
   return (NAND_READY);
 }
@@ -398,9 +397,9 @@ u32 FSMC_NAND_Reset(void)
 *                     a Timeout error
 *                   - NAND_READY: when memory is ready for the next operation    
 *******************************************************************************/
-u32 FSMC_NAND_GetStatus(void)
+uint32_t FSMC_NAND_GetStatus(void)
 {
-  u32 timeout = 0x1000000, status = NAND_READY;
+  uint32_t timeout = 0x1000000, status = NAND_READY;
 
   status = FSMC_NAND_ReadStatus(); 
 
@@ -429,13 +428,13 @@ u32 FSMC_NAND_GetStatus(void)
 *                   - NAND_READY: when memory is ready for the next operation    
 *                   - NAND_ERROR: when the previous operation gererates error   
 *******************************************************************************/
-u32 FSMC_NAND_ReadStatus(void)
+uint32_t FSMC_NAND_ReadStatus(void)
 {
-  u32 data = 0x00, status = NAND_BUSY;
+  uint32_t data = 0x00, status = NAND_BUSY;
 
   /* Read status operation ------------------------------------ */
-  *(vu8 *)(Bank_NAND_ADDR | CMD_AREA) = NAND_CMD_STATUS;
-  data = *(vu8 *)(Bank_NAND_ADDR);
+  *(__IO uint8_t *)(Bank_NAND_ADDR | CMD_AREA) = NAND_CMD_STATUS;
+  data = *(__IO uint8_t *)(Bank_NAND_ADDR);
 
   if((data & NAND_ERROR) == NAND_ERROR)
   {
@@ -462,9 +461,9 @@ u32 FSMC_NAND_ReadStatus(void)
 *                  - NAND_VALID_ADDRESS: When the new address is valid address
 *                  - NAND_INVALID_ADDRESS: When the new address is invalid address
 *******************************************************************************/
-u32 FSMC_NAND_AddressIncrement(NAND_ADDRESS* Address)
+uint32_t FSMC_NAND_AddressIncrement(NAND_ADDRESS* Address)
 {
-  u32 status = NAND_VALID_ADDRESS;
+  uint32_t status = NAND_VALID_ADDRESS;
  
   Address->Page++;
 
@@ -488,4 +487,4 @@ u32 FSMC_NAND_AddressIncrement(NAND_ADDRESS* Address)
   return (status);
 }
 
-/******************* (C) COPYRIGHT 2008 STMicroelectronics *****END OF FILE****/
+/******************* (C) COPYRIGHT 2009 STMicroelectronics *****END OF FILE****/

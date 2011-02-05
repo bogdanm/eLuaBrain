@@ -53,7 +53,7 @@ void NMI_Handler(void)
 #if 0
 int fputc(int ch, FILE *f)
 {
-   platform_uart_send(0, ch);
+   platform_s_uart_send(0, ch);
    return ch;
 }
 #endif
@@ -123,10 +123,10 @@ void MemManage_Handler(void)
 /* Go to infinite loop when Memory Manage exception occurs */
 while (1)
 {
-  platform_uart_send(0, ' ');
-  platform_uart_send(0, 'M');
-  platform_uart_send(0, 'M');
-  platform_uart_send(0, '!');
+  platform_s_uart_send(0, ' ');
+  platform_s_uart_send(0, 'M');
+  platform_s_uart_send(0, 'M');
+  platform_s_uart_send(0, '!');
 }
 }
 
@@ -140,10 +140,10 @@ void BusFault_Handler(void)
 /* Go to infinite loop when Bus Fault exception occurs */
 while (1)
 {
-  platform_uart_send(0, ' ');
-  platform_uart_send(0, 'B');
-  platform_uart_send(0, 'F');
-  platform_uart_send(0, '!');
+  platform_s_uart_send(0, ' ');
+  platform_s_uart_send(0, 'B');
+  platform_s_uart_send(0, 'F');
+  platform_s_uart_send(0, '!');
 }
 }
 
@@ -157,10 +157,10 @@ void UsageFault_Handler(void)
 /* Go to infinite loop when Usage Fault exception occurs */
 while (1)
 {
-  platform_uart_send(0, ' ');
-  platform_uart_send(0, 'U');
-  platform_uart_send(0, 'F');
-  platform_uart_send(0, '!');
+  platform_s_uart_send(0, ' ');
+  platform_s_uart_send(0, 'U');
+  platform_s_uart_send(0, 'F');
+  platform_s_uart_send(0, '!');
 }
 }
 

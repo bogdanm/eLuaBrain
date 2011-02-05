@@ -89,6 +89,8 @@
 #define SDIO_CARD_SPEED_MHZ                4
 #define SDIO_TRANSFER_CLK_DIV              ((u8)((72/SDIO_CARD_SPEED_MHZ)-2))
 typedef int bool;
+#define FALSE 0
+#define TRUE  1
 
 /* Private macro -------------------------------------------------------------*/
 /* Private variables ---------------------------------------------------------*/

@@ -44,10 +44,6 @@
 #include "fsmc_nand.h"
 #include <stdio.h>
 
-// Define this when SDIO will actually work; until then everything will 
-// happen in the (slow) internal NAND
-//#define USESDIO
-
 static SD_CardInfo SDCardInfo2;
 
 /*--------------------------------------------------------------------------

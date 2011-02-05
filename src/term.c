@@ -117,7 +117,7 @@ void term_putstr( const char* str, unsigned size )
     size --;
   }
 }
- 
+
 // Return the cursor "x" position
 unsigned term_get_cx()
 {
