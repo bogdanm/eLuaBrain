@@ -46,11 +46,9 @@
 
 // Define this when SDIO will actually work; until then everything will 
 // happen in the (slow) internal NAND
-#define USESDIO
+//#define USESDIO
 
-#ifdef USESDIO
 static SD_CardInfo SDCardInfo2;
-#endif
 
 /*--------------------------------------------------------------------------
 
@@ -67,21 +65,24 @@ DSTATUS disk_initialize (
 	BYTE drv		/* Physical drive number (0) */
 )
 {
-#ifdef USESDIO
-  SD_Init();
-  SD_GetCardInfo(&SDCardInfo2);
-  SD_SelectDeselect((uint32_t) (SDCardInfo2.RCA << 16));
-  SD_SetDeviceMode(SD_INTERRUPT_MODE);
-  NVIC_InitTypeDef nvic_init_structure;
-  nvic_init_structure.NVIC_IRQChannel = SDIO_IRQn;
-  nvic_init_structure.NVIC_IRQChannelPreemptionPriority = 0;
-  nvic_init_structure.NVIC_IRQChannelSubPriority = 0;
-  nvic_init_structure.NVIC_IRQChannelCmd = ENABLE;
-  NVIC_Init(&nvic_init_structure);
-#else  
-  RCC_AHBPeriphClockCmd(RCC_AHBPeriph_FSMC, ENABLE);
-	NAND_Init();
-#endif  
+  if( drv == 0 )
+  {
+    SD_Init();
+    SD_GetCardInfo(&SDCardInfo2);
+    SD_SelectDeselect((uint32_t) (SDCardInfo2.RCA << 16));
+    SD_SetDeviceMode(SD_INTERRUPT_MODE);
+    NVIC_InitTypeDef nvic_init_structure;
+    nvic_init_structure.NVIC_IRQChannel = SDIO_IRQn;
+    nvic_init_structure.NVIC_IRQChannelPreemptionPriority = 0;
+    nvic_init_structure.NVIC_IRQChannelSubPriority = 0;
+    nvic_init_structure.NVIC_IRQChannelCmd = ENABLE;
+    NVIC_Init(&nvic_init_structure);
+  } 
+  else 
+  {
+    RCC_AHBPeriphClockCmd(RCC_AHBPeriph_FSMC, ENABLE);
+  	NAND_Init();
+  }
 	return 0;
 }
 
@@ -109,22 +110,24 @@ DRESULT disk_read (
 	BYTE count			/* Sector count (1..255) */
 )
 {
-#ifdef USESDIO
   while( count )
   {
-    if( SD_ReadBlock(sector * 512, (uint32_t *)buff, 512) != SD_OK )
-      return RES_ERROR;    
+    if( drv == 0 )
+    {
+      if( SD_ReadBlock(sector * 512, (uint32_t *)buff, 512) != SD_OK )
+        return RES_ERROR;    
+    }
+    else
+    {
+	    if( NAND_Read(sector * 512, (uint32_t *)buff, 512) != NAND_OK )
+        return RES_ERROR;
+    }
     sector ++;
     count --;
     buff += 512;
   }
 	return RES_OK;
-#else  
-	NAND_Read(sector * 512, (uint32_t *)buff, ( u16 )count * 512);
-	return RES_OK;
-#endif
 }
-
 
 /*-----------------------------------------------------------------------*/
 /* Write Sector(s)                                                       */
@@ -137,26 +140,22 @@ DRESULT disk_write (
 	BYTE count			/* Sector count (1..255) */
 )
 {
-	uint16_t Transfer_Length;
-	uint32_t Memory_Offset;
-
-	Transfer_Length =  count * 512;
-	Memory_Offset = sector * 512;
-
-#ifdef USESDIO
   while( count )
   {
-    if( SD_WriteBlock(sector * 512, (uint32_t *)buff, 512) != SD_OK )
-      return RES_ERROR;    
+    if( drv == 0 )
+    {
+      if( SD_WriteBlock(sector * 512, (uint32_t *)buff, 512) != SD_OK )
+        return RES_ERROR;    
+    }
+    else
+    {
+      if( NAND_Write(sector * 512, (uint32_t *)buff, 512) != NAND_OK )
+        return RES_ERROR;
+    }
     sector ++;
     count --;
     buff += 512;
   }
-	return RES_OK;
-#else
-	NAND_Write(sector * 512, (uint32_t *)buff, ( u16 )count * 512);
-#endif
-	
 	return RES_OK;
 }
 
@@ -188,44 +187,32 @@ DRESULT disk_ioctl (
 )
 {		
 	DRESULT res= RES_OK;
-#ifdef USESDIO  
-	uint32_t status = SD_NO_TRANSFER;
-#else  
-	uint32_t status = NAND_READY;
-#endif
 
-		switch (ctrl) {
-		case CTRL_SYNC :		/// Make sure that no pending write process
-#ifdef USESDIO
-			status = SD_GetTransferState();
-			if (status == SD_NO_TRANSFER)
-#else      
-			status = FSMC_NAND_GetStatus();
-			if (status == NAND_READY)
-#endif      
-		    res = RES_OK;        
-			else
-        res = RES_ERROR;
-			break;
+  switch (ctrl) {
+  case CTRL_SYNC :		/// Make sure that no pending write process
+    if( drv == 0 )
+      res = SD_GetTransferState() == SD_NO_TRANSFER ? RES_OK : RES_ERROR;
+    else
+      res = FSMC_NAND_GetStatus() == NAND_READY ? RES_OK : RES_ERROR;
+    break;
 
-		case GET_SECTOR_COUNT :	  // Get number of sectors on the disk (DWORD)
-#ifdef USESDIO    
-			*(DWORD*)buff = 131072;	// 4*1024*32 = 131072
-#else
-      *(DWORD*)buff = 65536  // 64M
-#endif      
-			res = RES_OK;
-			break;
+  case GET_SECTOR_COUNT :	  // Get number of sectors on the disk (DWORD)
+    if( drv == 0 )
+      *( DWORD* )buff = 131072; // [TODO] we should actually remember the disk size!
+    else
+      *( DWORD* )buff = 65536;
+    res = RES_OK;
+    break;
 
-		case GET_SECTOR_SIZE :	  // Get R/W sector size (WORD) 
-			*(WORD*)buff = 512;
-			res = RES_OK;
-			break;
+  case GET_SECTOR_SIZE :	  // Get R/W sector size (WORD) 
+    *(WORD*)buff = 512;
+    res = RES_OK;
+    break;
 
-		case GET_BLOCK_SIZE :	    // Get erase block size in unit of sector (DWORD)
-			*(DWORD*)buff = 32;
-			res = RES_OK;
-		  }
+  case GET_BLOCK_SIZE :	    // Get erase block size in unit of sector (DWORD)
+    *(DWORD*)buff = 32;
+    res = RES_OK;
+    }
 	  
 	return res;
 }

@@ -19,6 +19,7 @@ static int mmcfs_num_fd;
 
 // Data structures used by FatFs
 static FATFS mmc_fs;
+static FATFS nand_fs;
 static FIL mmc_fileObject;
 //static DIR mmc_dir;
 //static FILINFO mmc_fileInfo;
@@ -36,7 +37,7 @@ static int mmcfs_find_empty_fd( void )
   return -1;
 }
 
-static int mmcfs_open_r( struct _reent *r, const char *path, int flags, int mode )
+static int mmcfs_open_r( struct _reent *r, const char *path, int flags, int mode, int devid )
 {
   int fd;
   int mmc_mode;
@@ -48,7 +49,9 @@ static int mmcfs_open_r( struct _reent *r, const char *path, int flags, int mode
   }
 
   // Default to top directory if none given
-  mmc_pathBuf[0] = 0;
+  mmc_pathBuf[0] = devid + '0';
+  mmc_pathBuf[1] = ':';
+  mmc_pathBuf[2] = 0;
   if (strchr(path, '/') == NULL)
     strcat(mmc_pathBuf, "/");
   strcat(mmc_pathBuf, path);
@@ -98,6 +101,16 @@ static int mmcfs_open_r( struct _reent *r, const char *path, int flags, int mode
   memcpy(mmcfs_fd_table + fd, &mmc_fileObject, sizeof(FIL));
   mmcfs_num_fd ++;
   return fd;
+}
+
+static int mmcfs_open_r_mmc( struct _reent *r, const char *path, int flags, int mode )
+{
+  return mmcfs_open_r( r, path, flags, mode, 0 );
+}
+
+static int mmcfs_open_r_nand( struct _reent *r, const char *path, int flags, int mode )
+{
+  return mmcfs_open_r( r, path, flags, mode, 1 );
 }
 
 static int mmcfs_close_r( struct _reent *r, int fd )
@@ -169,12 +182,25 @@ static off_t mmcfs_lseek_r( struct _reent *r, int fd, off_t off, int whence )
 
 // opendir
 static DIR mmc_dir;
-static void* mmcfs_opendir_r( struct _reent *r, const char* dname )
+static void* mmcfs_opendir_r( struct _reent *r, const char* dname, int devnum )
 {
   void* res = NULL;
+  mmc_pathBuf[0] = devnum + '0';
+  mmc_pathBuf[1] = 0;
+  strcat(mmc_pathBuf, ":/" );
   if( !dname || strlen( dname ) == 0 || ( strlen( dname ) == 1 && !strcmp( dname, "/" ) ) )
-    res = f_opendir( &mmc_dir, "/" ) != FR_OK ? NULL : &mmc_dir; 
+    res = f_opendir( &mmc_dir, mmc_pathBuf ) != FR_OK ? NULL : &mmc_dir; 
   return res;
+}
+
+static void* mmcfs_opendir_r_mmc( struct _reent *r, const char* dname )
+{ 
+  return mmcfs_opendir_r( r, dname, 0 );
+}
+
+static void* mmcfs_opendir_r_nand( struct _reent *r, const char* dname )
+{
+  return mmcfs_opendir_r( r, dname, 1 );
 }
 
 // readdir
@@ -223,23 +249,40 @@ static int mmcfs_closedir_r( struct _reent *r, void *d )
 static DM_DEVICE mmcfs_device =
 {
   "/mmc",
-  mmcfs_open_r,         // open
+  mmcfs_open_r_mmc,     // open
   mmcfs_close_r,        // close
   mmcfs_write_r,        // write
   mmcfs_read_r,         // read
   mmcfs_lseek_r,        // lseek
-  mmcfs_opendir_r,      // opendir
+  mmcfs_opendir_r_mmc,  // opendir
   mmcfs_readdir_r,      // readdir
   mmcfs_closedir_r      // closedir
 };
 
-const DM_DEVICE* mmcfs_init()
+// MMC device descriptor structure (NAND)
+static DM_DEVICE nand_device =
 {
-  // Mount the MMC file system using logical disk 0
-  if ( f_mount( 0, &mmc_fs ) != FR_OK )
+  "/nand",
+  mmcfs_open_r_nand,    // open
+  mmcfs_close_r,        // close
+  mmcfs_write_r,        // write
+  mmcfs_read_r,         // read
+  mmcfs_lseek_r,        // lseek
+  mmcfs_opendir_r_nand, // opendir
+  mmcfs_readdir_r,      // readdir
+  mmcfs_closedir_r      // closedir
+};
+
+const DM_DEVICE* mmcfs_init( unsigned i )
+{
+  if( i >= 2 )
     return NULL;
 
-  return &mmcfs_device;
+  // Mount the MMC file system using logical disk 0
+  if ( f_mount( i, i == 0 ? &mmc_fs : &nand_fs ) != FR_OK )
+    return NULL;
+
+  return i == 0 ? &mmcfs_device : &nand_device;
 }
 
 #else // #ifdef BUILD_MMCFS

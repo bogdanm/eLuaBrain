@@ -119,7 +119,7 @@
 / Physical Drive Configurations
 /----------------------------------------------------------------------------*/
 
-#define _DRIVES		1
+#define _DRIVES		2
 /* Number of volumes (logical drives) to be used. */
 
 
