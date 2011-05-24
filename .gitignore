@@ -1,11 +1,19 @@
-*.o
+.build/
+*.hex
 *.elf
+*.o
+*.obj
+*.exe
 *.bin
 *.pyc
-*.hex
+inc/romfiles.h
+*.swp
+.sconf_temp/
 .sconsign.dblite
 config.log
-inc/romfiles.h
-.sconf_temp
+mux*
+rfs_server*
+doc/dist
+doc/cache
 luarpc
 

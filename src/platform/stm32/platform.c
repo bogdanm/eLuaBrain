@@ -85,7 +85,7 @@ int platform_init()
   // Setup ADCs
   adcs_init();
 #endif
-  
+
   // Setup CANs
   cans_init();
   
@@ -283,7 +283,10 @@ pio_type platform_pio_op( unsigned port, pio_type pinmask, int op )
 
 void cans_init( void )
 {
-  /* CAN Periph clock enable */
+  // Remap CAN to PB8/9
+  GPIO_PinRemapConfig( GPIO_Remap1_CAN1, ENABLE );
+
+  // CAN Periph clock enable
   RCC_APB1PeriphClockCmd(RCC_APB1Periph_CAN1, ENABLE);
 }
 
@@ -317,8 +320,6 @@ u32 platform_can_setup( unsigned id, u32 clock )
   GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP;
   GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
   GPIO_Init( GPIOB, &GPIO_InitStructure );
-  
-  GPIO_PinRemapConfig( GPIO_Remap1_CAN1, ENABLE );
 
   // Select baud rate up to requested rate, except for below min, where min is selected
   if ( clock >= can_baud_rate[ CAN_BAUD_COUNT - 1 ] ) // round down to peak rate if >= peak rate
@@ -698,9 +699,11 @@ int platform_s_uart_set_flow_control( unsigned id, int type )
   GPIO_InitTypeDef GPIO_InitStructure;
 
   if( id >= 3 ) // on STM32 only USART1 through USART3 have hardware flow control ([TODO] but only on high density devices?)
-    return PLATFORM_ERR;  
+    return PLATFORM_ERR;
+
   GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING;  
+  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING;
+
   if( type == PLATFORM_UART_FLOW_NONE )
   {
     usart->CR3 &= ~USART_HardwareFlowControl_RTS_CTS;
@@ -708,17 +711,17 @@ int platform_s_uart_set_flow_control( unsigned id, int type )
     GPIO_Init( usart_gpio_hwflow_port[ id ], &GPIO_InitStructure );      
     return PLATFORM_OK;
   }
-  if( type & PLATFORM_UART_FLOW_RTS )
-  {
-    temp |= USART_HardwareFlowControl_RTS;
-    GPIO_InitStructure.GPIO_Speed = usart_gpio_rts_pin[ id ];
-    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP;
-    GPIO_Init( usart_gpio_hwflow_port[ id ], &GPIO_InitStructure );
-  }
   if( type & PLATFORM_UART_FLOW_CTS )
   {
     temp |= USART_HardwareFlowControl_CTS;
-    GPIO_InitStructure.GPIO_Speed = usart_gpio_cts_pin[ id ];
+    GPIO_InitStructure.GPIO_Pin = usart_gpio_cts_pin[ id ];
+    GPIO_Init( usart_gpio_hwflow_port[ id ], &GPIO_InitStructure );
+  }
+  if( type & PLATFORM_UART_FLOW_RTS )
+  {
+    temp |= USART_HardwareFlowControl_RTS;
+    GPIO_InitStructure.GPIO_Pin = usart_gpio_rts_pin[ id ];
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP;
     GPIO_Init( usart_gpio_hwflow_port[ id ], &GPIO_InitStructure );
   }
   usart->CR3 |= temp;
@@ -893,16 +896,22 @@ static u32 platform_pwm_set_clock( u32 clock )
 {
   TIM_TimeBaseInitTypeDef  TIM_TimeBaseStructure;
   TIM_TypeDef* ptimer = PWM_TIMER_NAME;
+  unsigned period, prescaler;
   
   /* Time base configuration */
-  TIM_TimeBaseStructure.TIM_Period = ( TIM_GET_BASE_CLK( PWM_TIMER_ID ) / clock ) - 1;
-  TIM_TimeBaseStructure.TIM_Prescaler = 0;
+  period = TIM_GET_BASE_CLK( PWM_TIMER_ID ) / clock;
+    
+  prescaler = (period / 0x10000) + 1;
+  period /= prescaler;
+  
+  TIM_TimeBaseStructure.TIM_Period = period - 1;
+  TIM_TimeBaseStructure.TIM_Prescaler = prescaler - 1;
   TIM_TimeBaseStructure.TIM_ClockDivision = TIM_CKD_DIV1;
   TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up;
   TIM_TimeBaseStructure.TIM_RepetitionCounter = 0x0000;
   TIM_TimeBaseInit( ptimer, &TIM_TimeBaseStructure );
     
-  return ( TIM_GET_BASE_CLK( PWM_TIMER_ID ) / ( TIM_TimeBaseStructure.TIM_Period + 1 ) ) ;
+  return platform_pwm_get_clock();
 }
 
 u32 platform_pwm_setup( unsigned id, u32 frequency, unsigned duty )
@@ -1200,13 +1209,13 @@ u32 platform_adc_setclock( unsigned id, u32 frequency )
     period = TIM_GET_BASE_CLK( id ) / frequency;
     
     prescaler = (period / 0x10000) + 1;
-  	period /= prescaler;
+    period /= prescaler;
 
-  	timer_base_struct.TIM_Period = period - 1;
-  	timer_base_struct.TIM_Prescaler = prescaler - 1;
-  	timer_base_struct.TIM_ClockDivision = TIM_CKD_DIV1;
-  	timer_base_struct.TIM_CounterMode = TIM_CounterMode_Down;
-  	TIM_TimeBaseInit( timer[ d->timer_id ], &timer_base_struct );
+    timer_base_struct.TIM_Period = period - 1;
+    timer_base_struct.TIM_Prescaler = prescaler - 1;
+    timer_base_struct.TIM_ClockDivision = TIM_CKD_DIV1;
+    timer_base_struct.TIM_CounterMode = TIM_CounterMode_Down;
+    TIM_TimeBaseInit( timer[ d->timer_id ], &timer_base_struct );
     
     frequency = ( TIM_GET_BASE_CLK( id ) / ( TIM_GetPrescaler( timer[ d->timer_id ] ) + 1 ) ) / period;
     

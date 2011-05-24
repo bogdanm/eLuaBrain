@@ -1,6 +1,6 @@
 # Configuration file for the AVR32 microcontrollers
 
-specific_files = "crt0.s trampoline.s platform.c exception.s intc.c pm.c flashc.c pm_conf_clocks.c usart.c gpio.c tc.c spi.c platform_int.c"
+specific_files = "crt0.s trampoline.s platform.c exception.s intc.c pm.c flashc.c pm_conf_clocks.c usart.c gpio.c tc.c spi.c platform_int.c adc.c pwm.c ethernet.c"
 comp.Append(CPPDEFINES = 'FORAVR32')
 
 # See board.h for possible BOARD values.
@@ -18,10 +18,17 @@ else:
 
 # Prepend with path
 specific_files = " ".join( [ "src/platform/%s/%s" % ( platform, f ) for f in specific_files.split() ] )
-ldscript = "src/platform/%s/%s.ld" % ( platform, comp[ 'cpu' ].lower() )
+
+# Choose ldscript according to choice of bootloader
+if comp[ 'bootloader' ] == "none":
+    print "Compiling for FLASH execution"
+    ldscript = "src/platform/%s/%s.ld" % ( platform, comp[ 'cpu' ].lower() )
+else :
+    print "Compiling for SDRAM execution"
+    ldscript = "src/platform/%s/%s_%s.ld" % ( platform, comp[ 'cpu' ].lower(), comp[ 'bootloader'] )
 
 # Standard GCC Flags
-comp.Append(CCFLAGS = ['-ffunction-sections','-fdata-sections','-fno-strict-aliasing','-Wall'])
+comp.Append(CCFLAGS = ['-ffunction-sections','-fdata-sections','-fno-strict-aliasing','-Wall','-DBOOTLOADER_%s' %comp['bootloader'].upper()])
 comp.Append(LINKFLAGS = ['-nostartfiles','-nostdlib','-Wl,--gc-sections','-Wl,--allow-multiple-definition','-Wl,--relax','-Wl,--direct-data','-T',ldscript])
 comp.Append(ASFLAGS = ['-x','assembler-with-cpp','-c'])
 comp.Append(LIBS = ['c','gcc','m'])
