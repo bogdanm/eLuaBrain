@@ -21,6 +21,10 @@
 #include "platform_conf.h"
 #ifdef BUILD_SHELL
 
+#define EE_I2C_ADDR               0xA0
+#define EE_I2C_NUM                0
+#define EE_PAGE_SIZE              64
+
 // Shell alternate ' ' char
 #define SHELL_ALT_SPACE           '\x07'
 
@@ -59,6 +63,7 @@ static void shell_help( char* args )
   printf( "  lua [args]  - run Lua with the given arguments\n" );
   printf( "  recv        - receive a file via XMODEM and execute it\n" );
   printf( "  cp <src> <dst> - copy source file 'src' to 'dst'\n" );
+  printf( "  ee <file>   - dump file to the EEPROM connected on I2C1\n" );
   printf( "  ver         - print eLua version\n" );
 }
 
@@ -240,6 +245,67 @@ static void shell_cat( char *args )
       printf( "Usage: cat (or type) <filename1> [<filename2> ...]\n" );
 }    
 
+// 'ee' handler
+static void shell_ee( char *args )
+{
+  FILE *fp;
+  char eebuf[ EE_PAGE_SIZE ];
+  u16 addr = 0;
+  int writing = 1;
+  unsigned i;
+
+  if( *args == 0 )
+  {
+    printf( "Must specify filename\n" );
+    return;
+  }
+  *strchr( args, ' ' ) = 0;
+  if( ( fp = fopen( args, "rb" ) ) == NULL )
+  {
+    printf( "Unable to open %s\n", args );
+    return;
+  }
+  printf( "File opened\n" );
+  platform_i2c_setup( EE_I2C_NUM, PLATFORM_I2C_SPEED_SLOW ); 
+  // Copy all data to the EEPROM
+  while( writing )
+  {
+    memset( eebuf, 0xFF, EE_PAGE_SIZE );
+    if( fread( eebuf, 1, EE_PAGE_SIZE, fp ) != EE_PAGE_SIZE )
+      writing = 0;
+    printf( "Data read, writing=%d\n", writing );
+    // Start write cycle
+    platform_i2c_send_start( EE_I2C_NUM );
+    printf( "@a\n" );
+    printf( "@b %d\n", platform_i2c_send_address( EE_I2C_NUM, EE_I2C_ADDR, PLATFORM_I2C_DIRECTION_TRANSMITTER ) );
+    // Send EEPROM address
+    printf( "@c %d\n", platform_i2c_send_byte( EE_I2C_NUM, addr >> 8 ) );
+    printf( "@d %d\n", platform_i2c_send_byte( EE_I2C_NUM, addr & 0xFF ) );
+    // Send data bytes
+    for( i = 0; i < EE_PAGE_SIZE; i ++ )
+      platform_i2c_send_byte( EE_I2C_NUM, eebuf[ i ] );
+    printf( "@1\n" );
+    // All done, send stop
+    platform_i2c_send_stop( EE_I2C_NUM );
+    printf( "@2\n" );
+    // Now wait for operation complete
+    while( 1 )
+    {
+      platform_i2c_send_start( EE_I2C_NUM );
+      printf( "@start2\n" );
+      if( platform_i2c_send_address( EE_I2C_NUM, EE_I2C_ADDR, PLATFORM_I2C_DIRECTION_TRANSMITTER ) )
+        break;
+      printf( "WAITING\n" );
+    }
+    printf( "@3\n" );
+    // Show progress and proceed with next block
+    printf( "." );
+    addr += EE_PAGE_SIZE; 
+  }
+  printf( " done\n" );
+  fclose( fp );
+}
+
 // 'copy' handler
 #ifdef BUILD_RFS
 #define SHELL_COPY_BUFSIZE    ( ( 1 << RFS_BUFFER_SIZE ) - ELUARPC_WRITE_REQUEST_EXTRA )
@@ -318,6 +384,7 @@ static const SHELL_COMMAND shell_commands[] =
   { "cat", shell_cat },
   { "type", shell_cat },
   { "cp", shell_cp },
+  { "ee", shell_ee },
   { NULL, NULL }
 };
 

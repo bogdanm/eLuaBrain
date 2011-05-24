@@ -165,11 +165,12 @@ void term_init( unsigned lines, unsigned cols, p_term_out term_out_func,
   term_cx = term_cy = 0;
 }                
 
-#else // #ifdef BUILD_TERM
+#elif !defined( BUILD_TERM_VRAM )
 
-/*void term_init( unsigned lines, unsigned cols, p_term_out term_out_func, 
+void term_init( unsigned lines, unsigned cols, p_term_out term_out_func, 
                 p_term_in term_in_func, p_term_translate term_translate_func )
 {
-}*/
+}
 
 #endif // #ifdef BUILD_TERM
+

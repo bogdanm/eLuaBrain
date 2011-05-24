@@ -98,7 +98,7 @@ int main( void )
 
   // Register the MMC filesystem
   i = 0;
-  while( ( d = mmcfs_init( i ++) ) != NULL )
+  while( ( d = mmcfs_init( i ++ ) ) != NULL )
     dm_register( d );
 
   // Register the Semihosting filesystem
