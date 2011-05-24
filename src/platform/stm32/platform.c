@@ -57,6 +57,7 @@ static void pios_init();
 static void adcs_init();
 static void cans_init();
 static void vram_transfer_init();
+static void i2cs_init();
 
 int platform_init()
 {
@@ -88,6 +89,9 @@ int platform_init()
 
   // Setup CANs
   cans_init();
+
+  // Setup I2Cs
+  i2cs_init();
   
   // Enable SysTick
   if ( SysTick_Config( HCLK / SYSTICKHZ ) )
@@ -1263,6 +1267,117 @@ int platform_adc_start_sequence( )
 }
 
 #endif // ifdef BUILD_ADC
+
+// ****************************************************************************
+// I2C support
+
+static I2C_TypeDef *const i2c[]  = { I2C1, I2C2 };
+static const u16 i2c_gpio_pins[] = { GPIO_Pin_6  | GPIO_Pin_7,
+                                     GPIO_Pin_10 | GPIO_Pin_11 };
+//                                   SCL           SDA
+
+static void i2cs_init()
+{
+  RCC_APB1PeriphClockCmd( RCC_APB1Periph_I2C1, ENABLE );
+  RCC_APB1PeriphClockCmd( RCC_APB1Periph_I2C2, ENABLE );
+}
+
+u32 platform_i2c_setup( unsigned id, u32 speed )
+{
+  I2C_InitTypeDef I2C_InitStructure;
+  GPIO_InitTypeDef GPIO_InitStructure;
+  
+  /* Configure I2C pins */
+  GPIO_InitStructure.GPIO_Pin = i2c_gpio_pins[ id ];
+  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_OD;
+  GPIO_Init( GPIOB, &GPIO_InitStructure );
+
+  /* Configure I2C peripheral */
+  I2C_Cmd( i2c[ id ], DISABLE );
+  I2C_StructInit( &I2C_InitStructure );
+  I2C_InitStructure.I2C_Mode = I2C_Mode_I2C;
+  I2C_InitStructure.I2C_DutyCycle = I2C_DutyCycle_2;
+  I2C_InitStructure.I2C_Ack = I2C_Ack_Enable;
+  I2C_InitStructure.I2C_ClockSpeed = speed;
+  I2C_InitStructure.I2C_OwnAddress1 = 0; // dummy, shouldn't matter
+  I2C_InitStructure.I2C_AcknowledgedAddress = I2C_AcknowledgedAddress_7bit;
+  I2C_Init( i2c[ id ], &I2C_InitStructure );
+  I2C_Cmd( i2c[ id ], ENABLE );
+
+  return speed;
+}
+
+void platform_i2c_send_start( unsigned id )
+{
+  I2C_TypeDef *pi2c = ( I2C_TypeDef* )i2c[ id ];
+
+  //while( I2C_GetFlagStatus( pi2c, I2C_FLAG_BUSY ) );
+  I2C_GenerateSTART( pi2c, ENABLE );
+  while( I2C_CheckEvent( pi2c, I2C_EVENT_MASTER_MODE_SELECT ) != SUCCESS );
+}
+
+void platform_i2c_send_stop( unsigned id )
+{
+  I2C_TypeDef *pi2c = ( I2C_TypeDef* )i2c[ id ];
+
+  I2C_GenerateSTOP( pi2c, ENABLE );
+  while( I2C_GetFlagStatus( pi2c, I2C_FLAG_BUSY ) );
+  ( void )pi2c->SR1;
+  ( void )pi2c->SR2;
+}
+
+int platform_i2c_send_address( unsigned id, u16 address, int direction )
+{
+  I2C_TypeDef *pi2c = ( I2C_TypeDef* )i2c[ id ];
+  u32 flags;
+  u32 match = direction == PLATFORM_I2C_DIRECTION_TRANSMITTER ? I2C_EVENT_MASTER_TRANSMITTER_MODE_SELECTED : I2C_EVENT_MASTER_RECEIVER_MODE_SELECTED;
+
+  I2C_Send7bitAddress( pi2c, address, direction == PLATFORM_I2C_DIRECTION_TRANSMITTER ? I2C_Direction_Transmitter : I2C_Direction_Receiver );
+  while( 1 )
+  {
+    flags = I2C_GetLastEvent( pi2c );
+    if( flags & I2C_FLAG_AF )
+      return 0;
+    if( flags == match )
+      break;
+  }
+  I2C_ReadRegister( pi2c, I2C_Register_SR1 );
+  I2C_ReadRegister( pi2c, I2C_Register_SR2 );
+  return 1;
+}
+
+int platform_i2c_send_byte( unsigned id, u8 data )
+{
+  I2C_TypeDef *pi2c = ( I2C_TypeDef* )i2c[ id ];
+  u32 flags;
+
+  I2C_SendData( pi2c, data ); 
+  while( 1 )
+  {
+    flags = I2C_GetLastEvent( pi2c );
+    if( flags & I2C_FLAG_AF )
+      return 0;
+    if( flags == I2C_EVENT_MASTER_BYTE_TRANSMITTED )
+      break;
+  }
+  return 1;
+}
+
+int platform_i2c_recv_byte( unsigned id, int ack )
+{
+  I2C_TypeDef *pi2c = ( I2C_TypeDef* )i2c[ id ];
+  u8 data;
+
+  I2C_AcknowledgeConfig( pi2c, ack ? ENABLE : DISABLE );
+  if( !ack )
+    I2C_GenerateSTOP( pi2c, ENABLE );
+  while( I2C_GetFlagStatus( pi2c, I2C_FLAG_RXNE ) == RESET );
+  data = I2C_ReceiveData( pi2c );
+  if( !ack )
+    while( pi2c->CR1 & I2C_CR1_STOP );
+  return data;
+}
 
 // *****************************************************************************
 // VRAM subsystem

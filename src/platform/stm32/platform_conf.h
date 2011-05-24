@@ -87,6 +87,7 @@
   _ROM( AUXLIB_CPU, luaopen_cpu, cpu_map )\
   _ROM( AUXLIB_ELUA, luaopen_elua, elua_map )\
   _ROM( AUXLIB_TMR, luaopen_tmr, tmr_map )\
+  _ROM( AUXLIB_I2C, luaopen_i2c, i2c_map )\
   ADCLINE\
   _ROM( AUXLIB_CAN, luaopen_can, can_map )\
   _ROM( AUXLIB_PWM, luaopen_pwm, pwm_map )\
@@ -113,6 +114,7 @@
 #define NUM_PWM               4
 #define NUM_ADC               16
 #define NUM_CAN               1
+#define NUM_I2C               2
 
 // Enable RX buffering on UART
 #define BUF_ENABLE_UART
