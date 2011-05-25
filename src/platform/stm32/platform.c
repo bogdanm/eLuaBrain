@@ -1332,36 +1332,46 @@ int platform_i2c_send_address( unsigned id, u16 address, int direction )
   I2C_TypeDef *pi2c = ( I2C_TypeDef* )i2c[ id ];
   u32 flags;
   u32 match = direction == PLATFORM_I2C_DIRECTION_TRANSMITTER ? I2C_EVENT_MASTER_TRANSMITTER_MODE_SELECTED : I2C_EVENT_MASTER_RECEIVER_MODE_SELECTED;
+  int res = 1;
 
   I2C_Send7bitAddress( pi2c, address, direction == PLATFORM_I2C_DIRECTION_TRANSMITTER ? I2C_Direction_Transmitter : I2C_Direction_Receiver );
   while( 1 )
   {
     flags = I2C_GetLastEvent( pi2c );
     if( flags & I2C_FLAG_AF )
-      return 0;
+    {
+      I2C_ClearFlag( pi2c, I2C_FLAG_AF );
+      res = 0;
+      break;
+    }
     if( flags == match )
       break;
   }
-  I2C_ReadRegister( pi2c, I2C_Register_SR1 );
-  I2C_ReadRegister( pi2c, I2C_Register_SR2 );
-  return 1;
+  ( void )pi2c->SR1;
+  ( void )pi2c->SR2;
+  return res;
 }
 
 int platform_i2c_send_byte( unsigned id, u8 data )
 {
   I2C_TypeDef *pi2c = ( I2C_TypeDef* )i2c[ id ];
   u32 flags;
+  int res = 1;
 
   I2C_SendData( pi2c, data ); 
   while( 1 )
   {
     flags = I2C_GetLastEvent( pi2c );
     if( flags & I2C_FLAG_AF )
-      return 0;
+    {
+      I2C_ClearFlag( pi2c, I2C_FLAG_AF );
+      res = 0;
+      break;
+    }
     if( flags == I2C_EVENT_MASTER_BYTE_TRANSMITTED )
       break;
   }
-  return 1;
+  return res;
 }
 
 int platform_i2c_recv_byte( unsigned id, int ack )

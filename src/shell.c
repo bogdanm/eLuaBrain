@@ -17,7 +17,7 @@
 #include "remotefs.h"
 #include "eluarpc.h"
 #include "linenoise.h"
-
+#include "stm32f10x.h"
 #include "platform_conf.h"
 #ifdef BUILD_SHELL
 
@@ -265,7 +265,6 @@ static void shell_ee( char *args )
     printf( "Unable to open %s\n", args );
     return;
   }
-  printf( "File opened\n" );
   platform_i2c_setup( EE_I2C_NUM, PLATFORM_I2C_SPEED_SLOW ); 
   // Copy all data to the EEPROM
   while( writing )
@@ -273,36 +272,31 @@ static void shell_ee( char *args )
     memset( eebuf, 0xFF, EE_PAGE_SIZE );
     if( fread( eebuf, 1, EE_PAGE_SIZE, fp ) != EE_PAGE_SIZE )
       writing = 0;
-    printf( "Data read, writing=%d\n", writing );
     // Start write cycle
+    RCC_AHBPeriphClockCmd(RCC_AHBPeriph_FSMC, DISABLE);
     platform_i2c_send_start( EE_I2C_NUM );
-    printf( "@a\n" );
-    printf( "@b %d\n", platform_i2c_send_address( EE_I2C_NUM, EE_I2C_ADDR, PLATFORM_I2C_DIRECTION_TRANSMITTER ) );
+    platform_i2c_send_address( EE_I2C_NUM, EE_I2C_ADDR, PLATFORM_I2C_DIRECTION_TRANSMITTER );
     // Send EEPROM address
-    printf( "@c %d\n", platform_i2c_send_byte( EE_I2C_NUM, addr >> 8 ) );
-    printf( "@d %d\n", platform_i2c_send_byte( EE_I2C_NUM, addr & 0xFF ) );
+    platform_i2c_send_byte( EE_I2C_NUM, addr >> 8 );
+    platform_i2c_send_byte( EE_I2C_NUM, addr & 0xFF );
     // Send data bytes
     for( i = 0; i < EE_PAGE_SIZE; i ++ )
       platform_i2c_send_byte( EE_I2C_NUM, eebuf[ i ] );
-    printf( "@1\n" );
     // All done, send stop
     platform_i2c_send_stop( EE_I2C_NUM );
-    printf( "@2\n" );
     // Now wait for operation complete
     while( 1 )
     {
       platform_i2c_send_start( EE_I2C_NUM );
-      printf( "@start2\n" );
       if( platform_i2c_send_address( EE_I2C_NUM, EE_I2C_ADDR, PLATFORM_I2C_DIRECTION_TRANSMITTER ) )
         break;
-      printf( "WAITING\n" );
     }
-    printf( "@3\n" );
+    RCC_AHBPeriphClockCmd(RCC_AHBPeriph_FSMC, ENABLE);
     // Show progress and proceed with next block
     printf( "." );
     addr += EE_PAGE_SIZE; 
   }
-  printf( " done\n" );
+  printf( " done, wrote %u bytes\n", ( unsigned )addr );
   fclose( fp );
 }
 
