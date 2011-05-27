@@ -16,4 +16,6 @@ rfs_server*
 doc/dist
 doc/cache
 luarpc
+*.binary
+*.eeprom
 
