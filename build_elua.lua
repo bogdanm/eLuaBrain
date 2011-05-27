@@ -299,7 +299,7 @@ end
 
 -- CPU/allocator mapping (if allocator not specified)
 if comp.allocator == 'auto' then
-  if utils.array_element_index( { 'LPC-H2888', 'ATEVK1100', 'MBED' }, comp.board:upper() ) then
+  if utils.array_element_index( { 'LPC-H2888', 'ATEVK1100', 'MBED', "STM3210E-EVAL" }, comp.board:upper() ) then
     comp.allocator = 'multiple'
   else
     comp.allocator = 'newlib'
@@ -402,7 +402,10 @@ local function make_romfs()
   local flist = {}
   flist = utils.string_to_table( utils.get_files( 'romfs', function( fname ) return not fname:find( "%.gitignore" ) end ) )
   flist = utils.linearize_array( flist )  
-  if not mkfs.mkfs( ".", "romfiles", flist, comp.romfs, fscompcmd ) then return -1 end
+  for k, v in pairs( flist ) do
+    flist[ k ] = v:gsub( "romfs/", "" )
+  end
+  if not mkfs.mkfs( "romfs", "romfiles", flist, comp.romfs, fscompcmd ) then return -1 end
   if utils.is_file( "inc/romfiles.h" ) then
     -- Read both the old and the new file
     local oldfile = io.open( "inc/romfiles.h", "rb" )

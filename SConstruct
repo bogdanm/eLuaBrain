@@ -389,9 +389,9 @@ if not GetOption( 'help' ):
     print "Building ROM File System..."
     flist = []
     for sample in glob.glob("romfs/*"):
-      flist += [ sample ]
+      flist += [ string.replace( sample, "romfs/", "" ) ]
     import mkfs
-    mkfs.mkfs( ".", "romfiles", flist, comp['romfs'], compcmd )
+    mkfs.mkfs( "romfs", "romfiles", flist, comp['romfs'], compcmd )
     print
     if os.path.exists( "inc/romfiles.h" ): 
       os.remove( "inc/romfiles.h" )
