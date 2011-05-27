@@ -251,7 +251,6 @@ static void shell_ee( char *args )
   FILE *fp;
   char eebuf[ EE_PAGE_SIZE ];
   u16 addr = 0;
-  int writing = 1;
   unsigned i;
 
   if( *args == 0 )
@@ -265,13 +264,13 @@ static void shell_ee( char *args )
     printf( "Unable to open %s\n", args );
     return;
   }
-  platform_i2c_setup( EE_I2C_NUM, PLATFORM_I2C_SPEED_SLOW ); 
+  platform_i2c_setup( EE_I2C_NUM, PLATFORM_I2C_SPEED_FAST ); 
   // Copy all data to the EEPROM
-  while( writing )
+  while( 1 )
   {
     memset( eebuf, 0xFF, EE_PAGE_SIZE );
-    if( fread( eebuf, 1, EE_PAGE_SIZE, fp ) != EE_PAGE_SIZE )
-      writing = 0;
+    if( fread( eebuf, 1, EE_PAGE_SIZE, fp ) == 0 )
+      break;
     // Start write cycle
     RCC_AHBPeriphClockCmd(RCC_AHBPeriph_FSMC, DISABLE);
     platform_i2c_send_start( EE_I2C_NUM );
