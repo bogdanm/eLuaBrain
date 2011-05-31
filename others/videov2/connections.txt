@@ -1,15 +1,24 @@
-REQ  GND
-MISO MOSI
-CS   SCK
-
-Memory
-1 - CS      (PB12)
-2 - MISO    (PB14)
-3 - NC
-4 - VSS
-5 - MOSI    (PB15)
-6 - CLK     (PB13)
+Memory      STM32 pin         Propeller pin
+1 - CS      (PB12)            (PA0)
+2 - MISO    (PB14)            (PA1)
+3 - NC 
+4 - VSS 
+5 - MOSI    (PB15)            (PA2)
+6 - CLK     (PB13)            (PA3)
 7 - /HOLD
 8 - VCC
 
-REQ ->   PC5
+Other pins:
+REQ         (PC5)             (PA5)
+
+-------------------------------------------------------------------------------
+New configuration:
+
+Pin         On STM32          On Propeller
+MISO        PB14              PA1
+MOSI        PB15              PA2
+CLK         PB13              PA3
+Prop.reset  PB12              Reset (with pull-down resistor)
+
+Other connections:
+

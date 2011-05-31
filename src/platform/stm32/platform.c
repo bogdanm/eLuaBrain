@@ -160,18 +160,6 @@ static void NVIC_Configuration(void)
   /* Configure the NVIC Preemption Priority Bits */
   NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2);
 
-#ifdef BUILD_VRAM
-  nvic_init_structure.NVIC_IRQChannel = EXTI1_IRQn;
-  nvic_init_structure.NVIC_IRQChannelSubPriority = 0;
-  nvic_init_structure.NVIC_IRQChannelCmd = ENABLE;
-  NVIC_Init(&nvic_init_structure);
-  nvic_init_structure.NVIC_IRQChannel = DMA1_Channel5_IRQn; 
-  nvic_init_structure.NVIC_IRQChannelPreemptionPriority = 1; 
-  nvic_init_structure.NVIC_IRQChannelSubPriority = 2; 
-  nvic_init_structure.NVIC_IRQChannelCmd = ENABLE; 
-  NVIC_Init( &nvic_init_structure );  
-#endif  
-
 #ifdef BUILD_ADC  
   nvic_init_structure_adc.NVIC_IRQChannel = DMA1_Channel1_IRQn; 
   nvic_init_structure_adc.NVIC_IRQChannelPreemptionPriority = 0; 
@@ -528,6 +516,7 @@ u32 platform_spi_setup( unsigned id, int mode, u32 clock, unsigned cpol, unsigne
   return ( SPI_GET_BASE_CLK( id ) / ( ( ( u16 )2 << ( prescaler_idx ) ) ) );
 }
 
+#if 0
 static u32 platform_spi_setup_nopins( unsigned id, int mode, u32 clock, unsigned cpol, unsigned cpha, unsigned databits )
 {
   SPI_InitTypeDef SPI_InitStructure;
@@ -554,6 +543,7 @@ static u32 platform_spi_setup_nopins( unsigned id, int mode, u32 clock, unsigned
   
   return ( SPI_GET_BASE_CLK( id ) / ( ( ( u16 )2 << ( prescaler_idx ) ) ) );
 }
+#endif
 
 spi_data_type platform_spi_send_recv( unsigned id, spi_data_type data )
 {
@@ -731,7 +721,6 @@ int platform_s_uart_set_flow_control( unsigned id, int type )
   usart->CR3 |= temp;
   return PLATFORM_OK;
 }
-
 
 // ****************************************************************************
 // Timers
@@ -1392,83 +1381,49 @@ int platform_i2c_recv_byte( unsigned id, int ack )
 // *****************************************************************************
 // VRAM subsystem
 
-#define SPI_ID                1
-#define SPI2_DR_Address       0x4000380C
-
-#define CS_PORT               1
-#define CS_LINE               12
-#define REQ_PORT              0
-#define REQ_LINE              1
-#define CMD_WRITE             2
-
-#define TIME_PORT             2
-#define TIME_PIN              5
-
-static DMA_InitTypeDef DMA_InitStructure;
-static GPIO_InitTypeDef GPIO_InitStructure;
 extern u32 vram_data[ VRAM_SIZE_TOTAL >> 2 ]; 
 
-void EXTI1_IRQHandler()
-{    
-  EXTI_ClearFlag( EXTI_Line1 );
-  
-  // Set pins to SPI
-  GPIO_InitStructure.GPIO_Pin = spi_gpio_pins[ SPI_ID ];
-  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP;
-  GPIO_Init(spi_gpio_port[ SPI_ID ], &GPIO_InitStructure);
-  
-  // Send data 
-  platform_pio_op( TIME_PORT, 1 << TIME_PIN, PLATFORM_IO_PIN_SET );  
-  platform_pio_op( CS_PORT, 1 << CS_LINE, PLATFORM_IO_PIN_CLEAR );
-  platform_pio_op( CS_PORT, 1 << CS_LINE, PLATFORM_IO_PIN_DIR_OUTPUT );
-  // Send write command
-  platform_spi_send_recv( SPI_ID, CMD_WRITE );
-  platform_spi_send_recv( SPI_ID, 0 );
-  platform_spi_send_recv( SPI_ID, 0 );    
-  // And DMA everything else
-  DMA_DeInit( DMA1_Channel5 );
-  DMA_Init( DMA1_Channel5, &DMA_InitStructure );
-  DMA_ITConfig( DMA1_Channel5, DMA_IT_TC, ENABLE );  
-	SPI_I2S_DMACmd( SPI2, SPI_I2S_DMAReq_Tx, ENABLE );	
-	DMA_Cmd( DMA1_Channel5, ENABLE );  	
-  // End tranfer will generate a DMA1_Channel5 interrupt (below)
-}
-
-void DMA1_Channel5_IRQHandler()
-{
-  DMA_ClearITPendingBit( DMA1_IT_GL5 );
-  platform_pio_op( CS_PORT, 1 << CS_LINE, PLATFORM_IO_PIN_SET );  
-  platform_pio_op( CS_PORT, 1 << CS_LINE, PLATFORM_IO_PIN_DIR_INPUT ); 
-  platform_pio_op( TIME_PORT, 1 << TIME_PIN, PLATFORM_IO_PIN_CLEAR );    
-    
-  // Reset pins
-  GPIO_InitStructure.GPIO_Pin = spi_gpio_pins[ SPI_ID ];
-  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING;
-  GPIO_Init(spi_gpio_port[ SPI_ID ], &GPIO_InitStructure);   
-}
+#define SPI2_DR_Address       0x4000380C
+#define SPI_VRAM_PIN_MOSI     GPIO_Pin_15
+#define SPI_VRAM_PIN_MISO     GPIO_Pin_14
+#define SPI_VRAM_PIN_CLK      GPIO_Pin_13
+#define SPI_VRAM_PORT         GPIOB
+#define SPI_VRAM_PERIPH       SPI2
+#define PROP_RESET_PIN        12
+#define PROP_RESET_PORT       1
 
 static void vram_transfer_init()
 {
-  EXTI_InitTypeDef exti; 
-    
-  // Enable pullups on request line
-  platform_pio_op( REQ_PORT, 1 << REQ_LINE, PLATFORM_IO_PIN_PULLUP );
-  
-  // Set 1 on the CS line (but don't enable it yet!)
-  platform_pio_op( CS_PORT, 1 << CS_LINE, PLATFORM_IO_PIN_SET );
-  
-  // Enable EXTI interrupt on PA1 falling edge
-  EXTI_DeInit();
-  exti.EXTI_Line = EXTI_Line1;
-  exti.EXTI_Mode = EXTI_Mode_Interrupt;
-  exti.EXTI_Trigger = EXTI_Trigger_Falling;
-  exti.EXTI_LineCmd = ENABLE;
-  EXTI_Init( &exti );  
-  
-  // Setup SPI interface
-  platform_spi_setup_nopins( SPI_ID, PLATFORM_SPI_MASTER, 20000000, 0, 0, 8 );
+  // NEW CODE
+  DMA_InitTypeDef DMA_InitStructure;
+  SPI_InitTypeDef SPI_InitStructure;
+  GPIO_InitTypeDef GPIO_InitStructure;
+
+  // Setup SPI interface in slave mode
+   /* Configure SPI pins */
+  GPIO_InitStructure.GPIO_Pin = SPI_VRAM_PIN_CLK | SPI_VRAM_PIN_MOSI;
+  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING;
+  GPIO_Init(SPI_VRAM_PORT, &GPIO_InitStructure);
+  GPIO_InitStructure.GPIO_Pin = SPI_VRAM_PIN_MISO;
+  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP;
+  GPIO_Init(SPI_VRAM_PORT, &GPIO_InitStructure);
+ 
+  /* Take down, then reconfigure SPI peripheral */
+  SPI_Cmd( SPI_VRAM_PERIPH, DISABLE );
+  SPI_InitStructure.SPI_Direction = SPI_Direction_2Lines_FullDuplex;
+  SPI_InitStructure.SPI_Mode = SPI_Mode_Slave;
+  SPI_InitStructure.SPI_DataSize = SPI_DataSize_8b;
+  SPI_InitStructure.SPI_CPOL = SPI_CPOL_Low;
+  SPI_InitStructure.SPI_CPHA = SPI_CPHA_1Edge;
+  SPI_InitStructure.SPI_NSS = SPI_NSS_Soft;
+  SPI_InitStructure.SPI_BaudRatePrescaler = SPI_BaudRatePrescaler_2;
+  SPI_InitStructure.SPI_FirstBit = SPI_FirstBit_MSB;
+  SPI_InitStructure.SPI_CRCPolynomial = 7;
+  SPI_Init( SPI_VRAM_PERIPH, &SPI_InitStructure );
+  SPI_Cmd( SPI_VRAM_PERIPH, ENABLE );
+  SPI_NSSInternalSoftwareConfig( SPI_VRAM_PERIPH, SPI_NSSInternalSoft_Reset );
   
   // Setup DMA
   RCC_AHBPeriphClockCmd( RCC_AHBPeriph_DMA1, ENABLE );  
@@ -1476,19 +1431,24 @@ static void vram_transfer_init()
   DMA_InitStructure.DMA_PeripheralBaseAddr = (uint32_t)SPI2_DR_Address;
   DMA_InitStructure.DMA_MemoryBaseAddr = (uint32_t)vram_data;
   DMA_InitStructure.DMA_DIR = DMA_DIR_PeripheralDST;
-  DMA_InitStructure.DMA_Priority = DMA_Priority_Low;
+  DMA_InitStructure.DMA_Priority = DMA_Priority_VeryHigh;
   DMA_InitStructure.DMA_BufferSize = VRAM_SIZE_TOTAL;
   DMA_InitStructure.DMA_PeripheralInc = DMA_PeripheralInc_Disable;
   DMA_InitStructure.DMA_MemoryInc = DMA_MemoryInc_Enable;
   DMA_InitStructure.DMA_PeripheralDataSize = DMA_MemoryDataSize_Byte;
   DMA_InitStructure.DMA_MemoryDataSize = DMA_MemoryDataSize_Byte;
-  DMA_InitStructure.DMA_Mode = DMA_Mode_Normal;
+  DMA_InitStructure.DMA_Mode = DMA_Mode_Circular;
   DMA_InitStructure.DMA_M2M = DMA_M2M_Disable;
-  DMA_Init( DMA1_Channel5, &DMA_InitStructure );     	
+  DMA_Init( DMA1_Channel5, &DMA_InitStructure );     
   
-  // Timing pin (remove this)
-  platform_pio_op( TIME_PORT, 1 << TIME_PIN, PLATFORM_IO_PIN_CLEAR );
-  platform_pio_op( TIME_PORT, 1 << TIME_PIN, PLATFORM_IO_PIN_DIR_OUTPUT );  
+  // Start DMA transfer now
+  // It will automatically cycle through the data each time a request is made
+	SPI_I2S_DMACmd( SPI_VRAM_PERIPH, SPI_I2S_DMAReq_Tx, ENABLE );	
+	DMA_Cmd( DMA1_Channel5, ENABLE );  
+
+  // Now it's a good time to get the Propeller out of reset
+  platform_pio_op( PROP_RESET_PORT, 1 << PROP_RESET_PIN, PLATFORM_IO_PIN_SET );  
+  platform_pio_op( PROP_RESET_PORT, 1 << PROP_RESET_PIN, PLATFORM_IO_PIN_DIR_OUTPUT );
 }
 
 // ****************************************************************************

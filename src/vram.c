@@ -236,7 +236,7 @@ static void vram_putchar_internal( int x, int y, char c )
 
 static void vram_clear_line( int y )
 {
-  u16 *pdata = ( u16* )vram_data + VRAM_CHARADDR( 0, y );
+  u16 *pdata = ( u16* )vram_data + VRAM_CHARADDR( 1, y ); // yes, 1 is actually right (not 0)
   u16 fill = ( ' ' << 8 ) | MKCOL( vram_fg_col, vram_bg_col );
   unsigned i;
   

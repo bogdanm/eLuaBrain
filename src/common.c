@@ -202,18 +202,19 @@ void cmn_platform_init()
     platform_uart_set_buffer( i + SERMUX_SERVICE_ID_FIRST, bufsizes[ i ] );
 #endif // #ifdef BUILD_SERMUX
 
-#ifdef BUILD_VRAM
-  vram_init();
-  std_set_send_func( vram_send );
-  std_set_get_func( uart_recv );
-#else // #ifdef BUILD_VRAM  
-
 #if defined( CON_UART_ID ) && CON_UART_ID < SERMUX_SERVICE_ID_FIRST
   // Setup console UART
   platform_uart_setup( CON_UART_ID, CON_UART_SPEED, 8, PLATFORM_UART_PARITY_NONE, PLATFORM_UART_STOPBITS_1 );  
   platform_uart_set_flow_control( CON_UART_ID, CON_FLOW_TYPE );
   platform_uart_set_buffer( CON_UART_ID, CON_BUF_SIZE );
 #endif // #if defined( CON_UART_ID ) && CON_UART_ID < SERMUX_SERVICE_ID_FIRST
+
+#ifdef BUILD_VRAM
+  vram_init();
+  std_set_send_func( vram_send );
+  std_set_get_func( uart_recv );
+
+#else // #ifdef BUILD_VRAM  
 
   // Set the send/recv functions                          
   std_set_send_func( uart_send );
