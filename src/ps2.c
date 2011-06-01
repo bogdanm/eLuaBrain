@@ -80,6 +80,7 @@ static void ps2_lh_clk_int_handler( elua_int_resnum resnum )
   else if( ps2_bitcnt == 11 )
   {
     // Done sending, need to wait ACK from the keyboard
+    ps2_sending = ps2_bitcnt = ps2_data = 0;
     platform_cpu_set_interrupt( INT_GPIO_POSEDGE, PS2_CLOCK_PIN_RESNUM, PLATFORM_CPU_DISABLE );
     platform_cpu_set_interrupt( INT_GPIO_NEGEDGE, PS2_CLOCK_PIN_RESNUM, PLATFORM_CPU_ENABLE );
   }
@@ -92,22 +93,12 @@ static void ps2_hl_clk_int_handler( elua_int_resnum resnum )
     return;
   if( ps2_sending ) // send command to keyboard
   {
-    if( ps2_bitcnt == 0 )
-    {
-      ps2_send_one_bits = 0;
-      // We got the first falling edge, after this the keyboard wil start to read data
-      // Since the data read by the keyboard is sampled on the falling edge of the clock, 
-      // we'll set it on the rising edge
-      platform_cpu_set_interrupt( INT_GPIO_NEGEDGE, PS2_CLOCK_PIN_RESNUM, PLATFORM_CPU_DISABLE );
-      platform_cpu_set_interrupt( INT_GPIO_POSEDGE, PS2_CLOCK_PIN_RESNUM, PLATFORM_CPU_ENABLE );
-    }
-    else
-    {
-      // We get here after the data was sent, we need to read the ACK now
-      if( platform_pio_op( PS2_DATA_PORT, 1 << PS2_DATA_PIN, PLATFORM_IO_PIN_GET ) != 0 ) // No ACK bit?
-        platform_uart_send( CON_UART_ID, '@' );
-      ps2_sending = ps2_bitcnt = 0;
-    }
+    ps2_send_one_bits = 0;
+    // We got the first falling edge, after this the keyboard wil start to read data
+    // Since the data read by the keyboard is sampled on the falling edge of the clock, 
+    // we'll set it on the rising edge
+    platform_cpu_set_interrupt( INT_GPIO_NEGEDGE, PS2_CLOCK_PIN_RESNUM, PLATFORM_CPU_DISABLE );
+    platform_cpu_set_interrupt( INT_GPIO_POSEDGE, PS2_CLOCK_PIN_RESNUM, PLATFORM_CPU_ENABLE );
   }
   else // receive data from keyboard
   {
@@ -116,7 +107,7 @@ static void ps2_hl_clk_int_handler( elua_int_resnum resnum )
       ps2_data |= platform_pio_op( PS2_DATA_PORT, 1 << PS2_DATA_PIN, PLATFORM_IO_PIN_GET ) << ( ps2_bitcnt - 2 );
     else if( ps2_bitcnt == 11 ) // done receiving
     {
-      printf( "%02X ", ( unsigned )ps2_data );
+      printf( "c=%02X ", ( unsigned )ps2_data );
       if( ps2_wait_ack == -1 )
         ps2_wait_ack = ps2_data;
       else
@@ -144,6 +135,7 @@ static u8 ps2_send( u8 data, int needs_ack )
   if( needs_ack )
   {
     while( ps2_wait_ack == -1 );
+    printf( "%02X\n", ( unsigned )ps2_wait_ack );
     return ( u8 )ps2_wait_ack;
   }
   else
@@ -162,6 +154,12 @@ void ps2_init()
   elua_int_set_c_handler( INT_GPIO_NEGEDGE, ps2_hl_clk_int_handler ); 
   elua_int_set_c_handler( INT_GPIO_POSEDGE, ps2_lh_clk_int_handler );
   platform_cpu_set_interrupt( INT_GPIO_NEGEDGE, PS2_CLOCK_PIN_RESNUM, PLATFORM_CPU_ENABLE );
+  // LED test
+  ps2_send( 0xED, 1 );
+  ps2_send( 0x03, 1 );
+  // Typematic rate
+  ps2_send( 0xF3, 1 );
+  ps2_send( 0x00, 1 );
 }
 
 #else // #ifdef BUILD_PS2
