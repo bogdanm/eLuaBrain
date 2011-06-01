@@ -31,6 +31,7 @@
 #define BUILD_LINENOISE
 #define BUILD_C_INT_HANDLERS
 #define BUILD_LUA_INT_HANDLERS
+#define BUILD_PS2
 
 #define MMCFS_SDIO_STM32
 
@@ -141,6 +142,10 @@
 #define MMCFS_CS_PORT                0
 #define MMCFS_CS_PIN                 8
 #define MMCFS_SPI_NUM                0
+
+// PS/2 configuration
+#define PS2_DATA_PIN          PLATFORM_IO_ENCODE( 6, 13, PLATFORM_IO_ENC_PIN )
+#define PS2_CLOCK_PIN         PLATFORM_IO_ENCODE( 6, 15, PLATFORM_IO_ENC_PIN )      
 
 // CPU frequency (needed by the CPU module, 0 if not used)
 u32 platform_s_cpu_get_frequency();

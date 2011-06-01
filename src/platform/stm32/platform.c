@@ -192,6 +192,9 @@ static void pios_init()
 
     GPIO_Init(pio_port[port], &GPIO_InitStructure);
   }
+
+  // Get back lines PA13 and PA15
+  GPIO_PinRemapConfig( GPIO_Remap_SWJ_Disable, ENABLE );
 }
 
 pio_type platform_pio_op( unsigned port, pio_type pinmask, int op )

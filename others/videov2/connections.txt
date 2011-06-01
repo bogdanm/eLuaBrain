@@ -20,5 +20,9 @@ MOSI        PB15              PA2
 CLK         PB13              PA3
 Prop.reset  PB12              Reset (with pull-down resistor)
 
-Other connections:
+Keyboard:
+DATA        PA13
+CLK         PA15
 
+MODIFICATIONS TO ET-STM32:
+Removed R100 to R104 (joystick connections), frres PD3, PD7, PG13, PG14, PG15

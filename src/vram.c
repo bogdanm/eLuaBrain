@@ -6,6 +6,9 @@
 #include "term.h"
 #include <ctype.h>
 #include <stdio.h>
+// [REMOVE]
+#include "platform_conf.h"
+#include "platform.h"
 
 // *****************************************************************************
 // Local variables
@@ -332,6 +335,8 @@ void vram_putchar( char c )
 void vram_send( int fd, char c )
 {
   fd = fd;
+  // [REMOVE] 
+  platform_uart_send( CON_UART_ID, c );
   vram_putchar( c );
 }
 

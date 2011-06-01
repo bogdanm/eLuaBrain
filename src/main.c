@@ -14,6 +14,7 @@
 #include "term.h"
 #include "platform_conf.h"
 #include "elua_rfs.h"
+#include "ps2.h"
 #ifdef ELUA_SIMULATOR
 #include "hostif.h"
 #endif
@@ -89,6 +90,9 @@ int main( void )
     // This should never happen
     while( 1 );
   }
+
+  // Initialize the PS/2 keyboard
+  ps2_init();
 
   // Initialize device manager
   dm_init();

@@ -53,7 +53,8 @@ void UART5_IRQHandler()
 // ****************************************************************************
 // External interrupt handlers
 
-static const u32 exti_line[] = { EXTI_Line0, EXTI_Line1, EXTI_Line2, EXTI_Line3, EXTI_Line4, EXTI_Line5, EXTI_Line6, EXTI_Line7, EXTI_Line8, EXTI_Line9, EXTI_Line10, EXTI_Line12, EXTI_Line13, EXTI_Line14, EXTI_Line15 };
+static const u32 exti_line[] = { EXTI_Line0, EXTI_Line1,  EXTI_Line2,  EXTI_Line3,  EXTI_Line4,  EXTI_Line5,  EXTI_Line6,  EXTI_Line7, 
+                                 EXTI_Line8, EXTI_Line9, EXTI_Line10, EXTI_Line11, EXTI_Line12, EXTI_Line13, EXTI_Line14, EXTI_Line15 };
 
 static u16 exti_line_to_gpio( u32 line )
 {
@@ -75,9 +76,9 @@ static void all_exti_irqhandler( int line )
   port = PLATFORM_IO_GET_PORT( v );
   pin = PLATFORM_IO_GET_PIN( v );
 
-  if( EXTI->RTSR & (1 << line ) && platform_pio_op( port, 1 << pin, PLATFORM_IO_PIN_GET ) )
+  if( ( EXTI->RTSR & ( 1 << line ) ) && platform_pio_op( port, 1 << pin, PLATFORM_IO_PIN_GET ) )
     cmn_int_handler( INT_GPIO_POSEDGE, v );
-  if( EXTI->FTSR & (1 << line ) && ( platform_pio_op( port, 1 << pin, PLATFORM_IO_PIN_GET ) == 0 ) )
+  if( ( EXTI->FTSR & ( 1 << line ) ) && ( platform_pio_op( port, 1 << pin, PLATFORM_IO_PIN_GET ) == 0 ) )
     cmn_int_handler( INT_GPIO_NEGEDGE, v );
 
   EXTI_ClearITPendingBit( exti_line[ line ] );
@@ -145,6 +146,7 @@ static int gpioh_set_int_status( elua_int_id id, elua_int_resnum resnum, int sta
   u32 mask = 1 << exint_gpio_to_src( resnum );
   EXTI_InitTypeDef exti_init_struct;
   
+  EXTI_ClearITPendingBit( exti_line[ exint_gpio_to_src( resnum ) ] );
   if( status == PLATFORM_CPU_ENABLE )
   {
     // Configure port for interrupt line
@@ -153,15 +155,12 @@ static int gpioh_set_int_status( elua_int_id id, elua_int_resnum resnum, int sta
     EXTI_StructInit(&exti_init_struct);
     exti_init_struct.EXTI_Line = exti_line[ exint_gpio_to_src( resnum ) ];
     exti_init_struct.EXTI_Mode = EXTI_Mode_Interrupt;
-    if( ( ( ( EXTI->RTSR & mask ) != 0 ) && ( id == INT_GPIO_NEGEDGE ) ) ||
-	( ( ( EXTI->FTSR & mask ) != 0 ) && ( id == INT_GPIO_POSEDGE ) ) )
+    if( ( ( ( EXTI->RTSR & mask ) != 0 ) && ( id == INT_GPIO_NEGEDGE ) ) || ( ( ( EXTI->FTSR & mask ) != 0 ) && ( id == INT_GPIO_POSEDGE ) ) )
       exti_init_struct.EXTI_Trigger = EXTI_Trigger_Rising_Falling;
     else
       exti_init_struct.EXTI_Trigger = id == INT_GPIO_POSEDGE ? EXTI_Trigger_Rising : EXTI_Trigger_Falling;
     exti_init_struct.EXTI_LineCmd = ENABLE;
-    EXTI_Init(&exti_init_struct);
-
-    EXTI_ClearITPendingBit( exti_line[ exint_gpio_to_src( resnum ) ] );
+    EXTI_Init( &exti_init_struct );
   }
   else
   {
