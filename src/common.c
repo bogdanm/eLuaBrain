@@ -16,6 +16,7 @@
 #include "elua_int.h"
 #include "vram.h"
 #include "sermux.h"
+#include "ps2.h"
 
 // [TODO] the new builder should automatically do this
 #if defined( BUILD_LUA_INT_HANDLERS ) || defined( BUILD_C_INT_HANDLERS )
@@ -222,15 +223,23 @@ void cmn_platform_init()
 
 #endif // #ifdef BUILD_VRAM  
 
+#ifdef BUILD_PS2
+  std_set_get_func( ps2_std_get );
+#endif // #ifdef BUILD_PS2
+
 #ifdef BUILD_XMODEM  
   // Initialize XMODEM
   xmodem_init( xmodem_send, xmodem_recv );    
 #endif
 
 #if defined( BUILD_TERM ) || defined( BUILD_TERM_VRAM )  
+#ifdef BUILD_PS2
   // Initialize terminal
+  term_init( TERM_LINES, TERM_COLS, term_out, ps2_term_get, ps2_term_translate );
+#else // #ifdef BUILD_PS2
   term_init( TERM_LINES, TERM_COLS, term_out, term_in, term_translate );
-#endif
+#endif// #ifdef BUILD_PS2
+#endif // #if defined( BUILD_TERM ) || defined( BUILD_TERM_VRAM )  
 }
 
 // ****************************************************************************

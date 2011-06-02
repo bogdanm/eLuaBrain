@@ -124,6 +124,19 @@ void term_set_cursor( int type );
   _D( KC_CTRL_U ),\
   _D( KC_CTRL_K ),\
   _D( KC_DEL ),\
+  _D( KC_F1 ),\
+  _D( KC_F2 ),\
+  _D( KC_F3 ),\
+  _D( KC_F4 ),\
+  _D( KC_F5 ),\
+  _D( KC_F6 ),\
+  _D( KC_F7 ),\
+  _D( KC_F8 ),\
+  _D( KC_F9 ),\
+  _D( KC_F10 ),\
+  _D( KC_F11 ),\
+  _D( KC_F12 ),\
+  _D( KC_INSERT ),\
   _D( KC_UNKNOWN )
   
 // Terminal input functions
