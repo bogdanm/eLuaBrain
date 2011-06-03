@@ -1,0 +1,28 @@
+// Editor allocator
+
+#ifndef __EDALLOC_H__
+#define __EDALLOC_H__
+
+#include "type.h"
+#include "editor.h"
+
+// Static editor line configuration
+#define LINE_ALLOCATOR_ZONE_SIZE        20        // the "zone" is the minimal (and fixed) unit of allocatoin
+#define LINE_ALLOCATOR_ZONES            500       // size of allocator in zones
+#define BUFFER_ALLOCATOR_EXTRA_LINES    10        // how many more lines to allocate on each request
+#define FILE_ESTIMATED_LINE_SIZE        40        // estimated medium size (in chars) of an editor line
+#define LINE_BUFFER_SIZE                500       // size of the line buffer (gives the maximum length of a line in the file)
+
+// Editor line allocator
+int edalloc_init();
+EDITOR_BUFFER* edalloc_buffer_new( const char *fname );
+int edalloc_buffer_change_lines( EDITOR_BUFFER* b, int delta );
+void* edalloc_line_malloc( unsigned size );
+void edalloc_line_free( void* ptr );
+void* edalloc_line_realloc( void* ptr, unsigned size );
+void edalloc_line_set_extra_space( int size );
+void edalloc_buffer_remove_line( EDITOR_BUFFER* b, int line );
+int edalloc_buffer_add_line( EDITOR_BUFFER* b, int line, char* pline );
+
+#endif
+

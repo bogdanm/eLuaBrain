@@ -123,6 +123,8 @@ void term_set_cursor( int type );
   _D( KC_CTRL_T ),\
   _D( KC_CTRL_U ),\
   _D( KC_CTRL_K ),\
+  _D( KC_CTRL_Y ),\
+  _D( KC_CTRL_B ),\
   _D( KC_DEL ),\
   _D( KC_F1 ),\
   _D( KC_F2 ),\

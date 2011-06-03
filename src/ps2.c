@@ -440,7 +440,9 @@ static const ps2_keymap ps2_term_mapping[] =
   { 'c', KC_CTRL_C },
   { 't', KC_CTRL_T },
   { 'u', KC_CTRL_U },
-  { 'k', KC_CTRL_K }
+  { 'k', KC_CTRL_K },
+  { 'y', KC_CTRL_Y },
+  { 'b', KC_CTRL_B }
 };
 
 int ps2_term_translate( int code )

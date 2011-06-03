@@ -19,6 +19,7 @@
 #include "linenoise.h"
 #include "stm32f10x.h"
 #include "platform_conf.h"
+#include "editor.h"
 #ifdef BUILD_SHELL
 
 #define EE_I2C_ADDR               0xA0
@@ -64,6 +65,7 @@ static void shell_help( char* args )
   printf( "  recv        - receive a file via XMODEM and execute it\n" );
   printf( "  cp <src> <dst> - copy source file 'src' to 'dst'\n" );
   printf( "  ee <file>   - dump file to the EEPROM connected on I2C1\n" );
+  printf( "  edit <file> - edits the given file\n" );
   printf( "  ver         - print eLua version\n" );
 }
 
@@ -245,6 +247,27 @@ static void shell_cat( char *args )
       printf( "Usage: cat (or type) <filename1> [<filename2> ...]\n" );
 }    
 
+// 'edit' handler
+static void shell_edit( char *args )
+{
+  FILE *fp;
+
+  if( *args == 0 )
+  {
+    printf( "Must specify filename\n" );
+    return;
+  }
+  *strchr( args, ' ' ) = 0;
+  if( ( fp = fopen( args, "rb" ) ) == NULL )
+  {
+    printf( "Unable to open %s\n", args );
+    return;
+  }
+  fclose( fp );
+  editor_init( args );
+  editor_mainloop();
+}
+
 // 'ee' handler
 static void shell_ee( char *args )
 {
@@ -378,6 +401,7 @@ static const SHELL_COMMAND shell_commands[] =
   { "type", shell_cat },
   { "cp", shell_cp },
   { "ee", shell_ee },
+  { "edit", shell_edit },
   { NULL, NULL }
 };
 

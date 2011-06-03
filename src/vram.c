@@ -320,15 +320,14 @@ void vram_putchar( char c )
   }
   else
   {
-    vram_putchar_internal( *vram_p_cx, *vram_p_cy, c );  
-    if( *vram_p_cx == VRAM_COLS - 1 )
+    if( *vram_p_cx == VRAM_COLS )
     {
       // Last column on the line: write a new line (recursively) and change cursor position
       vram_putchar( '\n' );
       *vram_p_cx = 0;
     }
-    else
-      *vram_p_cx += 1;        
+    vram_putchar_internal( *vram_p_cx, *vram_p_cy, c );  
+    *vram_p_cx += 1;        
   }
 }            
 
