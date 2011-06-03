@@ -118,11 +118,15 @@ void term_set_cursor( int type )
 int term_getch( int mode )
 {
   int ch;
-  
-  if( ( ch = term_in( mode ) ) == -1 )
-    return -1;
-  else
-    return term_translate( ch );
+
+  while( 1 )
+  {
+    if( ( ch = term_in( mode ) ) == -1 )
+      return -1;
+    else
+      if( ( ch = term_translate( ch ) ) != -1 )
+        return ch;
+  }
 }
 
 void term_init( unsigned lines, unsigned cols, p_term_out term_out_func, 

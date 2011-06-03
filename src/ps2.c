@@ -19,7 +19,7 @@
 #define PS2_CLOCK_PIN_RESNUM  PLATFORM_IO_ENCODE( PS2_CLOCK_PORT, PS2_CLOCK_PIN, PLATFORM_IO_ENC_PIN )      
 #define PS2_QUEUE_LOG_SIZE    8
 #define PS2_QUEUE_MASK        ( ( 1 << PS2_QUEUE_LOG_SIZE ) - 1 )
-#define PS2_SEND_BUFFER_SIZE  8
+#define PS2_SEND_BUFFER_SIZE  16
 
 // Internal (non-public) flags
 #define PS2_IF_EXTENDED       0x0008
@@ -52,6 +52,7 @@
 // PS2/ commands
 #define PS2_CMD_LED_SET       0xED
 #define PS2_CMD_TYPE_RATE     0xF3
+#define PS2_CMD_RESET         0xFF
 #define PS2_CAPS_LED_MASK     0x04
 // "FAST" I/O operations
 #define ps2h_clock_low()      platform_pio_op( PS2_CLOCK_PORT, 1 << PS2_CLOCK_PIN, PLATFORM_IO_PIN_DIR_OUTPUT )
@@ -182,6 +183,25 @@ static void ps2h_send_cmd( int idx )
   platform_cpu_set_interrupt( INT_GPIO_NEGEDGE, PS2_CLOCK_PIN_RESNUM, PLATFORM_CPU_ENABLE );
 }
 
+// Data send function
+// Gets pairs of (cmd/arg, nacks) as arguments)
+static void ps2_send( int ncmds, ... )
+{
+  va_list va;
+  unsigned i;
+
+  va_start( va, ncmds );
+  // Copy all arguments to to the send buffer
+  for( i = 0; i < ncmds * 2; i ++ )
+    ps2_send_buffer[ i ] = va_arg( va, int );
+  // Initialize the PS/2 send variables
+  ps2_cmds_to_send = ncmds;
+  ps2_send_idx = ps2_acks_to_receive = 0;
+  // Send the first arguments "as-is", the rest wil be sent by the int handler
+  va_end( va );
+  ps2h_send_cmd( 0 );
+}
+
 // H->L clock line interrupt handler
 static void ps2_hl_clk_int_handler( elua_int_resnum resnum )
 {
@@ -198,7 +218,6 @@ static void ps2_hl_clk_int_handler( elua_int_resnum resnum )
     /// Check the "send" part first
     if( ps2_acks_to_receive > 0 )
     {
-      printf( "ACK=%02X ", ( unsigned )ps2_data );
       ps2_data = ps2_bitcnt = 0;
       if( -- ps2_acks_to_receive == 0 )
       {
@@ -280,11 +299,16 @@ static void ps2_hl_clk_int_handler( elua_int_resnum resnum )
           }
           else if( ps2_data == PS2_CAPS_CODE )
           {
-            // [TODO] LED on/off?
             if( ps2_is_set( PS2_IF_CAPS ) )
+            {
               ps2_clear_flag( PS2_IF_CAPS );
+              ps2_send( 2, PS2_CMD_LED_SET, 1, 0, 1 );
+            }
             else
+            {
               ps2_set_flag( PS2_IF_CAPS );
+              ps2_send( 2, PS2_CMD_LED_SET, 1, PS2_CAPS_LED_MASK, 1 );
+            }
           }
           ps2_clear_flag( PS2_IF_BREAK );
         }          
@@ -327,25 +351,6 @@ static void ps2_hl_clk_int_handler( elua_int_resnum resnum )
   }
 }
 
-// Data send function
-// Gets pairs of (cmd/arg, nacks) as arguments)
-static void ps2_send( int ncmds, ... )
-{
-  va_list va;
-  unsigned i;
-
-  va_start( va, ncmds );
-  // Copy all arguments to to the send buffer
-  for( i = 0; i < ncmds * 2; i ++ )
-    ps2_send_buffer[ i ] = va_arg( va, int );
-  // Initialize the PS/2 send variables
-  ps2_cmds_to_send = ncmds;
-  ps2_send_idx = ps2_acks_to_receive = 0;
-  // Send the first arguments "as-is", the rest wil be sent by the int handler
-  va_end( va );
-  ps2h_send_cmd( 0 );
-}
-
 // Helper: read data from buffer, increment pointer
 static u16 ps2h_read_data()
 {
@@ -367,10 +372,8 @@ void ps2_init()
   // Enable interrupt on clock line 
   elua_int_set_c_handler( INT_GPIO_NEGEDGE, ps2_hl_clk_int_handler ); 
   platform_cpu_set_interrupt( INT_GPIO_NEGEDGE, PS2_CLOCK_PIN_RESNUM, PLATFORM_CPU_ENABLE );
-  // LED test
-  ps2_send( 2, PS2_CMD_LED_SET, 1, 0x07, 1 );
-  // Typematic rate
-  ps2_send( 2, PS2_CMD_TYPE_RATE, 1, 0x00, 1 );
+  // Reset + typematic rate
+  ps2_send( 3, PS2_CMD_RESET, 2, PS2_CMD_TYPE_RATE, 1, 0x00, 1 );
 }
 
 int ps2_get_rawkey( s32 timeout )
@@ -406,14 +409,16 @@ int ps2_get_rawkey( s32 timeout )
 // ignore everything that is not ASCII 0-255
 int ps2_std_get( s32 timeout )
 {
-  int data;
+  int data, mods;
 
   while( 1 )
   {
     if( ( data = ps2_get_rawkey( timeout ) ) == -1 )
       return -1;
-    data = PS2_RAW_TO_CODE( data );
-    if( data < 256 )
+    mods = PS2_RAW_TO_MODS( data );
+    if( mods & ( PS2_CTRL | PS2_ALT ) )
+      continue;
+    if( ( data = PS2_RAW_TO_CODE( data ) ) < 256 )
       break;
   }
   return data;
@@ -443,11 +448,12 @@ int ps2_term_translate( int code )
   unsigned i;
   int kcode = PS2_RAW_TO_CODE( code );
   int kmods = PS2_RAW_TO_MODS( code );
-  int termcode = kcode;
+  int termcode = code & ~( PS2_SHIFT << PS2_BASEF_SHIFT );
 
   if( ( kmods & PS2_CTRL ) && isalpha( kcode ) )
   {
     kcode = tolower( kcode );
+    termcode = -1;
     for( i = 0; i < sizeof( ps2_term_mapping ) / sizeof( ps2_keymap ); i ++ )
       if( ps2_term_mapping[ i ].kc == kcode )
       {
