@@ -217,6 +217,8 @@ u32 platform_pwm_op( unsigned id, int op, u32 data );
 
 #define PLATFORM_CPU_DISABLE            0
 #define PLATFORM_CPU_ENABLE             1
+#define PLATFORM_CPU_KEEP_FLAG          0
+#define PLATFORM_CPU_CLEAR_FLAG         1
 
 // Interrupt functions return status
 #define PLATFORM_INT_OK                 0

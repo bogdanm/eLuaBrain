@@ -7,6 +7,7 @@
 #include "term.h"
 #include <stdio.h>
 #include <ctype.h>
+#include <stdarg.h>
 
 #include "platform_conf.h"
 #ifdef BUILD_PS2
@@ -18,6 +19,7 @@
 #define PS2_CLOCK_PIN_RESNUM  PLATFORM_IO_ENCODE( PS2_CLOCK_PORT, PS2_CLOCK_PIN, PLATFORM_IO_ENC_PIN )      
 #define PS2_QUEUE_LOG_SIZE    8
 #define PS2_QUEUE_MASK        ( ( 1 << PS2_QUEUE_LOG_SIZE ) - 1 )
+#define PS2_SEND_BUFFER_SIZE  8
 
 // Internal (non-public) flags
 #define PS2_IF_EXTENDED       0x0008
@@ -47,14 +49,30 @@
 #define PS2_F7_CODE           0x83
 #define PS2_CAPS_CODE         0x58
 
+// PS2/ commands
+#define PS2_CMD_LED_SET       0xED
+#define PS2_CMD_TYPE_RATE     0xF3
+#define PS2_CAPS_LED_MASK     0x04
+// "FAST" I/O operations
+#define ps2h_clock_low()      platform_pio_op( PS2_CLOCK_PORT, 1 << PS2_CLOCK_PIN, PLATFORM_IO_PIN_DIR_OUTPUT )
+#define ps2h_clock_high()     platform_pio_op( PS2_CLOCK_PORT, 1 << PS2_CLOCK_PIN, PLATFORM_IO_PIN_DIR_INPUT )
+#define ps2h_data_low()       platform_pio_op( PS2_DATA_PORT, 1 << PS2_DATA_PIN, PLATFORM_IO_PIN_DIR_OUTPUT )
+#define ps2h_data_high()      platform_pio_op( PS2_DATA_PORT, 1 << PS2_DATA_PIN, PLATFORM_IO_PIN_DIR_INPUT )
+#define ps2h_clock_get()      platform_pio_op( PS2_CLOCK_PORT, 1 << PS2_CLOCK_PIN, PLATFORM_IO_PIN_GET )
+#define ps2h_data_get()       platform_pio_op( PS2_DATA_PORT, 1 << PS2_DATA_PIN, PLATFORM_IO_PIN_GET )
+
 static u16 ps2_flags;                   // internal and public flags
 static u8 ps2_bitcnt;                   // PS/2 data bit counter
 static u8 ps2_data;                     // PS/2 data read from keyboard
-static u8 ps2_sending, ps2_data_to_send, ps2_send_one_bits; // sender state
 static volatile int ps2_wait_ack;       // sender acknowledge 
 static volatile u8 ps2_r_idx, ps2_w_idx;  // queue read and write pointers
 static u16 ps2_queue[ 1 << PS2_QUEUE_LOG_SIZE ]; // keyboard data queue
 static u8 ps2_ignore_count;             // how many codes to ignore
+// Send buffer: kept as pairs of (byte to send, num acks)
+static u8 ps2_send_buffer[ PS2_SEND_BUFFER_SIZE ];
+static volatile u8 ps2_cmds_to_send;
+static u8 ps2_send_idx;
+static volatile u8 ps2_acks_to_receive;
 
 // Direct scancode to ASCII mappings (0 means 'no mapping')
 static const u16 ps2_direct_mapping[] = 
@@ -111,62 +129,57 @@ static const ps2_keymap ps2_ext_mapping[] =
 // ****************************************************************************
 // Helpers and internal functions
 
-// Helpers: set clock/data line high/low
-static void ps2h_clock_low()
+// Wait for a high to low transition on the clock line
+static void ps2h_wait_clock_hl()
 {
-  platform_pio_op( PS2_CLOCK_PORT, 1 << PS2_CLOCK_PIN, PLATFORM_IO_PIN_CLEAR );
-  platform_pio_op( PS2_CLOCK_PORT, 1 << PS2_CLOCK_PIN, PLATFORM_IO_PIN_DIR_OUTPUT );
+  while( ps2h_clock_get() == 0 ); // Wait for 1
+  while( ps2h_clock_get() == 1 ); // Wait for 0
 }
 
-static void ps2h_clock_high()
+// Send one command to the keyboard
+// Gets the command and the number of expected ACKs from ps2_send_buffer at
+// the index received as argument
+static void ps2h_send_cmd( int idx )
 {
-  platform_pio_op( PS2_CLOCK_PORT, 1 << PS2_CLOCK_PIN, PLATFORM_IO_PIN_DIR_INPUT );
-}
+  unsigned i;
+  int par;
+  int cmd = ps2_send_buffer[ idx * 2 ];
+  int nacks = ps2_send_buffer[ idx * 2 + 1 ];
 
-static void ps2h_data_low()
-{
-  platform_pio_op( PS2_DATA_PORT, 1 << PS2_DATA_PIN, PLATFORM_IO_PIN_CLEAR );
-  platform_pio_op( PS2_DATA_PORT, 1 << PS2_DATA_PIN, PLATFORM_IO_PIN_DIR_OUTPUT );
-}
-
-static void ps2h_data_high()
-{
-  platform_pio_op( PS2_DATA_PORT, 1 << PS2_DATA_PIN, PLATFORM_IO_PIN_DIR_INPUT );
-}
-
-// L->H clock line interrupt handler (for sending data)
-static void ps2_lh_clk_int_handler( elua_int_resnum resnum )
-{
-  if( resnum != PS2_CLOCK_PIN_RESNUM )
-    return;
-  ps2_bitcnt ++;
-  if( ps2_bitcnt < 9 ) // data bit
+  platform_cpu_set_interrupt( INT_GPIO_NEGEDGE, PS2_CLOCK_PIN_RESNUM, PLATFORM_CPU_DISABLE );
+  ps2h_clock_low();
+  platform_timer_delay( PS2_TIMER_ID, 1000 );
+  ps2h_data_low();
+  ps2h_clock_high();
+  ps2h_wait_clock_hl();
+  for( i = par = 0; i < 8; i ++, cmd >>= 1 ) 
   {
-    if( ps2_data_to_send & 1 )
+    if( cmd & 1 )
     {
-      ps2_send_one_bits ++;
       ps2h_data_high();
+      par ++;
     }
     else
       ps2h_data_low();
-    ps2_data_to_send >>= 1;
+    ps2h_wait_clock_hl();
   }
-  else if( ps2_bitcnt == 9 ) // parity bit (odd parity)
-  {
-    if( ps2_send_one_bits & 1 )
-      ps2h_data_low();
-    else
-      ps2h_data_high();
-  }
-  else if( ps2_bitcnt == 10 ) // stop bit (release data line)
+  // Send parity now
+  if( par & 1 )
+    ps2h_data_low();
+  else
     ps2h_data_high();
-  else if( ps2_bitcnt == 11 )
-  {
-    // Done sending, need to wait ACK from the keyboard
-    ps2_sending = ps2_bitcnt = ps2_data = 0;
-    platform_cpu_set_interrupt( INT_GPIO_POSEDGE, PS2_CLOCK_PIN_RESNUM, PLATFORM_CPU_DISABLE );
-    platform_cpu_set_interrupt( INT_GPIO_NEGEDGE, PS2_CLOCK_PIN_RESNUM, PLATFORM_CPU_ENABLE );
-  }
+  ps2h_wait_clock_hl();
+  // Release data line (stop bit)
+  ps2h_data_high();
+  ps2h_wait_clock_hl();
+  // Read and interpret ACK bit
+  if( ps2h_data_get() == 1 ) // error, [TODO] remove the platform_uart_send
+    platform_uart_send( CON_UART_ID, '@' );
+  while( ps2h_clock_get() == 0 );
+  // Clear pending interrupts and re-enable keyboard interrupt
+  ps2_acks_to_receive = nacks;
+  platform_cpu_get_interrupt_flag( INT_GPIO_NEGEDGE, PS2_CLOCK_PIN_RESNUM, PLATFORM_CPU_CLEAR_FLAG );
+  platform_cpu_set_interrupt( INT_GPIO_NEGEDGE, PS2_CLOCK_PIN_RESNUM, PLATFORM_CPU_ENABLE );
 }
 
 // H->L clock line interrupt handler
@@ -177,168 +190,160 @@ static void ps2_hl_clk_int_handler( elua_int_resnum resnum )
 
   if( resnum != PS2_CLOCK_PIN_RESNUM )
     return;
-  if( ps2_sending ) // send command to keyboard
+  ps2_bitcnt ++;
+  if( ps2_bitcnt != 1 && ps2_bitcnt < 10 ) // start/stop/parity bits, ignore
+    ps2_data |= platform_pio_op( PS2_DATA_PORT, 1 << PS2_DATA_PIN, PLATFORM_IO_PIN_GET ) << ( ps2_bitcnt - 2 );
+  else if( ps2_bitcnt == 11 ) // done receiving, the code is in ps2_data now
   {
-    ps2_send_one_bits = 0;
-    // We got the first falling edge, after this the keyboard wil start to read data
-    // Since the data read by the keyboard is sampled on the falling edge of the clock, 
-    // we'll set it on the rising edge
-    platform_cpu_set_interrupt( INT_GPIO_NEGEDGE, PS2_CLOCK_PIN_RESNUM, PLATFORM_CPU_DISABLE );
-    platform_cpu_set_interrupt( INT_GPIO_POSEDGE, PS2_CLOCK_PIN_RESNUM, PLATFORM_CPU_ENABLE );
-  }
-  else // receive data from keyboard
-  {
-    ps2_bitcnt ++;
-    if( ps2_bitcnt != 1 && ps2_bitcnt < 10 ) // start/stop/parity bits, ignore
-      ps2_data |= platform_pio_op( PS2_DATA_PORT, 1 << PS2_DATA_PIN, PLATFORM_IO_PIN_GET ) << ( ps2_bitcnt - 2 );
-    else if( ps2_bitcnt == 11 ) // done receiving, the code is in ps2_data now
+    /// Check the "send" part first
+    if( ps2_acks_to_receive > 0 )
     {
-      // printf( "c=%02X ", ( unsigned )ps2_data );
-      if( ps2_wait_ack == -1 )
-        ps2_wait_ack = ps2_data;
+      printf( "ACK=%02X ", ( unsigned )ps2_data );
+      ps2_data = ps2_bitcnt = 0;
+      if( -- ps2_acks_to_receive == 0 )
+      {
+        if( -- ps2_cmds_to_send != 0 ) // more data to send?
+          ps2h_send_cmd( ++ ps2_send_idx );
+      }
+      return;
+    }
+    else // nothing is sending, so interpret this code
+    {
+      if( ps2_ignore_count > 0 ) // need to ignore this code?        
+        ps2_ignore_count --;
       else
       {
-        if( ps2_ignore_count > 0 ) // need to ignore this code?        
-          ps2_ignore_count --;
-        else
+        if( ps2_is_set( PS2_IF_EXTENDED ) )           // extended key management
         {
-          if( ps2_is_set( PS2_IF_EXTENDED ) )           // extended key management
-          {
-            if( ps2_is_set( PS2_IF_BREAK ) )            // code of extended key that was released
-            {
-              if( ps2_data == PS2_CTRL_CODE )           // CTRL released
-              {
-                ps2_clear_flag( PS2_IF_EXT_CTRL );
-                if( !ps2_is_set( PS2_IF_CTRL )  )
-                  ps2_clear_flag( PS2_CTRL );
-              }
-              else if( ps2_data == PS2_ALT_CODE )       // ALT released
-              {
-                ps2_clear_flag( PS2_IF_EXT_ALT );
-                if( !ps2_is_set( PS2_IF_ALT ) )
-                  ps2_clear_flag( PS2_ALT );
-              }
-              ps2_clear_flag( PS2_IF_BREAK );
-              ps2_clear_flag( PS2_IF_EXTENDED );
-            }
-            else if( ps2_data == PS2_BREAK_CODE ) 
-              ps2_set_flag( PS2_IF_BREAK );
-            else
-            { 
-              if( ps2_data == PS2_CTRL_CODE )
-                ps2_set_flag( PS2_IF_EXT_CTRL | PS2_CTRL );
-              if( ps2_data == PS2_ALT_CODE )
-                ps2_set_flag( PS2_IF_EXT_ALT | PS2_ALT );
-              else
-                // Map keycode, add to queue if needed
-                for( i = 0; i < sizeof( ps2_ext_mapping ) / sizeof( ps2_keymap ); i ++ ) 
-                  if( ps2_ext_mapping[ i ].kc == ps2_data )
-                  {
-                    ps2_queue[ ps2_w_idx ] = ( ( ps2_flags & PS2_BASEF_MASK ) << PS2_BASEF_SHIFT ) | ps2_ext_mapping[ i ].code;
-                    ps2_w_idx = ( ps2_w_idx + 1 ) & PS2_QUEUE_MASK;
-                    break;
-                  }
-              ps2_clear_flag( PS2_IF_EXTENDED );
-            }
-          } // end of extended key management
-          else if( ps2_is_set( PS2_IF_BREAK ) )       // code of key that was released
+          if( ps2_is_set( PS2_IF_BREAK ) )            // code of extended key that was released
           {
             if( ps2_data == PS2_CTRL_CODE )           // CTRL released
             {
-              ps2_clear_flag( PS2_IF_CTRL );
-              if( !ps2_is_set( PS2_IF_EXT_CTRL ) )
+              ps2_clear_flag( PS2_IF_EXT_CTRL );
+              if( !ps2_is_set( PS2_IF_CTRL )  )
                 ps2_clear_flag( PS2_CTRL );
             }
             else if( ps2_data == PS2_ALT_CODE )       // ALT released
             {
-              ps2_clear_flag( PS2_IF_ALT );
-              if( !ps2_is_set( PS2_IF_EXT_ALT ) )
+              ps2_clear_flag( PS2_IF_EXT_ALT );
+              if( !ps2_is_set( PS2_IF_ALT ) )
                 ps2_clear_flag( PS2_ALT );
             }
-            else if( ps2_data == PS2_LSHIFT_CODE )
-            {
-              ps2_clear_flag( PS2_IF_LSHIFT );
-              if( !ps2_is_set( PS2_IF_RSHIFT ) )
-                ps2_clear_flag( PS2_SHIFT );
-            }
-            else if( ps2_data == PS2_RSHIFT_CODE )
-            {
-              ps2_clear_flag( PS2_IF_RSHIFT );
-              if( !ps2_is_set( PS2_IF_LSHIFT ) )
-                ps2_clear_flag( PS2_SHIFT );
-            }
-            else if( ps2_data == PS2_CAPS_CODE )
-            {
-              // [TODO] LED off?
-              ps2_clear_flag( PS2_IF_CAPS );
-            }
             ps2_clear_flag( PS2_IF_BREAK );
-          }          
-          else if( ps2_data == PS2_PAUSE_1ST_CODE )   // ignore everything related to this crazy key
-            ps2_ignore_count = PS2_PAUSE_NUM_CODES - 1;
-          else if( ps2_data == PS2_EXTENDED_CODE )    // this is an extended key
-            ps2_set_flag( PS2_IF_EXTENDED );
-          else if( ps2_data == PS2_BREAK_CODE )       // found a break
+            ps2_clear_flag( PS2_IF_EXTENDED );
+          }
+          else if( ps2_data == PS2_BREAK_CODE ) 
             ps2_set_flag( PS2_IF_BREAK );
-          else if( ps2_data == PS2_CTRL_CODE )        // CTRL pressed
-            ps2_set_flag( PS2_IF_CTRL | PS2_CTRL );
-          else if( ps2_data == PS2_ALT_CODE )         // ALT pressed
-            ps2_set_flag( PS2_IF_ALT | PS2_ALT );
-          else if( ps2_data == PS2_LSHIFT_CODE )      // Left SHIFT pressed
-            ps2_set_flag( PS2_IF_LSHIFT | PS2_SHIFT );
-          else if( ps2_data == PS2_RSHIFT_CODE )      // Right SHIFT pressed
-            ps2_set_flag( PS2_IF_RSHIFT | PS2_SHIFT );
-          else if( ps2_data == PS2_CAPS_CODE )        // CAPS LOCK pressed
-          {
-            // [TODO] LED on?
-            ps2_set_flag( PS2_IF_CAPS );
-          }
           else
-          {
-            // Check if we need to enqueue a key
-            if( ps2_data == PS2_F7_CODE )             // special case to keep mapping arrays small
-              temp = KC_F7;
-            else if( ps2_data > PS2_LAST_MAP_CODE )
-              temp = 0;
-            else if( ps2_is_set( PS2_SHIFT ) )
-              temp = ps2_shift_mapping[ ps2_data ];
+          { 
+            if( ps2_data == PS2_CTRL_CODE )
+              ps2_set_flag( PS2_IF_EXT_CTRL | PS2_CTRL );
+            if( ps2_data == PS2_ALT_CODE )
+              ps2_set_flag( PS2_IF_EXT_ALT | PS2_ALT );
             else
-              temp = ps2_direct_mapping[ ps2_data ];
-            if( temp )
-            {
-              if( ps2_is_set( PS2_IF_CAPS ) && isalpha( temp ) )
-                temp = toupper( temp );
-              ps2_queue[ ps2_w_idx ] = ( ( ps2_flags & PS2_BASEF_MASK ) << PS2_BASEF_SHIFT ) | temp;
-              ps2_w_idx = ( ps2_w_idx + 1 ) & PS2_QUEUE_MASK;
-            }           
+              // Map keycode, add to queue if needed
+              for( i = 0; i < sizeof( ps2_ext_mapping ) / sizeof( ps2_keymap ); i ++ ) 
+                if( ps2_ext_mapping[ i ].kc == ps2_data )
+                {
+                  ps2_queue[ ps2_w_idx ] = ( ( ps2_flags & PS2_BASEF_MASK ) << PS2_BASEF_SHIFT ) | ps2_ext_mapping[ i ].code;
+                  ps2_w_idx = ( ps2_w_idx + 1 ) & PS2_QUEUE_MASK;
+                  break;
+                }
+            ps2_clear_flag( PS2_IF_EXTENDED );
           }
+        } // end of extended key management
+        else if( ps2_is_set( PS2_IF_BREAK ) )       // code of key that was released
+        {
+          if( ps2_data == PS2_CTRL_CODE )           // CTRL released
+          {
+            ps2_clear_flag( PS2_IF_CTRL );
+            if( !ps2_is_set( PS2_IF_EXT_CTRL ) )
+              ps2_clear_flag( PS2_CTRL );
+          }
+          else if( ps2_data == PS2_ALT_CODE )       // ALT released
+          {
+            ps2_clear_flag( PS2_IF_ALT );
+            if( !ps2_is_set( PS2_IF_EXT_ALT ) )
+              ps2_clear_flag( PS2_ALT );
+          }
+          else if( ps2_data == PS2_LSHIFT_CODE )
+          {
+            ps2_clear_flag( PS2_IF_LSHIFT );
+            if( !ps2_is_set( PS2_IF_RSHIFT ) )
+              ps2_clear_flag( PS2_SHIFT );
+          }
+          else if( ps2_data == PS2_RSHIFT_CODE )
+          {
+            ps2_clear_flag( PS2_IF_RSHIFT );
+            if( !ps2_is_set( PS2_IF_LSHIFT ) )
+              ps2_clear_flag( PS2_SHIFT );
+          }
+          else if( ps2_data == PS2_CAPS_CODE )
+          {
+            // [TODO] LED on/off?
+            if( ps2_is_set( PS2_IF_CAPS ) )
+              ps2_clear_flag( PS2_IF_CAPS );
+            else
+              ps2_set_flag( PS2_IF_CAPS );
+          }
+          ps2_clear_flag( PS2_IF_BREAK );
+        }          
+        else if( ps2_data == PS2_PAUSE_1ST_CODE )   // ignore everything related to this crazy key
+          ps2_ignore_count = PS2_PAUSE_NUM_CODES - 1;
+        else if( ps2_data == PS2_EXTENDED_CODE )    // this is an extended key
+          ps2_set_flag( PS2_IF_EXTENDED );
+        else if( ps2_data == PS2_BREAK_CODE )       // found a break
+          ps2_set_flag( PS2_IF_BREAK );
+        else if( ps2_data == PS2_CTRL_CODE )        // CTRL pressed
+          ps2_set_flag( PS2_IF_CTRL | PS2_CTRL );
+        else if( ps2_data == PS2_ALT_CODE )         // ALT pressed
+          ps2_set_flag( PS2_IF_ALT | PS2_ALT );
+        else if( ps2_data == PS2_LSHIFT_CODE )      // Left SHIFT pressed
+          ps2_set_flag( PS2_IF_LSHIFT | PS2_SHIFT );
+        else if( ps2_data == PS2_RSHIFT_CODE )      // Right SHIFT pressed
+          ps2_set_flag( PS2_IF_RSHIFT | PS2_SHIFT );
+        else
+        {
+          // Check if we need to enqueue a key
+          if( ps2_data == PS2_F7_CODE )             // special case to keep mapping arrays small
+            temp = KC_F7;
+          else if( ps2_data > PS2_LAST_MAP_CODE )
+            temp = 0;
+          else if( ps2_is_set( PS2_SHIFT ) )
+            temp = ps2_shift_mapping[ ps2_data ];
+          else
+            temp = ps2_direct_mapping[ ps2_data ];
+          if( temp )
+          {
+            if( ps2_is_set( PS2_IF_CAPS ) && isalpha( temp ) )
+              temp = toupper( temp );
+            ps2_queue[ ps2_w_idx ] = ( ( ps2_flags & PS2_BASEF_MASK ) << PS2_BASEF_SHIFT ) | temp;
+            ps2_w_idx = ( ps2_w_idx + 1 ) & PS2_QUEUE_MASK;
+          }           
         }
       }
-      ps2_data = ps2_bitcnt = 0;
     }
+    ps2_data = ps2_bitcnt = 0;
   }
 }
 
-// Data send function, return the ACK from the keyboard
-static u8 ps2_send( u8 data, int needs_ack )
+// Data send function
+// Gets pairs of (cmd/arg, nacks) as arguments)
+static void ps2_send( int ncmds, ... )
 {
-  ps2h_clock_low();
-  platform_timer_delay( PS2_TIMER_ID, 1000 );  
-  ps2h_data_low();
-  ps2_data_to_send = data;
-  ps2_sending = 1;
-  ps2_bitcnt = 0;
-  if( needs_ack )
-    ps2_wait_ack = -1;
-  ps2h_clock_high();
-  if( needs_ack )
-  {
-    while( ps2_wait_ack == -1 );
-    printf( "%02X\n", ( unsigned )ps2_wait_ack );
-    return ( u8 )ps2_wait_ack;
-  }
-  else
-    return 1;
+  va_list va;
+  unsigned i;
+
+  va_start( va, ncmds );
+  // Copy all arguments to to the send buffer
+  for( i = 0; i < ncmds * 2; i ++ )
+    ps2_send_buffer[ i ] = va_arg( va, int );
+  // Initialize the PS/2 send variables
+  ps2_cmds_to_send = ncmds;
+  ps2_send_idx = ps2_acks_to_receive = 0;
+  // Send the first arguments "as-is", the rest wil be sent by the int handler
+  va_end( va );
+  ps2h_send_cmd( 0 );
 }
 
 // Helper: read data from buffer, increment pointer
@@ -357,16 +362,15 @@ void ps2_init()
   // Setup pins (inputs with external pullups)
   platform_pio_op( PS2_DATA_PORT, 1 << PS2_DATA_PIN, PLATFORM_IO_PIN_DIR_INPUT );
   platform_pio_op( PS2_CLOCK_PORT, 1 << PS2_CLOCK_PIN, PLATFORM_IO_PIN_DIR_INPUT );
+  platform_pio_op( PS2_DATA_PORT, 1 << PS2_DATA_PIN, PLATFORM_IO_PIN_CLEAR );
+  platform_pio_op( PS2_CLOCK_PORT, 1 << PS2_CLOCK_PIN, PLATFORM_IO_PIN_CLEAR );
   // Enable interrupt on clock line 
   elua_int_set_c_handler( INT_GPIO_NEGEDGE, ps2_hl_clk_int_handler ); 
-  elua_int_set_c_handler( INT_GPIO_POSEDGE, ps2_lh_clk_int_handler );
   platform_cpu_set_interrupt( INT_GPIO_NEGEDGE, PS2_CLOCK_PIN_RESNUM, PLATFORM_CPU_ENABLE );
   // LED test
-  // ps2_send( 0xED, 1 );
-  // ps2_send( 0x03, 1 );
+  ps2_send( 2, PS2_CMD_LED_SET, 1, 0x07, 1 );
   // Typematic rate
-  ps2_send( 0xF3, 1 );
-  ps2_send( 0x00, 1 );
+  ps2_send( 2, PS2_CMD_TYPE_RATE, 1, 0x00, 1 );
 }
 
 int ps2_get_rawkey( s32 timeout )
@@ -422,8 +426,21 @@ int ps2_term_get( int mode )
   return ps2_get_rawkey( to );
 }
 
+// Mapping of terminal codes
+static const ps2_keymap ps2_term_mapping[] =
+{
+  { 'z', KC_CTRL_Z },
+  { 'a', KC_CTRL_A },
+  { 'e', KC_CTRL_E },
+  { 'c', KC_CTRL_C },
+  { 't', KC_CTRL_T },
+  { 'u', KC_CTRL_U },
+  { 'k', KC_CTRL_K }
+};
+
 int ps2_term_translate( int code )
 {
+  unsigned i;
   int kcode = PS2_RAW_TO_CODE( code );
   int kmods = PS2_RAW_TO_MODS( code );
   int termcode = kcode;
@@ -431,36 +448,12 @@ int ps2_term_translate( int code )
   if( ( kmods & PS2_CTRL ) && isalpha( kcode ) )
   {
     kcode = tolower( kcode );
-    switch( kcode )
-    {
-      case 'z':
-        termcode = KC_CTRL_Z;
+    for( i = 0; i < sizeof( ps2_term_mapping ) / sizeof( ps2_keymap ); i ++ )
+      if( ps2_term_mapping[ i ].kc == kcode )
+      {
+        termcode = ps2_term_mapping[ i ].code;
         break;
-
-      case 'a':
-        termcode = KC_CTRL_A;
-        break;
-
-      case 'e':
-        termcode = KC_CTRL_E;
-        break;
-
-      case 'c':
-       termcode = KC_CTRL_C;
-       break;
-
-      case 't':
-        termcode = KC_CTRL_T;
-        break;
-
-      case 'u':
-        termcode = KC_CTRL_U;
-        break;
-
-      case 'k':
-        termcode = KC_CTRL_K;
-        break;
-    }
+      }
   }
   else if( kcode == '\n' )
     termcode = KC_ENTER;
