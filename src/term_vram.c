@@ -110,6 +110,29 @@ void term_set_cursor( int type )
   vram_set_cursor( type );
 }
 
+void term_reset()
+{
+  term_clrscr();
+  term_gotoxy( 0, 0 );
+  term_set_color( TERM_COL_DEFAULT, TERM_COL_DEFAULT );
+  term_set_cursor( TERM_CURSOR_BLOCK );
+}
+
+void* term_box( unsigned x, unsigned y, unsigned width, unsigned height, const char *title, u16 flags )
+{
+  return vram_box( x, y, width, height, title, flags );
+}
+
+void term_close_box( void *pbox )
+{
+  vram_close_box( pbox );
+}
+
+void term_get_color( int *pfgcol, int *pbgcol )
+{
+  vram_get_color( pfgcol, pbgcol );
+}
+
 // Return a char read from the terminal
 // If "mode" is TERM_INPUT_DONT_WAIT, return the char only if it is available,
 // otherwise return -1

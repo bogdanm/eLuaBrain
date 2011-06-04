@@ -3,7 +3,7 @@ CON
         _clkmode                = xtal1 + pll16x                ' System clock is 80MHz
 
          CHAR_W                 = 80
-         CHAR_H                 = 40
+         CHAR_H                 = 30
 
 OBJ
         vga     : "vgacolour"

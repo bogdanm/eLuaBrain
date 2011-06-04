@@ -71,6 +71,12 @@ enum
 #define TERM_FGCOL_LIGHT_CYAN       TERM_FGCOL_HIGH( "36" )
 #define TERM_FGCOL_WHITE            TERM_FGCOL_HIGH( "37" )
 
+#define term_cstr( x )              term_putstr( x, strlen( x ) )
+#define term_cstrxy( x, y, s) do {\
+  term_gotoxy( x, y );\
+  term_putstr( s, strlen( s ) );\
+  } while( 0 )
+
 // Cursors
 enum
 {
@@ -78,6 +84,10 @@ enum
   TERM_CURSOR_BLOCK,
   TERM_CURSOR_UNDERLINE
 };
+
+// Box flags
+#define TERM_BOX_FLAG_BORDER        0x8000
+#define TERM_BOX_FLAG_RESTORE       0x4000
 
 // ****************************************************************************
 // Exported functions
@@ -101,7 +111,11 @@ void term_putstr( const char* str, unsigned size );
 unsigned term_get_cx();
 unsigned term_get_cy();
 void term_set_color( int fgcol, int bgcol );
+void term_get_color( int *pfgcol, int *pbgcol );
 void term_set_cursor( int type );
+void term_reset();
+void* term_box( unsigned x, unsigned y, unsigned width, unsigned height, const char *title, u16 flags );
+void term_close_box( void *pbox );
 
 #define TERM_KEYCODES\
   _D( KC_UP ),\
@@ -138,6 +152,7 @@ void term_set_cursor( int type );
   _D( KC_F10 ),\
   _D( KC_F11 ),\
   _D( KC_F12 ),\
+  _D( KC_CTRL_F2 ),\
   _D( KC_INSERT ),\
   _D( KC_UNKNOWN )
   

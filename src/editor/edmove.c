@@ -62,6 +62,32 @@ void edmove_set_cursorx( int x )
   edhw_gotoxy( ed_cursorx, ed_cursory );
 }
 
+// Go to the line received as argument, trying to position it
+// in the middle of the screen if possible
+void edmove_goto_line( int y )
+{
+  int sy;
+  int newstart;
+
+  y --;
+  if( y >= ed_crt_buffer->file_lines )
+    return;
+  sy = y - ( EDITOR_LINES >> 1 );
+  if( sy < 0 )
+    sy = 0;
+  newstart = sy;
+  if( newstart + EDITOR_LINES > ed_crt_buffer->file_lines )
+    newstart = EMAX( ed_crt_buffer->file_lines - EDITOR_LINES, 0 );
+  ed_cursory = y - newstart;
+  if( newstart != ed_startline )
+  {
+    ed_startline = newstart;
+    edutils_show_screen();
+  }
+  edutils_display_status();
+  edmove_cursor_check();
+}
+
 static void edmove_key_up()
 {
   if( ed_crt_buffer->file_lines == 0 )

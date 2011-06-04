@@ -5,7 +5,7 @@
 
 #include "type.h"
 
-#define VRAM_LINES            40
+#define VRAM_LINES            30
 #define VRAM_COLS             80
 #define VRAM_CHARS            ( VRAM_LINES * VRAM_COLS )
 #define VRAM_SIZE_TOTAL       ( VRAM_CURSOR_SIZE + VRAM_LINES * VRAM_COLS * 2 )
@@ -13,13 +13,22 @@
 #define VRAM_LINE_SIZE        ( VRAM_COLS * 2 )
 #define VRAM_CURSOR_SIZE      4
 
-#define VRAM_TAB_SIZE         8
+#define VRAM_TAB_SIZE         4
 
 #define VRAM_CURSOR_OFF             0
 #define VRAM_CURSOR_BLOCK           1
 #define VRAM_CURSOR_BLOCK_BLINK     2
 #define VRAM_CURSOR_LINE            5
 #define VRAM_CURSOR_LINE_BLINK      6
+
+// Box chars
+#define VRAM_SBOX_UL                0xDA
+#define VRAM_SBOX_UR                0xBF
+#define VRAM_SBOX_BL                0xC0
+#define VRAM_SBOX_BR                0xD9
+#define VRAM_SBOX_HLINE             0xC4
+#define VRAM_SBOX_VLINE             0xB3
+#define VRAM_SBOX_CROSS             0xC5
 
 // Colors
 #define VRAM_COL_DONT_CHANGE        ( -1 )
@@ -58,5 +67,9 @@ u8 vram_get_cx();
 u8 vram_get_cy();
 void vram_clreol();
 void vram_set_cursor( int type );
+void* vram_box( unsigned x, unsigned y, unsigned width, unsigned height, const char *title, u16 flags );
+void vram_close_box( void *pbox );
+void vram_get_color( int *pfgcol, int *pbgcol );
 
 #endif
+

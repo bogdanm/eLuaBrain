@@ -41,7 +41,7 @@
 #define CON_UART_ID           0
 #define CON_UART_SPEED        115200
 #define CON_TIMER_ID          0
-#define TERM_LINES            40
+#define TERM_LINES            30
 #define TERM_COLS             80
 
 // *****************************************************************************

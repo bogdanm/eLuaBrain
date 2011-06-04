@@ -7,6 +7,7 @@
 #include "edhw.h"
 #include <string.h>
 #include <stdio.h>
+#include <ctype.h>
 #include "term.h"
 
 // Get a line from the file
@@ -96,5 +97,17 @@ void edutils_show_screen()
   for( i = ed_startline; i < ed_startline + ed_nlines; i ++ )
     edutils_line_display( i - ed_startline, i );
   edutils_display_status();
+}
+
+// Input validator: number
+int edutils_number_validator( const char *input, int c )
+{
+  return isdigit( c ) || ( strlen( input ) == 0 && c == '-' );
+}
+
+// Input validator: file name
+int edutils_fname_validator( const char *input, int c )
+{
+  return isgraph( c );
 }
 

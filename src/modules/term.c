@@ -141,20 +141,81 @@ static int luaterm_getchar( lua_State* L )
   return 1;
 }
 
+// Lua: setcolor( [fgcol], [bgcol] )
 static int luaterm_setcolor( lua_State *L )
 {
-  int fgcol = ( int )luaL_checkinteger( L, 1 );
-  int bgcol = ( int )luaL_checkinteger( L, 2 );
-  
+  int fgcol, bgcol;
+
+  if( lua_gettop( L ) == 0 )
+    fgcol = bgcol = TERM_COL_DEFAULT;
+  else
+  {
+    fgcol = ( int )luaL_checkinteger( L, 1 );
+    bgcol = ( int )luaL_checkinteger( L, 2 );
+  }
   term_set_color( fgcol, bgcol );
   return 0;
 }
 
+// Lua: setfg( fgcol )
+static int luaterm_setfg( lua_State *L )
+{
+  int fgcol = ( int )luaL_checkinteger( L, 1 );
+
+  term_set_color( fgcol, TERM_COL_DONT_CHANGE );
+  return 0;
+}
+
+// Lua: setbg( fgcol )
+static int luaterm_setbg( lua_State *L )
+{
+  int bgcol = ( int )luaL_checkinteger( L, 1 );
+
+  term_set_color( TERM_COL_DONT_CHANGE, bgcol );
+  return 0;
+}
+
+// Lua: setcursor( type )
 static int luaterm_setcursor( lua_State *L )
 {
   int type = luaL_checkinteger( L, 1 );
 
   term_set_cursor( type );
+  return 0;
+}
+
+// Lua: reset()
+static int luaterm_reset( lua_State *L )
+{
+  term_reset();
+  return 0;
+}
+
+// Lua: id = box( x, y, width, height, title, attrs )
+static int luaterm_box( lua_State *L )
+{
+  int x = luaL_checkinteger( L, 1 );
+  int y = luaL_checkinteger( L, 2 );
+  int width = luaL_checkinteger( L, 3 );
+  int height = luaL_checkinteger( L, 4 );
+  const char *title = luaL_checkstring( L, 5 );
+  int attrs = luaL_checkinteger( L, 6 );
+  void *p;
+
+  p = term_box( x, y, width, height, title, attrs );
+  lua_pushlightuserdata( L, p );
+  return 1;
+}
+
+// Lua: close_box( id )
+static int luaterm_close_box( lua_State *L )
+{
+  void *p;
+
+  if( lua_type( L, 1 ) != LUA_TLIGHTUSERDATA )
+    return luaL_error( L, "invalid argument" );
+  p = lua_touserdata( L, 1 );
+  term_close_box( p );
   return 0;
 }
 
@@ -204,13 +265,20 @@ const LUA_REG_TYPE term_map[] =
   { LSTRKEY( "getcy" ), LFUNCVAL( luaterm_getcy ) },
   { LSTRKEY( "getchar" ), LFUNCVAL( luaterm_getchar ) },
   { LSTRKEY( "setcolor" ), LFUNCVAL( luaterm_setcolor ) },
+  { LSTRKEY( "setfg" ), LFUNCVAL( luaterm_setfg ) },
+  { LSTRKEY( "setbg" ), LFUNCVAL( luaterm_setbg ) },
   { LSTRKEY( "setcursor" ), LFUNCVAL( luaterm_setcursor ) },
+  { LSTRKEY( "reset" ), LFUNCVAL( luaterm_reset ) },
+  { LSTRKEY( "box" ), LFUNCVAL( luaterm_box ) },
+  { LSTRKEY( "close_box" ), LFUNCVAL( luaterm_close_box ) },
 #if LUA_OPTIMIZE_MEMORY > 0
   { LSTRKEY( "__metatable" ), LROVAL( term_map ) },
   { LSTRKEY( "NOWAIT" ), LNUMVAL( TERM_INPUT_DONT_WAIT ) },
   { LSTRKEY( "WAIT" ), LNUMVAL( TERM_INPUT_WAIT ) },
   { LSTRKEY( "COL_DONT_CHANGE" ), LNUMVAL( TERM_COL_DONT_CHANGE ) },
   { LSTRKEY( "COL_DEFAULT" ), LNUMVAL( TERM_COL_DEFAULT ) },  
+  { LSTRKEY( "BOX_RESTORE" ), LNUMVAL( TERM_BOX_FLAG_RESTORE ) },
+  { LSTRKEY( "BOX_BORDER" ), LNUMVAL( TERM_BOX_FLAG_BORDER ) },
   COLLINE( COL_BLACK ),
   COLLINE( COL_DARK_BLUE ),
   COLLINE( COL_DARK_GREEN ),

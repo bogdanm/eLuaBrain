@@ -106,7 +106,7 @@ static const u16 ps2_shift_mapping[] =
 // Key to code mapping
 typedef struct
 {
-  u8 kc;
+  u16 kc;
   u16 code;
 } ps2_keymap;
 
@@ -442,7 +442,8 @@ static const ps2_keymap ps2_term_mapping[] =
   { 'u', KC_CTRL_U },
   { 'k', KC_CTRL_K },
   { 'y', KC_CTRL_Y },
-  { 'b', KC_CTRL_B }
+  { 'b', KC_CTRL_B },
+  { KC_F2, KC_CTRL_F2 },
 };
 
 int ps2_term_translate( int code )
@@ -452,7 +453,7 @@ int ps2_term_translate( int code )
   int kmods = PS2_RAW_TO_MODS( code );
   int termcode = code & ~( PS2_SHIFT << PS2_BASEF_SHIFT );
 
-  if( ( kmods & PS2_CTRL ) && isalpha( kcode ) )
+  if( ( kmods & PS2_CTRL ) && ( isalpha( kcode ) || ( kcode >= KC_F1 && kcode <= KC_F12 ) ) )
   {
     kcode = tolower( kcode );
     termcode = -1;

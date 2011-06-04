@@ -14,6 +14,8 @@ void edutils_set_flag( EDITOR_BUFFER* b, int flag, int value );
 void edutils_display_status();
 void edutils_line_display( int scrline, int id );
 void edutils_show_screen();
+int edutils_number_validator( const char *input, int c );
+int edutils_fname_validator( const char *input, int c );
 
 #endif
 

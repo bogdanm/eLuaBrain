@@ -16,8 +16,8 @@ CON
     TEMP_PIN                = 6
     TEMP_PIN_MASK           = 1 << TEMP_PIN
 
-    VMEM_SIZE_LONGS         = (80 * 40 * 2) / 4
-    VMEM_SIZE_CHARS         = (80 * 40)
+    VMEM_SIZE_LONGS         = (80 * 30 * 2) / 4
+    VMEM_SIZE_CHARS         = (80 * 30)
     CURSOR_DEFAULT_MODE     = 2
     CURSOR_DATA_SIZE        = 1
 

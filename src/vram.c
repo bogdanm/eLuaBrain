@@ -6,6 +6,7 @@
 #include "term.h"
 #include <ctype.h>
 #include <stdio.h>
+#include <stdlib.h>
 // [REMOVE]
 #include "platform_conf.h"
 #include "platform.h"
@@ -29,6 +30,14 @@ static u8 vram_bg_col = VRAM_DEFAULT_BG_COL;
 #define VRAM_CHARADDR( x, y )   ( ( y ) * VRAM_COLS + ( x ^ 1 ) + ( VRAM_FIRST_DATA >> 1 ) )
 #define MKCOL( fg, bg )         ( ( ( bg ) << 4 ) + fg )
 #define VRAM_ANSI_ESC           0x1B
+
+// This defines a box (window)
+typedef struct
+{
+  u16 x, y, width, height;
+  u16 flags;
+  u8 *savedata;
+} TERM_BOX;
 
 // *****************************************************************************
 // ANSI sequence interpreter
@@ -428,5 +437,86 @@ void vram_set_cursor( int type )
       *vram_p_type = VRAM_CURSOR_LINE_BLINK;
       break;
   }
+}
+
+// Draw a "box" (with an optional border an title) at the specified coordinates
+// Return a "box id" that can be used later to close the box
+void* vram_box( unsigned x, unsigned y, unsigned width, unsigned height, const char *title, u16 flags )
+{
+  TERM_BOX *pbox = NULL;
+  unsigned ix, iy;
+  u16 *crt;
+  int hasborder = flags & TERM_BOX_FLAG_BORDER;
+
+  if( ( pbox = ( TERM_BOX* )malloc( sizeof( TERM_BOX ) ) ) == NULL )
+    goto error;
+  memset( pbox, 0, sizeof( pbox ) );
+  if( flags & TERM_BOX_FLAG_RESTORE )
+    if( ( pbox->savedata = ( u8* )malloc( width * height * 2 ) ) == NULL )
+      goto error;
+  pbox->x = ( u16 )x;
+  pbox->y = ( u16 )y;
+  pbox->width = ( u16 )width;
+  pbox->height = ( u16 )height;
+  pbox->flags = flags;
+  // Save previous data from video RAM
+  // [TODO] there's got to be a more efficient way to do this ...
+  if( flags & TERM_BOX_FLAG_RESTORE )
+    for( iy = y, crt = ( u16* )pbox->savedata; iy < y + height; iy ++ )
+      for( ix = x; ix < x + width; ix ++ )
+        *crt ++ = *( ( u16* )vram_data + VRAM_CHARADDR( ix, iy ) );
+  // Write the title line
+  vram_putchar_internal( x, y, hasborder ? VRAM_SBOX_UL : ' ' );
+  vram_putchar_internal( x + 1, y, hasborder ? VRAM_SBOX_HLINE : ' ' );
+  vram_putchar_internal( x + 2, y, hasborder ? VRAM_SBOX_HLINE : ' ' );
+  for( ix = 0; ix < ( title ? strlen( title ) : 0 ); ix ++ )
+    vram_putchar_internal( x + 3 + ix, y, title[ ix ] );
+  for( ix = ix + x + 3; ix < x + width - 1; ix ++ )
+    vram_putchar_internal( ix, y, hasborder ? VRAM_SBOX_HLINE : ' ' );
+  vram_putchar_internal( ix, y, hasborder ? VRAM_SBOX_UR : ' ' );
+  // Write the body lines
+  for( iy = y + 1; iy < y + height - 1; iy ++ )
+  {
+    vram_putchar_internal( x, iy, hasborder ? VRAM_SBOX_VLINE : ' ' );
+    for( ix = x + 1; ix < x + width - 1; ix ++ )
+      vram_putchar_internal( ix, iy, ' ' );
+    vram_putchar_internal( ix, iy, hasborder ? VRAM_SBOX_VLINE : ' ' );
+  }
+  // Write the bottom line
+  vram_putchar_internal( x, iy, hasborder ? VRAM_SBOX_BL : ' ' );
+  for( ix = x + 1; ix < x + width - 1; ix ++ )
+    vram_putchar_internal( ix, iy, hasborder ? VRAM_SBOX_HLINE : ' ' );
+  vram_putchar_internal( ix, iy, hasborder ? VRAM_SBOX_BR : ' ' );
+  // All done
+  return pbox;
+error:
+  if( pbox && pbox->savedata )
+    free( pbox->savedata );
+  if( pbox )
+    free( pbox );
+  return NULL;
+}
+
+// Close that box
+void vram_close_box( void *pbox )
+{
+  TERM_BOX *p = ( TERM_BOX* )pbox;
+  u16 *crt;
+  unsigned ix, iy;
+
+  // Restore video memory
+  if( p->flags & TERM_BOX_FLAG_RESTORE )
+    for( iy = p->y, crt = ( u16* )p->savedata; iy < p->y + p->height; iy ++ )
+      for( ix = p->x; ix < p->x + p->width; ix ++ )
+        *( ( u16* )vram_data + VRAM_CHARADDR( ix, iy ) ) = *crt ++;
+  if( p->savedata )
+    free( p->savedata );
+  free( p );
+}
+
+void vram_get_color( int *pfgcol, int *pbgcol )  
+{
+  *pfgcol = vram_fg_col;
+  *pbgcol = vram_bg_col;
 }
 

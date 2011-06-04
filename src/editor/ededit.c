@@ -44,6 +44,7 @@ static int ededit_key_char( int c )
     return -1;
   edmove_set_cursorx( ed_startx + ed_cursorx + 1 );
   edutils_line_display( ed_cursory, lineid );
+  edutils_set_flag( ed_crt_buffer, EDFLAG_DIRTY, 1 );
   edutils_display_status();
   return 1;
 }
@@ -68,6 +69,7 @@ static int ededit_key_backspace()
     else
       ed_cursory --;
     edmove_set_cursorx( linepos );
+    edutils_set_flag( ed_crt_buffer, EDFLAG_DIRTY, 1 );
     edutils_show_screen();
   }
   else // not the first column, simply remove a char and update the display
@@ -78,6 +80,7 @@ static int ededit_key_backspace()
     edutils_line_set( lineid, pline );
     edmove_set_cursorx( ed_startx + ed_cursorx - 1 );
     edutils_line_display( ed_cursory, lineid );
+    edutils_set_flag( ed_crt_buffer, EDFLAG_DIRTY, 1 );
     edutils_display_status();
   }
   return 1;
@@ -116,6 +119,7 @@ static int ededit_key_enter()
     ed_startline ++;
   else
     ed_cursory ++;
+  edutils_set_flag( ed_crt_buffer, EDFLAG_DIRTY, 1 );
   edutils_show_screen();
   return 1;
 }
@@ -136,6 +140,8 @@ static int ededit_delline()
       pline[ 0 ] = '\0';
       edutils_line_set( 0, pline );
     }
+    else
+      return 1;
   }
   else
     edalloc_buffer_remove_line( ed_crt_buffer, lineid );
@@ -148,6 +154,7 @@ static int ededit_delline()
   }
   edmove_set_cursorx( 0 );
   edmove_save_cursorx();
+  edutils_set_flag( ed_crt_buffer, EDFLAG_DIRTY, 1 );
   edutils_show_screen();
   return 1;
 }
@@ -166,7 +173,8 @@ static int ededit_deltoeol()
     pline[ linepos ] = '\0';
     edutils_line_set( lineid, pline );
     edutils_line_display( ed_cursory, lineid );
-    edmove_set_cursorx( linepos );
+    edutils_set_flag( ed_crt_buffer, EDFLAG_DIRTY, 1 );
+    edmove_set_cursorx( linepos );    
   }
   return 1;
 }
@@ -185,6 +193,7 @@ static int ededit_deltobol()
       return -1;
     edutils_line_set( lineid, pline );
     edutils_line_display( ed_cursory, lineid );
+    edutils_set_flag( ed_crt_buffer, EDFLAG_DIRTY, 1 );
     edmove_set_cursorx( 0 );
   }
   return 1;
