@@ -61,6 +61,7 @@
 #define ps2h_data_high()      platform_pio_op( PS2_DATA_PORT, 1 << PS2_DATA_PIN, PLATFORM_IO_PIN_DIR_INPUT )
 #define ps2h_clock_get()      platform_pio_op( PS2_CLOCK_PORT, 1 << PS2_CLOCK_PIN, PLATFORM_IO_PIN_GET )
 #define ps2h_data_get()       platform_pio_op( PS2_DATA_PORT, 1 << PS2_DATA_PIN, PLATFORM_IO_PIN_GET )
+#define ps2h_reset()          platform_pio_op( PS2_RESET_PORT, 1 << PS2_RESET_PIN, PLATFORM_IO_PIN_DIR_OUTPUT )
 
 static u16 ps2_flags;                   // internal and public flags
 static u8 ps2_bitcnt;                   // PS/2 data bit counter
@@ -264,6 +265,12 @@ static void ps2_hl_clk_int_handler( elua_int_resnum resnum )
               for( i = 0; i < sizeof( ps2_ext_mapping ) / sizeof( ps2_keymap ); i ++ ) 
                 if( ps2_ext_mapping[ i ].kc == ps2_data )
                 {
+                  // Check for CTRL+ATL+DEL
+                  if( ps2_ext_mapping[ i ].code == KC_DEL && ps2_is_set( PS2_ALT ) && ps2_is_set( PS2_CTRL ) )
+                  {
+                    ps2h_reset();
+                    while( 1 ); // obviously we won't reach code after this
+                  }
                   ps2_queue[ ps2_w_idx ] = ( ( ps2_flags & PS2_BASEF_MASK ) << PS2_BASEF_SHIFT ) | ps2_ext_mapping[ i ].code;
                   ps2_w_idx = ( ps2_w_idx + 1 ) & PS2_QUEUE_MASK;
                   break;
@@ -367,8 +374,10 @@ void ps2_init()
   // Setup pins (inputs with external pullups)
   platform_pio_op( PS2_DATA_PORT, 1 << PS2_DATA_PIN, PLATFORM_IO_PIN_DIR_INPUT );
   platform_pio_op( PS2_CLOCK_PORT, 1 << PS2_CLOCK_PIN, PLATFORM_IO_PIN_DIR_INPUT );
+  platform_pio_op( PS2_RESET_PORT, 1 << PS2_RESET_PIN, PLATFORM_IO_PIN_DIR_INPUT );
   platform_pio_op( PS2_DATA_PORT, 1 << PS2_DATA_PIN, PLATFORM_IO_PIN_CLEAR );
   platform_pio_op( PS2_CLOCK_PORT, 1 << PS2_CLOCK_PIN, PLATFORM_IO_PIN_CLEAR );
+  platform_pio_op( PS2_RESET_PORT, 1 << PS2_RESET_PIN, PLATFORM_IO_PIN_CLEAR );
   // Enable interrupt on clock line 
   elua_int_set_c_handler( INT_GPIO_NEGEDGE, ps2_hl_clk_int_handler ); 
   platform_cpu_set_interrupt( INT_GPIO_NEGEDGE, PS2_CLOCK_PIN_RESNUM, PLATFORM_CPU_ENABLE );

@@ -149,6 +149,8 @@
 #define PS2_CLOCK_PORT        6
 #define PS2_CLOCK_PIN         15
 #define PS2_TIMER_ID          0
+#define PS2_RESET_PORT        6
+#define PS2_RESET_PIN         14
 
 // CPU frequency (needed by the CPU module, 0 if not used)
 u32 platform_s_cpu_get_frequency();
