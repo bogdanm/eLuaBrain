@@ -33,11 +33,11 @@ static void editorh_print_lua_error( lua_State *L, void *buf )
   edhw_writetext( lua_tostring( L, -1 ) );
   edhw_getkey();
   edhw_init();
-  edutils_show_screen();
   if( L )
     lua_close( L );
   if( buf )
     free( buf );
+  edutils_show_screen();
 }
 
 // Helper: print a fatal error message
@@ -78,9 +78,9 @@ static void editor_run()
           edhw_writetext( "Press any key to return to the editor" );
           edhw_getkey();
           edhw_init();
-          edutils_show_screen();
           lua_close( L );
           free( buf );
+          edutils_show_screen();
         }
         else
           editorh_print_lua_error( L, buf );
@@ -201,6 +201,7 @@ int editor_init( const char *fname )
   ed_cursorx = ed_cursory = 0;
   ed_startx = ed_startline = 0;
   ed_userx = ed_userstartx = 0;
+  ed_firstsel = ed_lastsel = -1;
   edhw_invertcols( 0 );
   return 1;
 }

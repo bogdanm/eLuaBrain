@@ -35,6 +35,7 @@ void edhw_invertcols( int flag );
 void edhw_gotoxy( int x, int y );
 void edhw_setcursor( int type );
 void edhw_longline( int enable );
+void edhw_selectedline( int enable );
 void edhw_msg( const char *text, int type, const char *title );
 char* edhw_read( const char *title, const char *text, unsigned maxlen, p_ed_validate validator );
 int edhw_dlg( const char *text, int type, const char *title );

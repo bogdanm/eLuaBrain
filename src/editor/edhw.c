@@ -71,6 +71,14 @@ void edhw_longline( int enable )
     term_set_color( TEXTCOL, TERM_COL_DONT_CHANGE );
 }
 
+void edhw_selectedline( int enable )
+{
+  if( enable )
+    term_set_color( TERM_COL_BLACK, TERM_COL_WHITE );
+  else
+    term_set_color( TEXTCOL, TERM_COL_BLACK );
+}
+
 void edhw_msg( const char *text, int type, const char *title )
 {
   int fgcol = TERM_COL_LIGHT_BLUE, bgcol = TERM_COL_DARK_GRAY;

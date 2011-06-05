@@ -26,6 +26,9 @@ void edalloc_line_set_extra_space( int size );
 void edalloc_buffer_remove_line( EDITOR_BUFFER* b, int line );
 int edalloc_buffer_add_line( EDITOR_BUFFER* b, int line, char* pline );
 int edalloc_set_fname( EDITOR_BUFFER *b, const char *name );
+void edalloc_clear_selection( EDITOR_BUFFER *b );
+void edalloc_reset_used_selection( EDITOR_BUFFER *b );
+int edalloc_fill_selection( EDITOR_BUFFER *b );
 
 #endif
 

@@ -12,6 +12,7 @@ void edmove_set_cursorx( int x );
 void edmove_set_cursory( int y );
 void edmove_goto_line( int y );
 void edmove_save_cursorx();
+void edmove_restore_cursor();
 
 #endif
 

@@ -88,7 +88,7 @@ typedef struct
 } vram_ansi_op;
 
 // Convert an ASCII escape sequence to an operation we can understand
-static int vram_cvt_escape( const char* inbuf, vram_ansi_op* res )
+static int vram_cvt_escape( char* inbuf, vram_ansi_op* res )
 {
   const char *p = inbuf;
   char last = inbuf[ strlen( inbuf ) - 1 ];
@@ -98,6 +98,7 @@ static int vram_cvt_escape( const char* inbuf, vram_ansi_op* res )
   if( *p++ != '[' )
     return 0;
   res->op = res->p1 = res->p2 = -1;
+  inbuf[ strlen( inbuf ) - 1 ] = '\0';
   switch( last )
   {
     case 'J': // clrscr
@@ -406,19 +407,9 @@ u8 vram_get_cy()
 void vram_clreol()
 {
   unsigned i;
-  u16 *pdata = ( u16* )vram_data + VRAM_CHARADDR( *vram_p_cx, *vram_p_cy );
-  u16 fill = ( ' ' << 8 ) | MKCOL( vram_fg_col, vram_bg_col );
-  int incr = *vram_p_cx & 1 ? 2 : -1; 
-    
+   
   for( i = *vram_p_cx; i < VRAM_COLS; i ++ )
-  {
-    *pdata = fill;
-    pdata += incr;
-    if( incr == -1 )
-      incr = 2;
-    else if( incr == 2 )
-      incr = 1;
-  }
+    vram_putchar_internal( i, *vram_p_cy, ' ' );
 }
 
 void vram_set_cursor( int type )

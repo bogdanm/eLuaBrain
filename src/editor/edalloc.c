@@ -474,3 +474,50 @@ int edalloc_buffer_add_line( EDITOR_BUFFER* b, int line, char* pline )
   return 1;
 }
 
+// Clear the selection buffer
+void edalloc_clear_selection( EDITOR_BUFFER *b )
+{
+  int i;
+
+  if( b->sellines == NULL )
+    return;
+  for( i = b->firstsel; i <= b->lastsel; i ++ )
+    if( b->sellines[ i - b->firstsel ] )
+      edalloc_line_free( b->sellines[ i - b->firstsel ] );
+  free( b->sellines );
+  b->sellines = NULL;
+  b->firstsel = b->lastsel = -1;
+}
+
+// Reset an used selection by clearing only the main array, not the lines
+// (which are now part of the editor).
+void edalloc_reset_used_selection( EDITOR_BUFFER *b )
+{
+  if( b->sellines == NULL )
+    return;
+  free( b->sellines );
+  b->sellines = NULL;
+  b->firstsel = b->lastsel = -1;
+}
+
+// Fill the selection buffer
+int edalloc_fill_selection( EDITOR_BUFFER *b )
+{
+  int i, total = b->lastsel - b->firstsel + 1;
+
+  if( ( b->sellines = ( char ** )malloc( total * sizeof( char* ) ) ) == NULL )
+    return 0;
+  memset( b->sellines, 0, total * sizeof( char* ) );
+  for( i = 0; i < total; i ++ )
+  {
+    if( ( b->sellines[ i ] = edalloc_line_malloc( strlen( edutils_line_get( i + b->firstsel ) ) + 1 ) ) == NULL )
+      goto error;
+    strcpy( b->sellines[ i ], edutils_line_get( i + b->firstsel ) );
+  }
+  return 1;
+error:
+  edalloc_clear_selection( b );
+  return 0;
+}
+
+

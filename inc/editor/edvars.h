@@ -10,10 +10,17 @@
 #endif
 
 EDSPEC EDITOR_BUFFER *ed_crt_buffer;     // current editor file data
-EDSPEC s16 ed_startx, ed_startline;      // start column and line
-EDSPEC s16 ed_cursorx, ed_cursory;       // cursor position
-EDSPEC s16 ed_nlines;                    // number of lines on screen
-EDSPEC s16 ed_userstartx, ed_userx;     // cursor column as requested by user
+
+#define ed_startx             ed_crt_buffer->startx
+#define ed_startline          ed_crt_buffer->startline
+#define ed_cursorx            ed_crt_buffer->cursorx
+#define ed_cursory            ed_crt_buffer->cursory
+#define ed_nlines             ed_crt_buffer->nlines
+#define ed_userstartx         ed_crt_buffer->userstartx
+#define ed_userx              ed_crt_buffer->userx
+#define ed_firstsel           ed_crt_buffer->firstsel
+#define ed_lastsel            ed_crt_buffer->lastsel
+#define ed_sellines           ed_crt_buffer->sellines
 
 #endif
 

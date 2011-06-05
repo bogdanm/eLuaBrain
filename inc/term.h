@@ -139,6 +139,8 @@ void term_close_box( void *pbox );
   _D( KC_CTRL_K ),\
   _D( KC_CTRL_Y ),\
   _D( KC_CTRL_B ),\
+  _D( KC_CTRL_X ),\
+  _D( KC_CTRL_V ),\
   _D( KC_DEL ),\
   _D( KC_F1 ),\
   _D( KC_F2 ),\
@@ -153,6 +155,7 @@ void term_close_box( void *pbox );
   _D( KC_F11 ),\
   _D( KC_F12 ),\
   _D( KC_CTRL_F2 ),\
+  _D( KC_CTRL_F4 ),\
   _D( KC_INSERT ),\
   _D( KC_UNKNOWN )
   

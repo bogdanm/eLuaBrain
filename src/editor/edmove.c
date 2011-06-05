@@ -7,6 +7,7 @@
 #include "term.h"
 #include "edhw.h"
 #include "edutils.h"
+#include "edalloc.h"
 #include <ctype.h>
 
 // ----------------------------------------------------------------------------
@@ -216,6 +217,86 @@ static void edmove_key_home()
   edmove_set_cursorx( firstc );
 }
 
+// Selection handling
+static void edmove_toggle_select()
+{
+  int temp;
+
+  if( edutils_is_flag_set( ed_crt_buffer, EDFLAG_SELECT ) )
+  {
+    edutils_set_flag( ed_crt_buffer, EDFLAG_SELECT, 0 );
+    if( ed_firstsel > ed_lastsel )
+    {
+      temp = ed_firstsel;
+      ed_firstsel = ed_lastsel;
+      ed_lastsel = temp;
+    }
+    edalloc_fill_selection( ed_crt_buffer );
+    for( temp = ed_firstsel; temp <= ed_lastsel; temp ++ )
+      if( ed_startline <= temp && temp <= ed_startline + EDITOR_LINES - 1 )
+        edutils_line_display( temp - ed_startline, temp );
+    edutils_display_status();
+  }
+  else if( ed_crt_buffer->file_lines > 0 )
+  {
+    edutils_set_flag( ed_crt_buffer, EDFLAG_SELECT, 1 );
+    edalloc_clear_selection( ed_crt_buffer );
+    ed_firstsel = ed_startline + ed_cursory;
+    ed_lastsel = ed_firstsel;
+    edutils_line_display( ed_cursory, ed_startline + ed_cursory );
+  }
+}
+
+// Clear on-screen selection
+static void edmove_clear_selection()
+{
+  edalloc_clear_selection( ed_crt_buffer );
+  edutils_display_status();
+}
+
+// Key handling in selection mode
+static int edmove_handle_selkey( int c )
+{
+  int inity = ed_cursory;
+
+  switch( c )
+  {
+    case KC_UP:
+      if( ed_cursory > 0 )
+        ed_cursory --;
+      ed_lastsel = ed_cursory + ed_startline;
+      break;
+
+    case KC_DOWN:
+      if( ed_cursory < EDITOR_LINES - 1 )
+        ed_cursory ++;
+      ed_lastsel = ed_cursory + ed_startline;
+      break;
+
+    case KC_F4:
+      edmove_toggle_select();
+      return 1;
+
+    case KC_CTRL_F4:
+      edmove_toggle_select();
+      edmove_clear_selection();
+      return 1;
+
+    default:
+      return 0;
+  }
+  if( ed_cursory != inity )
+  {
+    edutils_line_display( inity, ed_startline + inity );
+    edutils_line_display( ed_cursory, ed_startline + ed_cursory );
+    edutils_display_status();
+  }
+  return 1;
+}
+
+// ****************************************************************************
+// Public interface
+
 void edmove_key_end()
 {
   const char* pline;
@@ -238,10 +319,17 @@ void edmove_key_end()
   edutils_display_status();
 }
 
+void edmove_restore_cursor()
+{
+  edhw_gotoxy( ed_cursorx, ed_cursory );
+}
+
 // Take care of a movement key, returns 1 if the key is indeed a movement key
 // or 0 otherwise
 int edmove_handle_key( int c )
 {
+  if( edutils_is_flag_set( ed_crt_buffer, EDFLAG_SELECT ) )
+    return edmove_handle_selkey( c );
   switch( c )
   {
     case KC_UP:
@@ -278,6 +366,14 @@ int edmove_handle_key( int c )
     case KC_END:
       edmove_key_end();
       edmove_save_cursorx();
+      break;
+
+    case KC_F4:
+      edmove_toggle_select();
+      break;
+
+    case KC_CTRL_F4:
+      edmove_clear_selection();
       break;
 
     default:

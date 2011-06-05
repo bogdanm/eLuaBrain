@@ -10,6 +10,23 @@
 #include <ctype.h>
 #include "term.h"
 
+// Helper: return "true" if the given line is selected, false otherwise
+static int edutilsh_is_selected( int lineid )
+{
+  int first, last;
+
+  if( !edutils_is_flag_set( ed_crt_buffer, EDFLAG_SELECT ) )
+    return 0;
+  first = ed_firstsel;
+  last = ed_lastsel;
+  if( first > last )
+  {
+    first = ed_lastsel;
+    last = ed_firstsel;
+  }
+  return ( first <= lineid ) && ( lineid <= last );
+}
+
 // Get a line from the file
 char* edutils_line_get( int id )
 {
@@ -55,9 +72,9 @@ void edutils_display_status()
   edhw_invertcols( 1 );
   // Write current position
   temp[ 0 ] = temp[ TERM_COLS ] = '\0';
-  snprintf( temp, TERM_COLS, " %c %s    Col: %d    Line: %d/%d", edutils_is_flag_set( ed_crt_buffer, EDFLAG_DIRTY ) ? '*' : ' ', 
+  snprintf( temp, TERM_COLS, " %c %s    Col: %d    Line: %d/%d     Buffer: %d line(s)", edutils_is_flag_set( ed_crt_buffer, EDFLAG_DIRTY ) ? '*' : ' ', 
             ed_crt_buffer->fpath ? ed_crt_buffer->fpath : "(none)",  ed_cursorx + ed_startx + 1, ed_cursory + ed_startline + 1, 
-            ed_crt_buffer->file_lines );
+            ed_crt_buffer->file_lines, ed_sellines ? ed_lastsel - ed_firstsel + 1 : 0 );
   edhw_gotoxy( 0, TERM_LINES - 1 );
   edhw_writetext( temp );
   for( i = strlen( temp ); i < TERM_COLS; i ++ )
@@ -76,6 +93,8 @@ void edutils_line_display( int scrline, int id )
   edhw_gotoxy( 0, scrline );
   if( longline )
     edhw_longline( 1 );
+  if( edutilsh_is_selected( id ) )
+    edhw_selectedline( 1 );
   if( pline && ed_startx < strlen( pline ) )  
     for( i = 0; i < EMIN( strlen( pline ) - ed_startx, TERM_COLS ); i ++, nspaces -- )
       edhw_writechar( pline[ ed_startx + i ] );
@@ -83,6 +102,8 @@ void edutils_line_display( int scrline, int id )
     edhw_writechar( ' ' ); 
   if( longline )
     edhw_longline( 0 );
+  if( edutilsh_is_selected( id ) )
+    edhw_selectedline( 0 );
 }
 
 // Display the current editor screen
