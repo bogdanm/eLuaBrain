@@ -15,7 +15,9 @@
 
 // Editor line allocator
 int edalloc_init();
+void edalloc_deinit();
 EDITOR_BUFFER* edalloc_buffer_new( const char *fname );
+void edalloc_free_buffer( EDITOR_BUFFER *b );
 int edalloc_buffer_change_lines( EDITOR_BUFFER* b, int delta );
 void* edalloc_line_malloc( unsigned size );
 void edalloc_line_free( void* ptr );
@@ -23,6 +25,7 @@ void* edalloc_line_realloc( void* ptr, unsigned size );
 void edalloc_line_set_extra_space( int size );
 void edalloc_buffer_remove_line( EDITOR_BUFFER* b, int line );
 int edalloc_buffer_add_line( EDITOR_BUFFER* b, int line, char* pline );
+int edalloc_set_fname( EDITOR_BUFFER *b, const char *name );
 
 #endif
 

@@ -252,18 +252,16 @@ static void shell_edit( char *args )
 {
   FILE *fp;
 
-  if( *args == 0 )
+  if( *args != 0 )
   {
-    printf( "Must specify filename\n" );
-    return;
+    *strchr( args, ' ' ) = 0;
+    if( ( fp = fopen( args, "rb" ) ) == NULL )
+    {
+      printf( "Unable to open %s\n", args );
+      return;
+    }
+    fclose( fp );
   }
-  *strchr( args, ' ' ) = 0;
-  if( ( fp = fopen( args, "rb" ) ) == NULL )
-  {
-    printf( "Unable to open %s\n", args );
-    return;
-  }
-  fclose( fp );
   editor_init( args );
   editor_mainloop();
 }

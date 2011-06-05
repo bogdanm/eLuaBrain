@@ -20,6 +20,9 @@
 #define EDITOR_MAIN_FILE
 #include "edvars.h"
 
+#define EDITOR_EXIT_CODE      0xFF
+#define EDITOR_FATAL_CODE     ( -1 )
+
 // ****************************************************************************
 // Private functions and helpers
 
@@ -35,6 +38,12 @@ static void editorh_print_lua_error( lua_State *L, void *buf )
     lua_close( L );
   if( buf )
     free( buf );
+}
+
+// Helper: print a fatal error message
+static void editorh_print_fatal_error( const char *title )
+{
+  edhw_msg( "A fatal error has occured, the editor will be closed", EDHW_MSG_ERROR, title );
 }
 
 // Run the program currently in the editor
@@ -81,57 +90,62 @@ static void editor_run()
     }
     else
     {
-      edhw_msg( "Not enough memory", EDHW_MSG_ERROR );
+      edhw_msg( "Not enough memory", EDHW_MSG_ERROR, NULL );
       free( buf );
     }
   }
   else
-    edhw_msg( "Not enough memory", EDHW_MSG_ERROR );
+    edhw_msg( "Not enough memory", EDHW_MSG_ERROR, NULL );
 }
 
 // Save the file - helper function
-static int editorh_save_file( const char *fname )
+static int editorh_save_file( const char *fname, int show_confirmation )
 {
   FILE *fp;
   int c;
 
   if( !fname || strlen( fname ) == 0 )
   {
-    edhw_msg( "No file specified", EDHW_MSG_ERROR );
+    edhw_msg( "No file specified", EDHW_MSG_ERROR, NULL );
     return 0;
   }
   if( ( fp = fopen( fname, "wb" ) ) == NULL )
   {
-    edhw_msg( "Unable to open file", EDHW_MSG_ERROR );
+    edhw_msg( "Unable to open file", EDHW_MSG_ERROR, NULL );
     return 0;
   }
   for( c = 0; c < ed_crt_buffer->file_lines; c ++ )
     if( fprintf( fp, "%s\n", ed_crt_buffer->lines[ c ] ) != strlen( ed_crt_buffer->lines[ c ] ) + 1 )
     {
-      edhw_msg( "Error writing to file", EDHW_MSG_ERROR );
+      edhw_msg( "Error writing to file", EDHW_MSG_ERROR, NULL );
       fclose( fp ); // [TODO] remove file ?
       return 0;
     }
   fclose( fp );
   edutils_set_flag( ed_crt_buffer, EDFLAG_DIRTY, 0 );
   edutils_display_status();
-  edhw_msg( "File saved", EDHW_MSG_INFO );
+  if( show_confirmation )
+    edhw_msg( "File saved", EDHW_MSG_INFO, NULL );
   return 1;
 }
 
 // Save the file
 static void editor_save_file()
 {
-  editorh_save_file( ed_crt_buffer->fpath );
+  editorh_save_file( ed_crt_buffer->fpath, 1 );
 }
 
-// "Save as"
-static void editor_saveas_file()
+// "Save as", returns -1 on allocation error
+static int editor_saveas_file()
 {
   char *line = edhw_read( "Save as", "Enter file name", 32, edutils_fname_validator );
+  int res;
 
-  editorh_save_file( line );
+  res = edalloc_set_fname( ed_crt_buffer, line );
   free( line );
+  if( res )
+    editorh_save_file( ed_crt_buffer->fpath, 1 );
+  return res ? 1 : EDITOR_FATAL_CODE;
 }
 
 // Go to line
@@ -143,10 +157,33 @@ static void editor_goto_line()
   free( line );
   if( newl < 0 || newl > ed_crt_buffer->file_lines )
   {
-    edhw_msg( "Invalid line number", EDHW_MSG_ERROR );
+    edhw_msg( "Invalid line number", EDHW_MSG_ERROR, NULL );
     return;
   }
   edmove_goto_line( newl );
+}
+
+// Exit from editor
+static int editor_exit()
+{
+  int res;
+
+  // Ask the user for confirmation
+  if( ( res = edhw_dlg( "Are you sure you want to exit?", EDHW_DLG_YES | EDHW_DLG_NO, NULL ) ) == EDHW_DLG_NO )
+    return 0;
+  // If the file needs to be saved, ask the user
+  if( edutils_is_flag_set( ed_crt_buffer, EDFLAG_DIRTY ) )
+    if( ( res == edhw_dlg( "File not saved, save it now?", EDHW_DLG_YES | EDHW_DLG_NO, NULL ) ) == EDHW_DLG_YES )
+    {
+      if( ed_crt_buffer->fpath )
+        editor_save_file();
+      else
+        editor_saveas_file();
+    }
+  edalloc_free_buffer( ed_crt_buffer );
+  edalloc_deinit();
+  term_reset();
+  return EDITOR_EXIT_CODE;
 }
 
 // ****************************************************************************
@@ -186,15 +223,35 @@ int editor_mainloop()
     {
       // [TODO] handle fatal error here!
     }
-    // Now check "run"
-    if( c == KC_F5 )
-      editor_run();
-    else if( c == KC_F2 ) // "save"
-      editor_save_file();
-    else if( c == KC_CTRL_F2 ) // "save as"
-      editor_saveas_file();
-    else if( c == KC_F7 ) // "go to line" 
-      editor_goto_line();
+    // Now check Fx commands
+    res = 0;
+    switch( c )
+    {
+      case KC_F5:
+        editor_run();
+        break;
+
+      case KC_F2:
+        if( ed_crt_buffer->fpath )
+          editor_save_file();
+        else
+           res = editor_saveas_file();
+        break;
+
+      case KC_CTRL_F2:
+        res = editor_saveas_file();
+        break;
+
+      case KC_F7:
+        editor_goto_line();
+        break;
+
+      case KC_F10:
+        res = editor_exit();
+        break;
+    }
+    if( res == EDITOR_EXIT_CODE )
+      break;
   }
   return 0;
 }

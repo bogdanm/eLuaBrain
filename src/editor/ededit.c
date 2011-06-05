@@ -64,7 +64,8 @@ static int ededit_key_backspace()
     if( ededit_addstring( lineid - 1, linepos, pline ) == -1 )
       return -1;
     edalloc_buffer_remove_line( ed_crt_buffer, lineid );
-    if( ( ed_crt_buffer->file_lines == lineid && ed_startline > 0 ) || ed_cursory == 0 )
+    //if( ( ed_crt_buffer->file_lines == lineid && ed_startline > 0 ) || ed_cursory == 0 )
+    if( ed_cursory == 0 || ( ed_startline > 0 && ed_startline + EDITOR_LINES > ed_crt_buffer->file_lines ) )
       ed_startline --;
     else
       ed_cursory --;
@@ -74,11 +75,46 @@ static int ededit_key_backspace()
   }
   else // not the first column, simply remove a char and update the display
   {
-    pline = edalloc_line_realloc( pline, strlen( pline ) );
     linepos --;
     memmove( pline + linepos, pline + linepos + 1, ( strlen( pline ) - linepos ) * sizeof( char ) ); 
+    pline = edalloc_line_realloc( pline, strlen( pline ) );
     edutils_line_set( lineid, pline );
     edmove_set_cursorx( ed_startx + ed_cursorx - 1 );
+    edutils_line_display( ed_cursory, lineid );
+    edutils_set_flag( ed_crt_buffer, EDFLAG_DIRTY, 1 );
+    edutils_display_status();
+  }
+  return 1;
+}
+
+// Remove a char to the right of the cursor (handle 'del')
+static int ededit_key_del()
+{
+  int linepos = ed_startx + ed_cursorx;
+  int lineid = ed_startline + ed_cursory;
+  char *pline = edutils_line_get( lineid );
+
+  if( linepos == strlen( pline ) ) // this is the last column, so join this line with the one below
+  {
+    if( lineid == ed_crt_buffer->file_lines - 1 ) // nothing to do on the last line
+      return 1;
+    if( ededit_addstring( lineid, linepos, edutils_line_get( lineid + 1 ) ) == -1 )
+      return -1;
+    edalloc_buffer_remove_line( ed_crt_buffer, lineid + 1 );
+    if( ed_startline > 0 && ed_startline + EDITOR_LINES > ed_crt_buffer->file_lines )
+    {
+      ed_startline --;
+      ed_cursory ++;
+    }
+    edmove_set_cursorx( linepos );
+    edutils_set_flag( ed_crt_buffer, EDFLAG_DIRTY, 1 );
+    edutils_show_screen();
+  }
+  else if( strlen( pline ) > 0 ) // not in the last column, simply remove a char and update the display
+  {  
+    memmove( pline + linepos, pline + linepos + 1, ( strlen( pline ) - linepos ) * sizeof( char ) );
+    pline = edalloc_line_realloc( pline, strlen( pline ) );
+    edutils_line_set( lineid, pline );
     edutils_line_display( ed_cursory, lineid );
     edutils_set_flag( ed_crt_buffer, EDFLAG_DIRTY, 1 );
     edutils_display_status();
@@ -207,12 +243,23 @@ static int ededit_deltobol()
 // Return '-1' if a fatal error occured (for example out of memory)
 int ededit_handle_key( int c )
 {
+  int res;
+
   if( isprint( c ) )
     return ededit_key_char( c );
   switch( c )
   {
     case KC_BACKSPACE:
       return ededit_key_backspace();
+
+    case KC_DEL:
+      return ededit_key_del();
+
+    case KC_TAB:
+      res = ededit_key_char( ' ' );
+      if( res )
+        res = ededit_key_char( ' ' );
+      return res;
 
     case KC_ENTER:
       return ededit_key_enter();

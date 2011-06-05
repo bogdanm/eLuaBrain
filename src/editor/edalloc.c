@@ -82,7 +82,8 @@ static EDALLOC_LINE_AREA* edalloc_alloc_area()
 // Free an area
 static void edalloc_free_area( EDALLOC_LINE_AREA* area )
 {
-  free( area->data );
+  if( area->data )
+    free( area->data );
   free( area );
 }
 
@@ -279,6 +280,26 @@ void edalloc_line_set_extra_space( int size )
   edalloc_extra_space = edalloc_round_size( size ); 
 }
 
+// Free memory from an editor buffer
+void edalloc_free_buffer( EDITOR_BUFFER *b )
+{
+  unsigned i;
+
+  if( b )
+  {
+    if( b->fpath )
+      free( b->fpath );
+    if( b->lines )
+    {
+      for( i = 0; i < b->file_lines; i ++ )
+        if( b->lines[ i ] )
+          edalloc_line_free( b->lines[ i ] );
+      free( b->lines );
+    }
+    free( b );
+  }
+}
+
 // Create a new buffer from a file name reading all the file data
 EDITOR_BUFFER* edalloc_buffer_new( const char *fname )
 {
@@ -293,7 +314,7 @@ EDITOR_BUFFER* edalloc_buffer_new( const char *fname )
   if( ( linebuf = ( char* )malloc( LINE_BUFFER_SIZE + 1 ) ) == NULL )
     goto newout;
 
-  if( fname )
+  if( fname && *fname )
   {
     if( ( fp = fopen( fname, "rb" ) ) == NULL )
       goto newout;
@@ -304,6 +325,8 @@ EDITOR_BUFFER* edalloc_buffer_new( const char *fname )
     fsize = ftell( fp );
     fseek( fp, 0, SEEK_SET );
   }
+  else
+    fname = NULL;
 
   // Allocate the buffer now
   if( ( b = ( EDITOR_BUFFER* )malloc( sizeof( EDITOR_BUFFER ) ) ) == NULL )
@@ -360,22 +383,23 @@ EDITOR_BUFFER* edalloc_buffer_new( const char *fname )
 newout:  
   if( fp )
     fclose( fp );
-  if( b )
-  {
-    if( b->fpath )
-      free( b->fpath );
-    if( b->lines )
-    {
-      for( i = 0; i < b->file_lines; i ++ )
-        if( b->lines[ i ] )
-          free( b->lines[ i ] );
-      free( b->lines );
-    }
-    free( b );
-  }
+  edalloc_free_buffer( b );
   if( linebuf )
     free( linebuf );
   return NULL;
+}
+
+// Set the filename for a buffer
+int edalloc_set_fname( EDITOR_BUFFER *b, const char *name )
+{
+  if( name && *name )
+  {
+    if( b->fpath )
+      free( b->fpath );
+    if( ( b->fpath = strdup( name ) ) == NULL )
+      return 0;
+  }
+  return 1;
 }
 
 // Change the number of lines in the given buffer
@@ -410,6 +434,21 @@ int edalloc_init()
   if( ( edalloc_first_area = edalloc_alloc_area() ) == NULL )
     return 0;
   return 1;
+}
+
+// Reclaim all memory requested by the allocator
+void edalloc_deinit()
+{
+  EDALLOC_LINE_AREA *crt, *next;
+
+  crt = edalloc_first_area;
+  while( crt )
+  {
+    next = crt->next;
+    edalloc_free_area( crt );
+    crt = next;
+  }
+  edalloc_first_area = NULL;
 }
 
 void edalloc_buffer_remove_line( EDITOR_BUFFER* b, int line )
