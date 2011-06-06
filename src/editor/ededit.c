@@ -237,28 +237,6 @@ static int ededit_deltobol()
   return 1;
 }
 
-// Remove a previously defined block
-static int ededit_delblock()
-{
-  int i;
-
-  if( ed_sellines == NULL )
-    return 1;
-  for( i = ed_firstsel; i <= ed_lastsel; i ++ )
-    edalloc_buffer_remove_line( ed_crt_buffer, ed_firstsel );
-  edalloc_clear_selection( ed_crt_buffer );
-  if( ed_startline > 0 && ed_startline + EDITOR_LINES > ed_crt_buffer->file_lines )
-  {
-    ed_startline = UMAX( 0, ed_crt_buffer->file_lines - EDITOR_LINES );
-    if( ed_cursory >= ed_crt_buffer->file_lines - ed_startline )
-      ed_cursory = ed_crt_buffer->file_lines - ed_startline - 1;
-  }
-  edutils_set_flag( ed_crt_buffer, EDFLAG_DIRTY, 1 );
-  edmove_set_cursorx( 0 );
-  edutils_show_screen();
-  return 1;
-}
-
 // Copy a block to the current cursor position
 static int ededit_pasteblock()
 {
@@ -317,9 +295,6 @@ int ededit_handle_key( int c )
 
     case KC_CTRL_B:
       return ededit_deltobol();
-
-    case KC_CTRL_X:
-      return ededit_delblock();
 
     case KC_CTRL_V:
       return ededit_pasteblock();
