@@ -1,3 +1,8 @@
+// This will stay disabled until we figure out bugs in the editor
+// The version in edalloc.c will be compiled instead (it uses the regular
+// system allocator)
+
+#if 0
 // Editor allocator
 
 #include <stdlib.h>
@@ -14,15 +19,182 @@
 #define ZONE_FREE             0
 #define ZONE_USED             1
 
+// Line allocator
+typedef struct _edalloc_line_area
+{
+  u16 available_zones;                            // number of available zones
+  u16 current_free_zone;                          // a new allocation will be tried starting from this index
+  u8 zone_used_map[ ( LINE_ALLOCATOR_ZONES + 7 ) >> 3 ]; // zone usage bitmap
+  char *data;                                     // actual pointer to data
+  struct _edalloc_line_area *next;                // pointer to next area in chain
+} EDALLOC_LINE_AREA;
+
+static EDALLOC_LINE_AREA *edalloc_first_area;     // current allocator area
+static u16 edalloc_extra_space;                   // extra space on allocation
+
 // *****************************************************************************
 // Local functions
+
+// -----------------------------------------------------------------------------
+// Bitmap operations
+
+// Get a bit from the bitmap
+static int edalloc_bmp_get( EDALLOC_LINE_AREA* area, unsigned idx )
+{
+  u8 b = area->zone_used_map[ idx >> 3 ];
+  unsigned bmask = 1 << ( idx & 0x07 );
+  
+  return ( b & bmask ) ? 1 : 0;
+}
+
+// Set a bit in the bitmap
+static void edalloc_bmp_set( EDALLOC_LINE_AREA* area, unsigned idx, int value )
+{
+  unsigned bidx = idx >> 3;
+  unsigned bmask = 1 << ( idx & 0x07 );
+  
+  if( value )
+    area->zone_used_map[ bidx ] |= bmask;
+  else
+    area->zone_used_map[ bidx ] &= ( u8 )~bmask;
+}
 
 // -----------------------------------------------------------------------------
 
 // Round up a memory size to a multiple of LINE_ALLOCATOR_ZONE_SIZE
 static unsigned edalloc_round_size( unsigned size )
 {
-  return ( ( size + LINE_ALLOCATOR_ZONE_SIZE - 1 ) / LINE_ALLOCATOR_ZONE_SIZE ) * LINE_ALLOCATOR_SIZE;
+  return ( size + LINE_ALLOCATOR_ZONE_SIZE - 1 ) / LINE_ALLOCATOR_ZONE_SIZE;
+}
+
+// Allocate an area
+static EDALLOC_LINE_AREA* edalloc_alloc_area()
+{
+  EDALLOC_LINE_AREA *parea;
+  
+  if( ( parea = ( EDALLOC_LINE_AREA* )malloc( sizeof( EDALLOC_LINE_AREA ) ) ) == NULL )
+    return 0;
+  memset( parea, 0, sizeof( EDALLOC_LINE_AREA ) );
+  parea->available_zones = LINE_ALLOCATOR_ZONES;
+  if( ( parea->data = ( char* )malloc( LINE_ALLOCATOR_ZONE_SIZE * LINE_ALLOCATOR_ZONES ) ) == NULL )
+  {
+    free( parea );
+    return 0;
+  } 
+  return parea;
+}
+
+// Free an area
+static void edalloc_free_area( EDALLOC_LINE_AREA* area )
+{
+  if( area->data )
+    free( area->data );
+  free( area );
+}
+
+// Warning: size is specified in number of ZONES for this function, not in bytes
+static void* edalloc_alloc( EDALLOC_LINE_AREA* area, unsigned size )
+{
+  int i, j;
+  int overflow = 0;
+
+  // Find at least 'size' free contigous zones
+  i = area->current_free_zone;
+  while( 1 )
+  {
+    if( i >= LINE_ALLOCATOR_ZONES )
+    {
+      i = 0;
+      overflow = 1;
+    }
+    // Find the first free zone
+    while( edalloc_bmp_get( area, i ) != ZONE_FREE )
+    {
+      i ++;
+      if( i == LINE_ALLOCATOR_ZONES )
+      {
+        i = 0;
+        overflow = 1;
+      }
+    }
+    if( overflow && i >= area->current_free_zone )  // avoid cycles
+      return NULL;
+    // Check if there are enough free zones here
+    if( i + size > LINE_ALLOCATOR_ZONES )
+    {
+      i += size;
+      continue;
+    }
+    for( j = 1; j < size; j ++ )
+      if( edalloc_bmp_get( area, i + j ) != ZONE_FREE )
+        break;
+    if( j == size )
+      break;
+    i += j;               
+  }
+  // We found our area, mark it as taken and return it
+  for( j = 0; j < size; j ++ )
+    edalloc_bmp_set( area, i + j, ZONE_USED );
+  area->available_zones -= size;
+  area->current_free_zone = i + size + edalloc_extra_space;
+  if( area->current_free_zone >= LINE_ALLOCATOR_ZONES )
+    area->current_free_zone = 0;
+  return area->data + i * LINE_ALLOCATOR_ZONE_SIZE;    
+}
+
+// Free an area of memory in the given zone
+static void edalloc_free( EDALLOC_LINE_AREA* area, void* p )
+{
+  char* ptr = ( char* )p;
+  int i, j;
+  unsigned size;
+  
+  size = edalloc_round_size( strlen( ptr ) + 1 );  // get size in zones
+  i = ( ptr - area->data ) / LINE_ALLOCATOR_ZONE_SIZE; // ID of first zone
+  for( j = 0; j < size; j ++ )
+    edalloc_bmp_set( area, i + j, ZONE_FREE );
+  area->available_zones += size;       
+}
+
+// Realloc an area of memory in the given zone
+// Returns 1 for success and 0 for error
+static void* edalloc_realloc( EDALLOC_LINE_AREA *area, void *p, unsigned newsize )
+{
+  char* ptr = ( char* )p;
+  int i, j;
+  unsigned size;
+  
+  size = edalloc_round_size( strlen( ptr ) + 1 );  // current size in zones
+  newsize = edalloc_round_size( newsize ); // new size in zones
+  if( newsize == size ) // nothing needs to be done
+    return p;
+  else
+  {
+    i = ( ptr - area->data ) / LINE_ALLOCATOR_ZONE_SIZE; // ID of first zone
+    if( newsize < size ) // need to free a few zones, this is always possible
+    {
+      for( j = i + size - 1; j > i + newsize - 1; j -- )
+        edalloc_bmp_set( area, j, ZONE_FREE );
+      area->available_zones += size - newsize;
+      return p;
+    }
+    else // need to allocate more zones
+    {
+      // Try to allocate them in the same area
+      for( j = 0; j < newsize - size; j ++ )
+        if( edalloc_bmp_get( area, i + size + j ) != ZONE_FREE )
+          break;
+      if( j == newsize - size ) // we found a contigous area
+      {
+        for( j = 0; j < newsize - size; j ++ )
+          edalloc_bmp_set( area, i + size + j, ZONE_USED );
+        area->available_zones -= newsize - size;   
+        return p;                  
+      }        
+      else // couldn't find a contigous space
+        return NULL;
+    }  
+  }
 }
 
 // *****************************************************************************
@@ -30,25 +202,79 @@ static unsigned edalloc_round_size( unsigned size )
 
 void* edalloc_line_malloc( unsigned size )
 {
+  EDALLOC_LINE_AREA* area = edalloc_first_area;
+  EDALLOC_LINE_AREA* temp;
+  void *p;
+  
   // Get size in zones
   //return malloc( size );
   if( ( size = edalloc_round_size( size ) ) == 0 )
     return NULL;
-  return maloc( size );
+  // Try to allocate in all areas
+  while( 1 )
+  {
+    if( area->available_zones >= size )
+    {
+      if( ( p = edalloc_alloc( area, size ) ) != NULL )
+        return p;
+    }
+    if( area->next == NULL ) // need to allocate a new area
+    {
+      if( ( temp = edalloc_alloc_area() ) == NULL )
+        break;
+      area->next = temp;        
+    }  
+    area = area->next;
+  }
+  return NULL;
 }
 
 void edalloc_line_free( void* ptr )
 {
-  free( ptr );
+  EDALLOC_LINE_AREA* area = edalloc_first_area;
+  
+  //free( ptr ); return;
+  while( area )
+  {
+    if( ( char* )ptr >= area->data && ( char* )ptr < area->data + LINE_ALLOCATOR_ZONES * LINE_ALLOCATOR_ZONE_SIZE )
+    {
+      edalloc_free( area, ptr );
+      break;
+    }
+    area = area->next;
+  }  
 }
 
 void* edalloc_line_realloc( void* ptr, unsigned size )
 {
-  char *s = ( char* )ptr;
-
-  if( edalloc_round_size( size ) == edalloc_round_size( strlen( s ) + 1 ) )
+  EDALLOC_LINE_AREA* area = edalloc_first_area;
+  void *p;
+  
+  //return realloc( ptr, size );
+  if( ptr == NULL )
+    return edalloc_line_malloc( size );
+  if( size == 0 )
+  {
+    edalloc_line_free( ptr );
     return ptr;
-  return realloc( ptr, edalloc_round_size( size ) );
+  }
+  // This is an actual realloc
+  while( area )
+  {
+    if( ( char* )ptr >= area->data && ( char* )ptr < area->data + LINE_ALLOCATOR_ZONES * LINE_ALLOCATOR_ZONE_SIZE )
+    {
+      if( ( p = edalloc_realloc( area, ptr, size ) ) != NULL )
+        return p;
+      // Cannot realloc, need to alloc/copy/dealloc
+      if ( ( p = edalloc_line_malloc( size ) ) == NULL )
+        return NULL;
+      strcpy( p, ( const char* )ptr );
+      edalloc_line_free( ptr );
+      return p;        
+    }
+    area = area->next;
+  }    
+  return NULL;
 }
 
 // Set the free space that will be skipped after a line
@@ -299,4 +525,5 @@ error:
   return 0;
 }
 
+#endif
 

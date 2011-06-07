@@ -7,7 +7,8 @@
 #include "editor.h"
 
 // Static editor line configuration
-#define LINE_ALLOCATOR_ZONE_SIZE        20        // the "zone" is the minimal (and fixed) unit of allocatoin
+// The next constant used to be 20 for the zones allocator
+#define LINE_ALLOCATOR_ZONE_SIZE        24        // the "zone" is the minimal (and fixed) unit of allocatoin
 #define LINE_ALLOCATOR_ZONES            500       // size of allocator in zones
 #define BUFFER_ALLOCATOR_EXTRA_LINES    10        // how many more lines to allocate on each request
 #define FILE_ESTIMATED_LINE_SIZE        40        // estimated medium size (in chars) of an editor line
