@@ -79,7 +79,7 @@ static int ededit_key_backspace()
   {
     linepos --;
     memmove( pline + linepos, pline + linepos + 1, ( strlen( pline ) - linepos ) * sizeof( char ) ); 
-    pline = edalloc_line_realloc( pline, strlen( pline ) );
+    pline = edalloc_line_realloc( pline, strlen( pline ) + 1 );
     edutils_line_set( lineid, pline );
     edmove_set_cursorx( ed_startx + ed_cursorx - 1 );
     edutils_line_display( ed_cursory, lineid );
@@ -115,7 +115,7 @@ static int ededit_key_del()
   else if( strlen( pline ) > 0 ) // not in the last column, simply remove a char and update the display
   {  
     memmove( pline + linepos, pline + linepos + 1, ( strlen( pline ) - linepos ) * sizeof( char ) );
-    pline = edalloc_line_realloc( pline, strlen( pline ) );
+    pline = edalloc_line_realloc( pline, strlen( pline ) + 1 );
     edutils_line_set( lineid, pline );
     edutils_line_display( ed_cursory, lineid );
     edutils_set_flag( ed_crt_buffer, EDFLAG_DIRTY, 1 );
