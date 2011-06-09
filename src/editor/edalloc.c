@@ -17,12 +17,14 @@
 // *****************************************************************************
 // Local functions
 
+static int edalloc_extra_space;
+
 // -----------------------------------------------------------------------------
 
 // Round up a memory size to a multiple of LINE_ALLOCATOR_ZONE_SIZE
 static unsigned edalloc_round_size( unsigned size )
 {
-  return ( ( size + LINE_ALLOCATOR_ZONE_SIZE - 1 ) / LINE_ALLOCATOR_ZONE_SIZE ) * LINE_ALLOCATOR_SIZE;
+  return ( ( size + LINE_ALLOCATOR_ZONE_SIZE - 1 ) / LINE_ALLOCATOR_ZONE_SIZE ) * LINE_ALLOCATOR_ZONE_SIZE;
 }
 
 // *****************************************************************************
@@ -34,7 +36,7 @@ void* edalloc_line_malloc( unsigned size )
   //return malloc( size );
   if( ( size = edalloc_round_size( size ) ) == 0 )
     return NULL;
-  return maloc( size );
+  return malloc( size );
 }
 
 void edalloc_line_free( void* ptr )
@@ -210,24 +212,12 @@ int edalloc_buffer_change_lines( EDITOR_BUFFER* b, int delta )
 // Returns 1 for OK, 0 for error
 int edalloc_init()
 {
-  if( ( edalloc_first_area = edalloc_alloc_area() ) == NULL )
-    return 0;
   return 1;
 }
 
 // Reclaim all memory requested by the allocator
 void edalloc_deinit()
 {
-  EDALLOC_LINE_AREA *crt, *next;
-
-  crt = edalloc_first_area;
-  while( crt )
-  {
-    next = crt->next;
-    edalloc_free_area( crt );
-    crt = next;
-  }
-  edalloc_first_area = NULL;
 }
 
 void edalloc_buffer_remove_line( EDITOR_BUFFER* b, int line )

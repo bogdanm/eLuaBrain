@@ -175,8 +175,9 @@ static void ps2h_send_cmd( int idx )
   ps2h_data_high();
   ps2h_wait_clock_hl();
   // Read and interpret ACK bit
-  if( ps2h_data_get() == 1 ) // error, [TODO] remove the platform_uart_send
-    platform_uart_send( CON_UART_ID, '@' );
+  if( ps2h_data_get() == 1 ) // error, [TODO] what to do here?
+  {
+  }
   while( ps2h_clock_get() == 0 );
   // Clear pending interrupts and re-enable keyboard interrupt
   ps2_acks_to_receive = nacks;

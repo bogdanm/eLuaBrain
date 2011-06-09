@@ -13,7 +13,7 @@
 // *****************************************************************************
 // Define here what components you want for this platform
 
-#define BUILD_XMODEM
+//#define BUILD_XMODEM
 #define BUILD_SHELL
 #define BUILD_ROMFS
 #define BUILD_MMCFS
@@ -24,8 +24,8 @@
 //#define BUILD_DNS
 #define BUILD_CON_GENERIC
 //#define BUILD_ADC
-#define BUILD_RPC
-//#define BUILD_RFS
+//#define BUILD_RPC
+#define BUILD_RFS
 //#define BUILD_CON_TCP
 #define BUILD_VRAM
 #define BUILD_LINENOISE
@@ -38,9 +38,9 @@
 // *****************************************************************************
 // UART/Timer IDs configuration data (used in main.c)
 
-#define CON_UART_ID           0
-#define CON_UART_SPEED        115200
-#define CON_TIMER_ID          0
+//#define CON_UART_ID           0
+//#define CON_UART_SPEED        115200
+//#define CON_TIMER_ID          0
 #define TERM_LINES            30
 #define TERM_COLS             80
 
@@ -119,7 +119,7 @@
 
 // Enable RX buffering on UART
 #define BUF_ENABLE_UART
-#define CON_BUF_SIZE          BUF_SIZE_128
+//#define CON_BUF_SIZE          BUF_SIZE_128
 
 // ADC Configuration Params
 #define ADC_BIT_RESOLUTION    12

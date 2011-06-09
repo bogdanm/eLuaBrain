@@ -70,7 +70,7 @@ static int xmodem_recv( u32 timeout )
 // ****************************************************************************
 // Terminal support code
 
-#if defined( BUILD_TERM ) || defined( BUILD_TERM_VRAM )
+#if defined( BUILD_TERM )
 
 #define TERM_TIMEOUT    100000 
 
@@ -174,13 +174,19 @@ static int term_translate( int data )
 
 static void uart_send( int fd, char c )
 {
+#ifdef CON_UART_ID
   fd = fd;
   platform_uart_send( CON_UART_ID, c );
+#endif
 }
 
 static int uart_recv( s32 to )
 {
+#ifdef CON_UART_ID
   return platform_uart_recv( CON_UART_ID, CON_TIMER_ID, to );
+#else
+  return -1;
+#endif
 }
 
 void cmn_platform_init()
@@ -235,7 +241,7 @@ void cmn_platform_init()
 #if defined( BUILD_TERM ) || defined( BUILD_TERM_VRAM )  
 #ifdef BUILD_PS2
   // Initialize terminal
-  term_init( TERM_LINES, TERM_COLS, term_out, ps2_term_get, ps2_term_translate );
+  term_init( TERM_LINES, TERM_COLS, NULL, ps2_term_get, ps2_term_translate );
 #else // #ifdef BUILD_PS2
   term_init( TERM_LINES, TERM_COLS, term_out, term_in, term_translate );
 #endif// #ifdef BUILD_PS2

@@ -223,6 +223,7 @@ int editor_mainloop()
     if( res == -1 )
     {
       // [TODO] handle fatal error here!
+      printf( "FATAL ERROR IN EDITOR!!!!!\n" );
     }
     // Now check Fx commands
     res = 0;
@@ -287,6 +288,7 @@ int main( int argc, char **argv )
     if( res == -1 )
     {
       // [TODO] handle fatal error here!
+      printf( "FATAL ERROR IN EDITOR!!!!!\n" );
     }
     // Now check "save"
     if( c == KC_CTRL + 'S' ) 
