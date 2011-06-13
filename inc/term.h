@@ -89,6 +89,10 @@ enum
 #define TERM_BOX_FLAG_BORDER        0x8000
 #define TERM_BOX_FLAG_RESTORE       0x4000
 
+// Paging
+#define TERM_PAGING_ON              1
+#define TERM_PAGING_OFF             0
+
 // ****************************************************************************
 // Exported functions
 
@@ -116,6 +120,7 @@ void term_set_cursor( int type );
 void term_reset();
 void* term_box( unsigned x, unsigned y, unsigned width, unsigned height, const char *title, u16 flags );
 void term_close_box( void *pbox );
+void term_enable_paging( int enabled );
 
 #define TERM_KEYCODES\
   _D( KC_UP ),\

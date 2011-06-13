@@ -21,8 +21,8 @@ CLK         PB13              PA3
 Prop.reset  PB12              Reset (with pull-down resistor)
 
 Keyboard:
-DATA        PA13 with 4k7 pullup to +5V
-CLK         PA15 with 4k7 pullup to +5V
+DATA        PG13 with 4k7 pullup to +5V
+CLK         PG15 with 4k7 pullup to +5V
 
 Other pins:
 RESET - PG14 (three fingers salute)

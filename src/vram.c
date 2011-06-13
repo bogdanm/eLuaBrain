@@ -23,6 +23,8 @@ enum
 static u8 *vram_p_cx, *vram_p_cy, *vram_p_type;
 static u8 vram_fg_col = VRAM_DEFAULT_FG_COL;
 static u8 vram_bg_col = VRAM_DEFAULT_BG_COL;
+static u8 vram_paging_enabled;
+static u8 vram_paging_lines;
 
 #define VRAM_CHARADDR( x, y )   ( ( y ) * VRAM_COLS + ( x ^ 1 ) + ( VRAM_FIRST_DATA >> 1 ) )
 #define MKCOL( fg, bg )         ( ( ( bg ) << 4 ) + fg )
@@ -305,6 +307,14 @@ void vram_putchar( char c )
     }
     else
       *vram_p_cy += 1;
+    if( vram_paging_enabled )
+    {
+      if( ++ vram_paging_lines == VRAM_LINES - 2 )
+      {
+        term_getch( TERM_INPUT_WAIT );
+        vram_paging_lines = 0;
+      }
+    }
   }    
   else if( c == 8 ) // Backspace
   {
@@ -423,6 +433,13 @@ void vram_set_cursor( int type )
       *vram_p_type = VRAM_CURSOR_LINE_BLINK;
       break;
   }
+}
+
+// Enable/disable paging
+void vram_enable_paging( int enabled )
+{
+  vram_paging_enabled = enabled;
+  vram_paging_lines = 0;
 }
 
 // Draw a "box" (with an optional border an title) at the specified coordinates

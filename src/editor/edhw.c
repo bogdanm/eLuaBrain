@@ -149,6 +149,12 @@ char* edhw_read( const char *title, const char *text, unsigned maxlen, p_ed_vali
     }
     else if( c == KC_ENTER ) // NL
       break;
+    else if( c == KC_ESC ) // Escape
+    {
+      free( input );
+      input = NULL;
+      break;
+    }
     else if( c < TERM_FIRST_KEY && strlen( input ) < maxlen) // regular ASCII char, ignore everything else
     {
       vflag = validator ? validator( input, c ) : 1;

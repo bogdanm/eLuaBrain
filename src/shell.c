@@ -20,6 +20,7 @@
 #include "stm32f10x.h"
 #include "platform_conf.h"
 #include "editor.h"
+#include "common.h"
 #ifdef BUILD_SHELL
 
 #define EE_I2C_ADDR               0xA0
@@ -59,7 +60,7 @@ static void shell_help( char* args )
   printf( "Shell commands:\n" );
   printf( "  exit        - exit from this shell\n" );
   printf( "  help        - print this help\n" );
-  printf( "  ls or dir   - lists filesystems files and sizes\n" );
+  printf( "  ls [pattern] - lists filesystems files and sizes (optionally matching 'pattern')\n" );
   printf( "  cat or type - lists file contents\n" );
   printf( "  lua [args]  - run Lua with the given arguments\n" );
   printf( "  recv        - receive a file via XMODEM and execute it\n" );
@@ -188,12 +189,36 @@ static void shell_ls( char* args )
   DM_DIR *d;
   struct dm_dirent *ent;
   u32 total;
+  char *pattern = NULL;
+  char *fspattern = NULL;
 
+  // Check for pattern
+  if( *args != 0 )
+  {
+    *strchr( args, ' ' ) = 0;
+    pattern = args;
+    if( *pattern == '/' ) // the pattern contains a filesystem spec
+    {
+      fspattern = pattern;
+      pattern = strchr( fspattern + 1, '/' );
+      if( pattern )
+      {
+        pattern ++;
+        if( strlen( pattern ) == 0 )
+          pattern = NULL;
+      }
+    }
+  }
+  
+  term_enable_paging( TERM_PAGING_ON );
   // Iterate through all devices, looking for the ones that can do "opendir"
   for( dev = 0; dev < dm_get_num_devices(); dev ++ )
   {  
     pdev = dm_get_device_at( dev );
     if( pdev->p_opendir_r == NULL || pdev->p_readdir_r == NULL || pdev->p_closedir_r == NULL )
+      continue;
+    // Check against the pattern
+    if( fspattern && strncmp( fspattern, pdev->name, strlen( pdev->name ) ) )
       continue;
     d = dm_opendir( pdev->name );
     if( d )
@@ -202,16 +227,20 @@ static void shell_ls( char* args )
       printf( "\n%s", pdev->name );
       while( ( ent = dm_readdir( d ) ) != NULL )
       {
-        printf( "\n%s", ent->fname );
-        for( i = strlen( ent->fname ); i <= DM_MAX_FNAME_LENGTH; i++ )
-          printf( " " );
-        printf( "%u bytes", ( unsigned )ent->fsize );
-        total = total + ent->fsize;
+        if( cmn_match_fname( ent->fname, pattern ) )
+        {
+          printf( "\n%s", ent->fname );
+          for( i = strlen( ent->fname ); i <= DM_MAX_FNAME_LENGTH; i++ )
+            printf( " " );
+          printf( "%u bytes", ( unsigned )ent->fsize );
+          total = total + ent->fsize;
+        }
       }
       printf( "\n\nTotal on %s: %u bytes\n", pdev->name, ( unsigned )total );
       dm_closedir( d );
     }
   }   
+  term_enable_paging( TERM_PAGING_OFF );
   printf( "\n" );
 }
 
@@ -225,6 +254,8 @@ static void shell_cat( char *args )
 // *args has an appended space. Replace it with the string terminator.
 //  *(strchr( args, ' ' )) = 0;
   if ( *args )
+  {
+    term_enable_paging( TERM_PAGING_ON );
     while ( *args ) 
     {
       p = strchr( args, ' ' );
@@ -243,6 +274,8 @@ static void shell_cat( char *args )
         printf( "File %s not found\n", args );
       args = p + 1;
     }      
+    term_enable_paging( TERM_PAGING_OFF );
+  }
   else
       printf( "Usage: cat (or type) <filename1> [<filename2> ...]\n" );
 }    
@@ -362,7 +395,11 @@ static void shell_cp( char *args )
               while( 1 )
               {
                 datalen = fread( buf, 1, SHELL_COPY_BUFSIZE, fps );
-                fwrite( buf, 1, datalen, fpd );
+                if( fwrite( buf, 1, datalen, fpd ) != datalen )
+                {
+                  printf( "Unable to write to %s\n", p1 + 1 );
+                  goto out;
+                }
                 total += datalen;
                 if( datalen < SHELL_COPY_BUFSIZE )
                   break;
@@ -375,8 +412,9 @@ static void shell_cp( char *args )
       }
     }
   }
+out:  
   if( !res )
-    printf( "Syntax error.\n" );
+    printf( "Copy error.\n" );
   if( fps )
     fclose( fps );
   if( fpd )

@@ -133,6 +133,11 @@ void term_get_color( int *pfgcol, int *pbgcol )
   vram_get_color( pfgcol, pbgcol );
 }
 
+void term_enable_paging( int enabled )
+{
+  vram_enable_paging( enabled );
+}
+
 // Return a char read from the terminal
 // If "mode" is TERM_INPUT_DONT_WAIT, return the char only if it is available,
 // otherwise return -1

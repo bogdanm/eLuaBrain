@@ -9,6 +9,7 @@
 #include "platform_conf.h"
 #include "lrotable.h"
 #include <string.h>
+#include <stdlib.h>
 
 // Lua: clrscr()
 static int luaterm_clrscr( lua_State* L )
@@ -219,6 +220,92 @@ static int luaterm_close_box( lua_State *L )
   return 0;
 }
 
+// Lua: setpaging( [bool] )
+static int luaterm_setpaging( lua_State *L )
+{
+  int mode = TERM_PAGING_OFF;
+
+  if( lua_type( L, 1 ) == LUA_TBOOLEAN )
+    mode = lua_toboolean( L, 1 );
+  term_enable_paging( mode );
+  return 0;
+}
+
+// Lua: getstr( x, y, prompt, maxlen, [validator] )
+static int luaterm_getstr( lua_State *L )
+{
+  int cx = luaL_checkinteger( L, 1 );
+  int cy = luaL_checkinteger( L, 2 );
+  const char *prompt = lua_isnil( L, 3 ) ? NULL : luaL_checkstring( L, 3 );
+  int maxlen = luaL_checkinteger( L, 4 );
+  int has_validator = lua_isfunction( L, 5 );
+  int entered = 0, c, vflag;
+  char *input;
+  char current[ 2 ];
+
+  if( ( input = ( char* )malloc( maxlen + 1 ) ) == NULL )
+    return luaL_error( L, "not enough memory" );
+  term_gotoxy( cx, cy );
+  if( prompt )
+  {
+    term_cstr( prompt );
+    cx += strlen( prompt );
+  }
+  input[ 0 ] = '\0';
+  current[ 1 ]  = '\0';
+  while( 1 )
+  {
+    c = term_getch( TERM_INPUT_WAIT );
+    if( c == KC_BACKSPACE )
+    {
+      if( entered > 0 )
+      {
+        term_gotoxy( cx - 1, cy );
+        term_putch( ' ' );
+        term_gotoxy( -- cx, cy );
+        input[ --entered ] = '\0';
+      }
+    }
+    else if( c == KC_ENTER ) // NL
+      break;
+    else if ( c == KC_ESC ) // Escape
+    {
+      free( input );
+      input = NULL;
+      break;
+    }
+    else if( c < TERM_FIRST_KEY && strlen( input ) < maxlen ) // regular ASCII char, ignore everything else
+    {
+      if( !has_validator )
+        vflag = 1;
+      else // call validator with current string and last char
+      {
+        lua_pushstring( L, input );
+        current[ 0 ] = c;
+        lua_pushstring( L, current );
+        lua_call( L, 2, 1 );
+        vflag = lua_isboolean( L, -1 ) ? lua_toboolean( L, -1 ) : 0;
+        lua_pop( L, 1 );
+      }
+      if( vflag )
+      {
+        term_putch( c );
+        term_gotoxy( ++ cx, cy );
+        input[ entered ++ ] = c;
+        input[ entered ] = '\0';
+      }
+    }
+  }
+  if( input )
+  {
+    lua_pushstring( L, input );
+    free( input );
+  }
+  else
+    lua_pushnil( L );
+  return 1;
+}
+
 // Key codes by name
 #undef _D
 #define _D( x ) #x
@@ -271,6 +358,8 @@ const LUA_REG_TYPE term_map[] =
   { LSTRKEY( "reset" ), LFUNCVAL( luaterm_reset ) },
   { LSTRKEY( "box" ), LFUNCVAL( luaterm_box ) },
   { LSTRKEY( "close_box" ), LFUNCVAL( luaterm_close_box ) },
+  { LSTRKEY( "setpaging" ), LFUNCVAL( luaterm_setpaging ) },
+  { LSTRKEY( "getstr" ), LFUNCVAL( luaterm_getstr ) },
 #if LUA_OPTIMIZE_MEMORY > 0
   { LSTRKEY( "__metatable" ), LROVAL( term_map ) },
   { LSTRKEY( "NOWAIT" ), LNUMVAL( TERM_INPUT_DONT_WAIT ) },

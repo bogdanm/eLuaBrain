@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <ctype.h>
+#include <string.h>
 #include "math.h"
 #include "elua_adc.h"
 #include "term.h"
@@ -474,5 +475,39 @@ unsigned int intlog2( unsigned int v )
     r++;
   }
   return r;
+}
+
+// Check if a filename matches a given pattern
+// The pattern will match regular chars as they are and accepts a single "*"
+// char which will match any sequence of chars between regular chars or at the
+// beginning/end
+// For example: * - will match everything
+// a*.lua - will match a.lua, a1.lua, abcdef.lua ...
+// a*de.lua - will match ade.lua, aade.lua, a1de.lua ...
+// a* - will match everything that starts with an 'a'
+// By convention, a NULL pattern matches anything
+int cmn_match_fname( const char *fname, const char *pattern )
+{
+  if( !pattern )
+    return 1;
+  while( *fname && *pattern )
+  {
+    if( !strcmp( pattern, "*" ) ) // "*" in the last position of the pattern
+      return 1;
+    if( *pattern != '*' ) // match a char as-is
+    {
+      if( tolower( *pattern ) != tolower( *fname ) )
+        return 0;
+      pattern ++;
+      fname ++;
+    }
+    else // match after the "*"
+    {
+      if( strlen( pattern + 1 ) > strlen( fname ) )
+        return 0;
+      return strcmp( pattern + 1, fname + strlen( fname ) - strlen( pattern + 1 ) ) ? 0 : 1;
+    }
+  }
+  return *fname == *pattern;
 }
 

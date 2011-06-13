@@ -152,7 +152,8 @@ static void refreshLine(int id, const char *prompt, char *buf, size_t len, size_
     term_putstr( seq, strlen( seq ) );
     /* Move cursor to original position. */
     //snprintf(seq,MAX_SEQ_LEN,"\x1b[0G\x1b[%dC", (int)(pos+plen));
-    //term_putstr( seq, strlen( seq ) );
+    snprintf(seq,MAX_SEQ_LEN,"\x1b[%dG", (int)(pos+plen));
+    term_putstr( seq, strlen( seq ) );
 }
 
 static int linenoisePrompt(int id, char *buf, size_t buflen, const char *prompt) {

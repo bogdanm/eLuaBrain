@@ -141,6 +141,8 @@ static int editor_saveas_file()
   char *line = edhw_read( "Save as", "Enter file name", 32, edutils_fname_validator );
   int res;
 
+  if( !line )
+    return 1;
   res = edalloc_set_fname( ed_crt_buffer, line );
   free( line );
   if( res )
@@ -154,6 +156,8 @@ static void editor_goto_line()
   char *line = edhw_read( "Go to line", "Enter line number", 6, edutils_number_validator );
   int newl = atoi( line );
 
+  if( !line )
+    return;
   free( line );
   if( newl < 0 || newl > ed_crt_buffer->file_lines )
   {

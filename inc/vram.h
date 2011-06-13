@@ -70,6 +70,7 @@ void vram_set_cursor( int type );
 void* vram_box( unsigned x, unsigned y, unsigned width, unsigned height, const char *title, u16 flags );
 void vram_close_box( void *pbox );
 void vram_get_color( int *pfgcol, int *pbgcol );
+void vram_enable_paging( int enabled );
 
 #endif
 
