@@ -32,6 +32,7 @@
 #define BUILD_C_INT_HANDLERS
 #define BUILD_LUA_INT_HANDLERS
 #define BUILD_PS2
+#define ENABLE_ENC
 
 #define MMCFS_SDIO_STM32
 
@@ -46,6 +47,8 @@
 
 // *****************************************************************************
 // Auxiliary libraries that will be compiled for this platform
+
+#define PS_LIB_TABLE_NAME     "stm32"
 
 //#ifdef FORSTM3210E_EVAL
 //#define AUXLIB_LCD      "stm3210lcd"
@@ -151,6 +154,10 @@
 #define PS2_TIMER_ID          0
 #define PS2_RESET_PORT        6
 #define PS2_RESET_PIN         14
+
+// Sound resources
+#define SND_PWM_ID            1          
+#define SND_TIMER_ID          ( VTMR_FIRST_ID + 3 )
 
 // CPU frequency (needed by the CPU module, 0 if not used)
 u32 platform_s_cpu_get_frequency();

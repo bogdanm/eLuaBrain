@@ -1457,16 +1457,16 @@ static void vram_transfer_init()
 // ****************************************************************************
 // Platform specific modules go here
 
-#ifdef ENABLE_ENC
-
 #define MIN_OPT_LEVEL 2
 #include "lrodefs.h"
 extern const LUA_REG_TYPE enc_map[];
+extern const LUA_REG_TYPE snd_map[];
 
 const LUA_REG_TYPE platform_map[] =
 {
 #if LUA_OPTIMIZE_MEMORY > 0
   { LSTRKEY( "enc" ), LROVAL( enc_map ) },
+  { LSTRKEY( "snd" ), LROVAL( snd_map ) },
 #endif
   { LNILKEY, LNILVAL }
 };
@@ -1486,13 +1486,4 @@ LUALIB_API int luaopen_platform( lua_State *L )
   return 1;
 #endif // #if LUA_OPTIMIZE_MEMORY > 0
 }
-
-#else // #ifdef ENABLE_ENC
-
-LUALIB_API int luaopen_platform( lua_State *L )
-{
-  return 0;
-}
-
-#endif // #ifdef ENABLE_ENC
 

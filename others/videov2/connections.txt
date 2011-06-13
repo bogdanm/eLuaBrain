@@ -26,6 +26,7 @@ CLK         PG15 with 4k7 pullup to +5V
 
 Other pins:
 RESET - PG14 (three fingers salute)
+SPEAKER - PC9 (PWM3 in eLua)
 
 MODIFICATIONS TO ET-STM32:
 Removed R100 to R104 (joystick connections), frres PD3, PD7, PG13, PG14, PG15
