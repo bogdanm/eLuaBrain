@@ -46,3 +46,5 @@ Removed R100 to R104 (joystick connections), frres PD3, PD7, PG13, PG14, PG15
 Removed R112 to R116 (joystick pullups)
 Removed C95 to C99 (joystick debounce filters)
 Removed R35 and R37 (Flash CS and Flash MISO)
+Removed R67 and R68 (connections to audio DAC)
+

@@ -33,6 +33,7 @@
 #define BUILD_LUA_INT_HANDLERS
 #define BUILD_PS2
 #define ENABLE_ENC
+#define BUILD_ENC28J60
 
 #define MMCFS_SDIO_STM32
 
@@ -154,6 +155,13 @@
 #define PS2_TIMER_ID          0
 #define PS2_RESET_PORT        6
 #define PS2_RESET_PIN         14
+
+// ENC28J60 configuration
+#define ENC28J60_SPI_ID       0
+#define ENC28J60_CS_PORT      3  
+#define ENC28J60_CS_PIN       3
+#define ENC28J60_MAC_ADDRESS  { 0x00, 0x30, 0x84, 0x25, 0xE6, 0x1D }
+#define ENC28J60_SPI_CLOCK    1000000
 
 // Sound resources
 #define SND_PWM_ID            1          
