@@ -81,26 +81,28 @@ static u16 SPIRead( u8 *pdata, u16 size )
 void initMAC( const u8* bytMacAddress )
 {
   // Initialize the SPI and the CS pin
-  printf( "%d\n", ( int )platform_spi_setup( ENC28J60_SPI_ID, PLATFORM_SPI_MASTER, ENC28J60_SPI_CLOCK, 0, 0, 8 ) );
+  platform_spi_setup( ENC28J60_SPI_ID, PLATFORM_SPI_MASTER, ENC28J60_SPI_CLOCK, 0, 0, 8 );
   platform_pio_op( ENC28J60_CS_PORT, 1 << ENC28J60_CS_PIN, PLATFORM_IO_PIN_SET );
   platform_pio_op( ENC28J60_CS_PORT, 1 << ENC28J60_CS_PIN, PLATFORM_IO_PIN_DIR_OUTPUT );
-  
+#if defined( ENC28J60_RESET_PORT ) && defined( ENC28J60_RESET_PIN )
+  platform_pio_op( ENC28J60_RESET_PORT, 1 << ENC28J60_RESET_PIN, PLATFORM_IO_PIN_CLEAR );
+  platform_pio_op( ENC28J60_RESET_PORT, 1 << ENC28J60_RESET_PIN, PLATFORM_IO_PIN_DIR_OUTPUT );
+  platform_timer_delay( 0, 100000 );
+  platform_pio_op( ENC28J60_RESET_PORT, 1 << ENC28J60_RESET_PIN, PLATFORM_IO_PIN_SET );
+#endif
+
   ResetMac();       // erm. Resets the MAC.
-  
                     // setup memory by defining ERXST and ERXND
   BankSel(0);       // select bank 0
   WriteCtrReg(ERXSTL,(u08)( RXSTART & 0x00ff));    
   WriteCtrReg(ERXSTH,(u08)((RXSTART & 0xff00)>> 8));
   WriteCtrReg(ERXNDL,(u08)( RXEND   & 0x00ff));
   WriteCtrReg(ERXNDH,(u08)((RXEND   & 0xff00)>>8));
-
                     // Make sure Rx Read ptr is at the start of Rx segment
   WriteCtrReg(ERXRDPTL, (u08)( RXSTART & 0x00ff));
   WriteCtrReg(ERXRDPTH, (u08)((RXSTART & 0xff00)>> 8));
-
   BankSel(1);                             // select bank 1
   WriteCtrReg(ERXFCON,( ERXFCON_UCEN + ERXFCON_CRCEN + ERXFCON_BCEN));
-
 
                 // Initialise the MAC registers
   BankSel(2);                             // select bank 2
@@ -133,9 +135,7 @@ void initMAC( const u8* bytMacAddress )
   WritePhyReg(PHCON2, PHCON2_HDLDIS);
   WriteCtrReg(ECON1,  ECON1_RXEN);     //Enable the chip for reception of packets
 
-  // TEST: show revision
-  printf( "%02X\n", ( int )ReadCtrReg( EREVID, TRUE ) );
-  printf( "%02X\n", ( int )ReadCtrReg( MAADR1, FALSE ) );
+  BankSel( 3 );
 }
 
 /***********************************************************************/
@@ -419,26 +419,6 @@ static u08 WriteCtrReg(u08 bytAddress,u08 bytData)
   SEL_MAC(FALSE);
 
   return TRUE;
-}
-
-static u8 ReadCtrReg(u8 bytAddress, int isEth)
-{
-  u8 data;
-
-  if (bytAddress > 0x1f)
-  {
-    return FALSE;
-  }
-
-  SEL_MAC(TRUE);              // ENC CS low
-  SPIWrite(&bytAddress,1);    // Tx opcode and address
-  if(isEth == FALSE)
-    SPIRead(&data,1);        // MAC/MII: dummy bytes
-  SPIRead(&data,1);          // get data back
-  SEL_MAC(FALSE);
-
-  return data;
-
 }
 
 /***********************************************************************/

@@ -27,9 +27,9 @@ CLK         PG15 with 4k7 pullup to +5V
 ENC28J60:
 Module pin  CPU pin
 1 CS        PD3
-2 SCK       PA5 (SPI1.SCK)
-3 MOSI      PA7 (SPI1.MOSI)
-4 MISO      PA6 (SPI1.MISO)
+2 SCK       PA5 (SPI1.SCK)   -> PB3 (final connection)
+3 MOSI      PA7 (SPI1.MOSI)  -> PB5 (final connection) 
+4 MISO      PA6 (SPI1.MISO)  -> PB4 (final connection)
 5 GND
 6 WOL
 7 INT       PD7

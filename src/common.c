@@ -250,9 +250,9 @@ void cmn_platform_init()
 #endif // #if defined( BUILD_TERM ) || defined( BUILD_TERM_VRAM )  
 
 #ifdef BUILD_ENC28J60
-//  const u8 macaddr[] = ENC28J60_MAC_ADDRESS;
-//  initMAC( macaddr );
-#endif
+  u8 macaddr[] = ENC28J60_MAC_ADDRESS;
+  initMAC( macaddr );
+#endif // #ifdef BUILD_ENC28J60
 }
 
 // ****************************************************************************

@@ -113,7 +113,7 @@
 
 // Number of resources (0 if not available/not implemented)
 #define NUM_PIO               7
-#define NUM_SPI               2
+#define NUM_SPI               3
 #define NUM_UART              4
 #define NUM_TIMER             5
 #define NUM_PWM               4
@@ -157,11 +157,13 @@
 #define PS2_RESET_PIN         14
 
 // ENC28J60 configuration
-#define ENC28J60_SPI_ID       0
+#define ENC28J60_SPI_ID       2
 #define ENC28J60_CS_PORT      3  
 #define ENC28J60_CS_PIN       3
 #define ENC28J60_MAC_ADDRESS  { 0x00, 0x30, 0x84, 0x25, 0xE6, 0x1D }
-#define ENC28J60_SPI_CLOCK    1000000
+#define ENC28J60_SPI_CLOCK    10000000
+#define ENC28J60_RESET_PORT   0
+#define ENC28J60_RESET_PIN    13
 
 // Sound resources
 #define SND_PWM_ID            1          
