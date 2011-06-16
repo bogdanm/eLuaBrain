@@ -403,7 +403,7 @@ local function make_romfs()
   flist = utils.string_to_table( utils.get_files( 'romfs', function( fname ) return not fname:find( "%.gitignore" ) end ) )
   flist = utils.linearize_array( flist )  
   for k, v in pairs( flist ) do
-    flist[ k ] = v:gsub( "romfs/", "" )
+    flist[ k ] = v:gsub( "romfs" .. utils.dir_sep, "" )
   end
   if not mkfs.mkfs( "romfs", "romfiles", flist, comp.romfs, fscompcmd ) then return -1 end
   if utils.is_file( "inc/romfiles.h" ) then

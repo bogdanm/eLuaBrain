@@ -14,10 +14,10 @@
 u32 vram_data[ VRAM_SIZE_TOTAL >> 2 ];
 enum
 {
+  VRAM_OFF_CY,
+  VRAM_OFF_CX,
   VRAM_DUMMY,
   VRAM_OFF_TYPE,
-  VRAM_OFF_CY,
-  VRAM_OFF_CX,      
   VRAM_FIRST_DATA
 };
 static u8 *vram_p_cx, *vram_p_cy, *vram_p_type;
@@ -26,7 +26,8 @@ static u8 vram_bg_col = VRAM_DEFAULT_BG_COL;
 static u8 vram_paging_enabled;
 static u8 vram_paging_lines;
 
-#define VRAM_CHARADDR( x, y )   ( ( y ) * VRAM_COLS + ( x ^ 1 ) + ( VRAM_FIRST_DATA >> 1 ) )
+#define VRAM_CHARADDR( x, y )   ( ( y ) * VRAM_COLS + ( x ) + ( VRAM_FIRST_DATA >> 1 ) )
+#define VRAM_CHARADDR8( x, y )  ( ( char* )vram_data + ( ( ( y ) * VRAM_COLS + ( x ) ) << 1 ) + VRAM_FIRST_DATA )
 #define MKCOL( fg, bg )         ( ( ( bg ) << 4 ) + fg )
 #define VRAM_ANSI_ESC           0x1B
 
@@ -248,11 +249,12 @@ static void vram_putchar_internal( int x, int y, char c )
 
 static void vram_clear_line( int y )
 {
-  u16 *pdata = ( u16* )vram_data + VRAM_CHARADDR( 1, y ); // yes, 1 is actually right (not 0)
-  u16 fill = ( ' ' << 8 ) | MKCOL( vram_fg_col, vram_bg_col );
+  u32 *pdata = ( u32* )vram_data + ( VRAM_CHARADDR( 0, y ) >> 1 );
+  u32 fill = ( ' ' << 8 ) | MKCOL( vram_fg_col, vram_bg_col );
   unsigned i;
   
-  for( i = 0; i < VRAM_COLS; i ++ )
+  fill = ( fill < 16 ) | fill;
+  for( i = 0; i < VRAM_COLS >> 1; i ++ )
     *pdata ++ = fill;   
 }
 
@@ -411,10 +413,12 @@ u8 vram_get_cy()
 
 void vram_clreol()
 {
+  u16 *pdata = ( u16* )vram_data + VRAM_CHARADDR( *vram_p_cx, *vram_p_cy );
+  u16 fill = ( ' ' << 8 ) | MKCOL( vram_fg_col, vram_bg_col );
   unsigned i;
    
   for( i = *vram_p_cx; i < VRAM_COLS; i ++ )
-    vram_putchar_internal( i, *vram_p_cy, ' ' );
+    *pdata ++ = fill;
 }
 
 void vram_set_cursor( int type )
@@ -448,7 +452,7 @@ void* vram_box( unsigned x, unsigned y, unsigned width, unsigned height, const c
 {
   TERM_BOX *pbox = NULL;
   unsigned ix, iy;
-  u16 *crt;
+  u8 *crt;
   int hasborder = flags & TERM_BOX_FLAG_BORDER;
 
   if( ( pbox = ( TERM_BOX* )malloc( sizeof( TERM_BOX ) ) ) == NULL )
@@ -463,11 +467,12 @@ void* vram_box( unsigned x, unsigned y, unsigned width, unsigned height, const c
   pbox->height = ( u16 )height;
   pbox->flags = flags;
   // Save previous data from video RAM
-  // [TODO] there's got to be a more efficient way to do this ...
   if( flags & TERM_BOX_FLAG_RESTORE )
-    for( iy = y, crt = ( u16* )pbox->savedata; iy < y + height; iy ++ )
-      for( ix = x; ix < x + width; ix ++ )
-        *crt ++ = *( ( u16* )vram_data + VRAM_CHARADDR( ix, iy ) );
+    for( iy = y, crt = pbox->savedata; iy < y + height; iy ++ )
+    {
+      memcpy( crt, VRAM_CHARADDR8( x, iy ), width << 1 );
+      crt += width << 1;
+    }
   // Write the title line
   vram_putchar_internal( x, y, hasborder ? VRAM_SBOX_UL : ' ' );
   vram_putchar_internal( x + 1, y, hasborder ? VRAM_SBOX_HLINE : ' ' );
@@ -504,14 +509,16 @@ error:
 void vram_close_box( void *pbox )
 {
   TERM_BOX *p = ( TERM_BOX* )pbox;
-  u16 *crt;
-  unsigned ix, iy;
+  u8 *crt;
+  unsigned iy;
 
   // Restore video memory
   if( p->flags & TERM_BOX_FLAG_RESTORE )
-    for( iy = p->y, crt = ( u16* )p->savedata; iy < p->y + p->height; iy ++ )
-      for( ix = p->x; ix < p->x + p->width; ix ++ )
-        *( ( u16* )vram_data + VRAM_CHARADDR( ix, iy ) ) = *crt ++;
+    for( iy = p->y, crt = ( u8* )p->savedata; iy < p->y + p->height; iy ++ )
+    {
+      memcpy( VRAM_CHARADDR8( p->x, iy ), crt, p->width << 1 );
+      crt += p->width << 1;
+    }
   if( p->savedata )
     free( p->savedata );
   free( p );

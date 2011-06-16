@@ -74,6 +74,7 @@ cploop        call    #sram_rd        ' 4 times in a row, it will read a full lo
               call    #sram_rd
               call    #sram_rd
               call    #sram_rd
+              rol     data, #16
         if_z  mov     cursor_data,    data                         
        if_nz  wrlong  data,           dataptr
        if_nz  add     dataptr,        #4
