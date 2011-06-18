@@ -10,7 +10,9 @@ void initMAC( const u8* bytMacAddress );
 // function to write and send a packet from the ENC28J60_H
 u16 MACWrite(u08*, u16);
 // function to read a byte (if there) into a buffer
-u08 MACRead(u08*);
+u16 MACRead(u08*, u16 maxsize);
+// Enable/disable RX interrupt
+void SetRXInterrupt( int enabled );
 
 // useful structures
 typedef union {

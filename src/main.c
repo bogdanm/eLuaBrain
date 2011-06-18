@@ -111,6 +111,9 @@ int main( void )
   // Initialize the PS/2 keyboard
   ps2_init();
 
+  extern void testMe();
+  testMe();
+
   // Search for autorun files in the defined order and execute the 1st if found
   for( i = 0; i < sizeof( boot_order ) / sizeof( *boot_order ); i++ )
   {

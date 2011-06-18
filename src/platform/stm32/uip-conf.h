@@ -29,6 +29,8 @@
 #ifndef __UIP_CONF_H__
 #define __UIP_CONF_H__
 
+#include "enc28j60.h"
+
 //
 // 8 bit datatype
 // This typedef defines the 8-bit type used throughout uIP.
@@ -98,7 +100,7 @@ typedef unsigned short uip_stats_t;
 //
 // uIP buffer size.
 //
-#define UIP_CONF_BUFFER_SIZE        1024
+#define UIP_CONF_BUFFER_SIZE        ( MAXFRAMELEN + UIP_LLH_LEN + 60 + 4 )
 
 //
 // uIP statistics on or off

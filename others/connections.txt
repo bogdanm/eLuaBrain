@@ -1,17 +1,4 @@
-Memory      STM32 pin         Propeller pin
-1 - CS      (PB12)            (PA0)
-2 - MISO    (PB14)            (PA1)
-3 - NC 
-4 - VSS 
-5 - MOSI    (PB15)            (PA2)
-6 - CLK     (PB13)            (PA3)
-7 - /HOLD
-8 - VCC
-
-Other pins:
-REQ         (PC5)             (PA5)
-
--------------------------------------------------------------------------------
+------------------------------------------------------------------------------
 New configuration:
 
 Pin         On STM32          On Propeller

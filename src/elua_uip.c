@@ -15,6 +15,7 @@
 #include "dhcpc.h"
 #include "resolv.h"
 #include <string.h>
+#include <stdio.h>
 
 // UIP send buffer
 extern void* uip_sappdata;
@@ -146,6 +147,7 @@ void dhcpc_configured(const struct dhcpc_state *s)
 {
   if( s->ipaddr[ 0 ] != 0 )
   {
+    printf( "GOT DHCP IP!!!\n" );
     uip_sethostaddr( s->ipaddr );
     uip_setnetmask( s->netmask ); 
     uip_setdraddr( s->default_router );     

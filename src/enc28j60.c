@@ -19,7 +19,6 @@
 /*******************************************************************************/
 
 
-
 // define private variables
 
 /** MAC address. Will move this some where else*/
@@ -65,6 +64,9 @@ static u16 SPIRead( u8 *pdata, u16 size )
   return size;
 }
 
+static const u8 *pdata;
+static u32 theclock;
+
 /***********************************************************************/
 /** \brief Initialise the MAC.
  *
@@ -80,8 +82,9 @@ static u16 SPIRead( u8 *pdata, u16 size )
 /**********************************************************************/
 void initMAC( const u8* bytMacAddress )
 {
+  pdata = bytMacAddress;
   // Initialize the SPI and the CS pin
-  platform_spi_setup( ENC28J60_SPI_ID, PLATFORM_SPI_MASTER, ENC28J60_SPI_CLOCK, 0, 0, 8 );
+  theclock = platform_spi_setup( ENC28J60_SPI_ID, PLATFORM_SPI_MASTER, ENC28J60_SPI_CLOCK, 0, 0, 8 );
   platform_pio_op( ENC28J60_CS_PORT, 1 << ENC28J60_CS_PIN, PLATFORM_IO_PIN_SET );
   platform_pio_op( ENC28J60_CS_PORT, 1 << ENC28J60_CS_PIN, PLATFORM_IO_PIN_DIR_OUTPUT );
 #if defined( ENC28J60_RESET_PORT ) && defined( ENC28J60_RESET_PIN )
@@ -134,9 +137,25 @@ void initMAC( const u8* bytMacAddress )
   WritePhyReg(PHCON1, 0x000);
   WritePhyReg(PHCON2, PHCON2_HDLDIS);
   WriteCtrReg(ECON1,  ECON1_RXEN);     //Enable the chip for reception of packets
-
-  BankSel( 3 );
 }
+
+void testMe()
+{
+  unsigned i;
+
+  printf( "***********************\n" );
+  printf( "Clock: %u\n", theclock );
+  for( i = 0; i < 6; i ++ )
+    printf( "%02X ", pdata[ i ] );
+  printf( "\n" );
+  BankSel( 3 );
+  printf( "%02X %02X %02X %02X %02X %02X\n", ReadMacReg( MAADR1 ),  ReadMacReg( MAADR2 ), ReadMacReg( MAADR3 ), 
+    ReadMacReg( MAADR4 ), ReadMacReg( MAADR5 ), ReadMacReg( MAADR6 ) );
+  printf( "\n" );
+  printf( "Rev=%d\n", ReadETHReg( EREVID ) );
+  printf( "***********************\n" );
+}
+
 
 /***********************************************************************/
 /** \brief Writes a packet to the ENC28J60.
@@ -162,8 +181,8 @@ u16 MACWrite(u08 * ptrBuffer, u16 ui_Len)
   u08  bytControl;
   
   bytControl = 0x00;
-  
 
+  
   BankSel(0);                                          // select bank 0
   WriteCtrReg(ETXSTL,(u08)( TXSTART & 0x00ff));        // write ptr to start of Tx packet
   WriteCtrReg(ETXSTH,(u08)((TXSTART & 0xff00)>>8));
@@ -176,19 +195,19 @@ u16 MACWrite(u08 * ptrBuffer, u16 ui_Len)
   
   address+=WriteMacBuffer(ptrBuffer, ui_Len);          // write packet. Assume correct formating src, dst, type  + data
 
-  WriteCtrReg(ETXNDL, (u08)( address & 0x00ff));       // Tell MAC when the end of the packet is
+ WriteCtrReg(ETXNDL, (u08)( address & 0x00ff));       // Tell MAC when the end of the packet is
   WriteCtrReg(ETXNDH, (u08)((address & 0xff00)>>8));
   
  
   ClrBitField(EIR,EIR_TXIF);
-  SetBitField(EIE, EIE_TXIE |EIE_INTIE);
+  //SetBitField(EIE, EIE_TXIE |EIE_INTIE);
 
   ERRATAFIX;    
   SetBitField(ECON1, ECON1_TXRTS);                     // begin transmitting;
 
   do
   {
-                      
+    // [TODO] add timers here or make packet sending completely asynchronous
   }while (!(ReadETHReg(EIR) & (EIR_TXIF)));             // kill some time. Note: Nice place to block?
 
   ClrBitField(ECON1, ECON1_TXRTS);
@@ -237,14 +256,16 @@ u16 MACWrite(u08 * ptrBuffer, u16 ui_Len)
  *
  * \author Iain Derrington (www.kandi-electronics.com)
  * \param ptrBuffer ptr to buffer of bytes where the packet should be read into. 
- * \return byte, the number of complete packets in the buffer -1.
+ * param maxsize maximum number of bytes to read
+ * \return the number of bytes actually read
  */
 /**********************************************************************/
-u08 MACRead(u08 * ptrBuffer)
+u16 MACRead(u08 * ptrBuffer, u16 maxsize )
 {
   static u16 nextpckptr = RXSTART;
   RXSTATUS ptrRxStatus;
   u08 bytPacket;
+  u16 actsize;
 
   BankSel(1);
   
@@ -261,7 +282,10 @@ u08 MACRead(u08 * ptrBuffer)
   ReadMacBuffer((u08*)&ptrRxStatus.v[0],6);             // read next packet ptr + 4 status bytes
   nextpckptr = ptrRxStatus.bits.NextPacket;
       
-  ReadMacBuffer(ptrBuffer,ptrRxStatus.bits.ByteCount);   // read packet into buffer
+  actsize = ptrRxStatus.bits.ByteCount;
+  if( actsize > maxsize )
+    actsize = maxsize;
+  ReadMacBuffer(ptrBuffer,actsize);            // read packet into buffer
                                         // ptrBuffer should now contain a MAC packet
     BankSel(0);
   WriteCtrReg(ERXRDPTL,ptrRxStatus.v[0]);  // free up ENC memory my adjustng the Rx Read ptr
@@ -271,7 +295,7 @@ u08 MACRead(u08 * ptrBuffer)
   SetBitField(ECON2, ECON2_PKTDEC);
 
 
-  return bytPacket;
+  return actsize;
 }
 
 /*------------------------Private Functions-----------------------------*/
@@ -565,6 +589,14 @@ static void ResetMac(void)
   SEL_MAC(TRUE);              // ENC CS low
   SPIWrite(&bytOpcode,1);     // Tx opcode and address
   SEL_MAC(FALSE);
+}
+
+void SetRXInterrupt( int enabled )
+{
+  if( enabled )
+    SetBitField( EIE, EIE_PKTIE | EIE_INTIE );
+  else
+    ClrBitField( EIE, EIE_PKTIE | EIE_INTIE );
 }
 
 #endif // #ifdef BUILD_ENC28J60

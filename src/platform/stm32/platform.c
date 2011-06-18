@@ -20,6 +20,7 @@
 #include "utils.h"
 #include "vram.h"
 #include "fsmc_sram.h"
+#include "enc28j60.h"
 
 // Platform specific includes
 #include "stm32f10x.h"
@@ -58,6 +59,10 @@ static void adcs_init();
 static void cans_init();
 static void vram_transfer_init();
 static void i2cs_init();
+static void eth_init();
+
+static u8 eth_timer_fired;
+static u8 eth_initialized;
 
 int platform_init()
 {
@@ -107,6 +112,8 @@ int platform_init()
 #ifdef BUILD_VRAM
   vram_transfer_init();
 #endif  
+
+  eth_init();
   
   // All done
   return PLATFORM_OK;
@@ -175,6 +182,8 @@ static void NVIC_Configuration(void)
 // todo: Needs updates to support different processor lines.
 static GPIO_TypeDef * const pio_port[] = { GPIOA, GPIOB, GPIOC, GPIOD, GPIOE, GPIOF, GPIOG };
 static const u32 pio_port_clk[]        = { RCC_APB2Periph_GPIOA, RCC_APB2Periph_GPIOB, RCC_APB2Periph_GPIOC, RCC_APB2Periph_GPIOD, RCC_APB2Periph_GPIOE, RCC_APB2Periph_GPIOF, RCC_APB2Periph_GPIOG };
+const u32 exti_line[] = { EXTI_Line0, EXTI_Line1,  EXTI_Line2,  EXTI_Line3,  EXTI_Line4,  EXTI_Line5,  EXTI_Line6,  EXTI_Line7, 
+                          EXTI_Line8, EXTI_Line9, EXTI_Line10, EXTI_Line11, EXTI_Line12, EXTI_Line13, EXTI_Line14, EXTI_Line15 };
 
 static void pios_init()
 {
@@ -713,6 +722,17 @@ void SysTick_Handler( void )
 #ifdef BUILD_MMCFS
   disk_timerproc();
 #endif
+
+  if( eth_initialized )
+  {
+  
+    // Indicate that a SysTick interrupt has occurred.
+    eth_timer_fired = 1;
+
+    // Generate a fake Ethernet interrupt.  This will perform the actual work
+    // of incrementing the timers and taking the appropriate actions.
+    platform_eth_force_interrupt();
+  }
 }
 
 static void timers_init()
@@ -1422,6 +1442,91 @@ static void vram_transfer_init()
   platform_pio_op( PROP_RESET_PORT, 1 << PROP_RESET_PIN, PLATFORM_IO_PIN_SET );  
   platform_pio_op( PROP_RESET_PORT, 1 << PROP_RESET_PIN, PLATFORM_IO_PIN_DIR_OUTPUT );
 }
+
+// ****************************************************************************
+// Ethernet support with ENC28J60
+
+#ifdef BUILD_ENC28J60
+
+#define ETH_INT_RESNUM        PLATFORM_IO_ENCODE( ENC28J60_INT_PORT, ENC28J60_INT_PIN, PLATFORM_IO_ENC_PIN )
+static elua_int_c_handler eth_prev_handler;
+
+// Ethernet interrupt handler
+static void eth_int_handler( elua_int_resnum resnum )
+{
+  // Chain handlers
+  if( eth_prev_handler && ( resnum != ETH_INT_RESNUM ) )
+    eth_prev_handler( resnum );
+  if( eth_initialized && ( resnum == ETH_INT_RESNUM ) )
+  {
+    platform_s_uart_send( 0, '_' );
+    SetRXInterrupt( 0 );
+    elua_uip_mainloop();
+    SetRXInterrupt( 1 );
+  }
+}
+
+static void eth_init()
+{
+  static struct uip_eth_addr sTempAddr;
+  unsigned i;
+  
+  // Initialize the MAC first
+  static const u8 macaddr[] = ENC28J60_MAC_ADDRESS;
+  initMAC( macaddr );
+
+  // Then the Ethernet interrupt
+  platform_pio_op( ENC28J60_INT_PORT, 1 << ENC28J60_INT_PIN, PLATFORM_IO_PIN_DIR_INPUT );
+  platform_pio_op( ENC28J60_INT_PORT, 1 << ENC28J60_INT_PIN, PLATFORM_IO_PIN_PULLUP );
+  platform_uart_setup( RFS_UART_ID, RFS_UART_SPEED, 8, PLATFORM_UART_PARITY_NONE, PLATFORM_UART_STOPBITS_1 );
+  eth_prev_handler = elua_int_set_c_handler( INT_GPIO_NEGEDGE, eth_int_handler ); 
+  platform_cpu_set_interrupt( INT_GPIO_NEGEDGE, ETH_INT_RESNUM, PLATFORM_CPU_ENABLE );
+  SetRXInterrupt( 1 );
+  eth_initialized = 1;
+ 
+  // Let uIP run now
+  for( i = 0; i < 6; i ++ )
+    sTempAddr.addr[ i ] = macaddr[ i ];
+  elua_uip_init( &sTempAddr );  
+}
+
+void platform_eth_send_packet( const void* src, u32 size )
+{
+  printf( "send %d bytes\n", ( int )size );
+  MACWrite( ( u8* )src, ( u16 )size );
+}
+
+u32 platform_eth_get_packet_nb( void* buf, u32 maxlen )
+{
+  u16 res = MACRead( buf, maxlen );
+  if( res > 0 )
+    printf( "got %d bytes\n", res );
+  return res;
+}
+
+void platform_eth_force_interrupt()
+{
+  EXTI_GenerateSWInterrupt( exti_line[ ENC28J60_INT_PIN ]  ); 
+}
+
+u32 platform_eth_get_elapsed_time()
+{
+  if( eth_timer_fired )
+  {
+    eth_timer_fired = 0;
+    return SYSTICKMS;
+  }
+  else
+    return 0;
+}
+
+#else // #ifdef BUILD_ENC28J60
+
+static void eth_init()
+{
+}
+
+#endif // #ifdef BUILD_ENC28J60
 
 // ****************************************************************************
 // Platform specific modules go here

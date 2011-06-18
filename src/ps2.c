@@ -75,6 +75,7 @@ static u8 ps2_send_buffer[ PS2_SEND_BUFFER_SIZE ];
 static volatile u8 ps2_cmds_to_send;
 static u8 ps2_send_idx;
 static volatile u8 ps2_acks_to_receive;
+static elua_int_c_handler ps2_prev_handler;
 
 // Direct scancode to ASCII mappings (0 means 'no mapping')
 static const u16 ps2_direct_mapping[] = 
@@ -211,7 +212,7 @@ static void ps2_hl_clk_int_handler( elua_int_resnum resnum )
   unsigned i;
 
   if( resnum != PS2_CLOCK_PIN_RESNUM )
-    return;
+    goto done;
   ps2_bitcnt ++;
   if( ps2_bitcnt != 1 && ps2_bitcnt < 10 ) // start/stop/parity bits, ignore
     ps2_data |= platform_pio_op( PS2_DATA_PORT, 1 << PS2_DATA_PIN, PLATFORM_IO_PIN_GET ) << ( ps2_bitcnt - 2 );
@@ -226,7 +227,7 @@ static void ps2_hl_clk_int_handler( elua_int_resnum resnum )
         if( -- ps2_cmds_to_send != 0 ) // more data to send?
           ps2h_send_cmd( ++ ps2_send_idx );
       }
-      return;
+      goto done;
     }
     else // nothing is sending, so interpret this code
     {
@@ -357,6 +358,9 @@ static void ps2_hl_clk_int_handler( elua_int_resnum resnum )
     }
     ps2_data = ps2_bitcnt = 0;
   }
+done:
+  if( ps2_prev_handler )
+    ps2_prev_handler( resnum );
 }
 
 // Helper: read data from buffer, increment pointer
@@ -380,7 +384,7 @@ void ps2_init()
   platform_pio_op( PS2_CLOCK_PORT, 1 << PS2_CLOCK_PIN, PLATFORM_IO_PIN_CLEAR );
   platform_pio_op( PS2_RESET_PORT, 1 << PS2_RESET_PIN, PLATFORM_IO_PIN_CLEAR );
   // Enable interrupt on clock line 
-  elua_int_set_c_handler( INT_GPIO_NEGEDGE, ps2_hl_clk_int_handler ); 
+  ps2_prev_handler = elua_int_set_c_handler( INT_GPIO_NEGEDGE, ps2_hl_clk_int_handler ); 
   platform_cpu_set_interrupt( INT_GPIO_NEGEDGE, PS2_CLOCK_PIN_RESNUM, PLATFORM_CPU_ENABLE );
   // Reset + typematic rate
   ps2_send( 3, PS2_CMD_RESET, 2, PS2_CMD_TYPE_RATE, 1, 0x00, 1 );

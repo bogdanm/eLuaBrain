@@ -18,7 +18,6 @@
 #include "vram.h"
 #include "sermux.h"
 #include "ps2.h"
-#include "enc28j60.h"
 
 // [TODO] the new builder should automatically do this
 #if defined( BUILD_LUA_INT_HANDLERS ) || defined( BUILD_C_INT_HANDLERS )
@@ -248,11 +247,6 @@ void cmn_platform_init()
   term_init( TERM_LINES, TERM_COLS, term_out, term_in, term_translate );
 #endif// #ifdef BUILD_PS2
 #endif // #if defined( BUILD_TERM ) || defined( BUILD_TERM_VRAM )  
-
-#ifdef BUILD_ENC28J60
-  u8 macaddr[] = ENC28J60_MAC_ADDRESS;
-  initMAC( macaddr );
-#endif // #ifdef BUILD_ENC28J60
 }
 
 // ****************************************************************************
