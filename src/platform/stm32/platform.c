@@ -476,7 +476,7 @@ int platform_can_recv( unsigned id, u32 *canid, u8 *idtype, u8 *len, u8 *data )
 // SPI
 
 static SPI_TypeDef *const spi[]  = { SPI1, SPI2, SPI3 };
-static const u16 spi_prescaler[] = { SPI_BaudRatePrescaler_2, SPI_BaudRatePrescaler_4, SPI_BaudRatePrescaler_8, 
+static const u16 spi_prescaler[] = { 0, SPI_BaudRatePrescaler_2, SPI_BaudRatePrescaler_4, SPI_BaudRatePrescaler_8, 
                                      SPI_BaudRatePrescaler_16, SPI_BaudRatePrescaler_32, SPI_BaudRatePrescaler_64,
                                      SPI_BaudRatePrescaler_128, SPI_BaudRatePrescaler_256 };
 static GPIO_TypeDef *const spi_gpio_port[] = { GPIOA, GPIOB, GPIOB };
@@ -498,8 +498,10 @@ u32 platform_spi_setup( unsigned id, int mode, u32 clock, unsigned cpol, unsigne
   SPI_InitTypeDef SPI_InitStructure;
   GPIO_InitTypeDef GPIO_InitStructure;
   u8 prescaler_idx = intlog2( ( unsigned ) ( SPI_GET_BASE_CLK( id ) / clock ) );
-  if ( prescaler_idx > 7 )
-    prescaler_idx = 7;
+  if( prescaler_idx == 0 )
+    prescaler_idx ++;
+  else if( prescaler_idx > 8 )
+    prescaler_idx = 8;
   
   /* Configure SPI pins */
   GPIO_InitStructure.GPIO_Pin = spi_sck_mosi_pins[ id ];
@@ -525,7 +527,7 @@ u32 platform_spi_setup( unsigned id, int mode, u32 clock, unsigned cpol, unsigne
   SPI_Cmd( spi[ id ], ENABLE );
   SPI_NSSInternalSoftwareConfig( spi[ id ], SPI_NSSInternalSoft_Set );
   
-  return ( SPI_GET_BASE_CLK( id ) / ( ( ( u16 )2 << ( prescaler_idx ) ) ) );
+  return ( SPI_GET_BASE_CLK( id ) / ( 1 << prescaler_idx ) );
 }
 
 spi_data_type platform_spi_send_recv( unsigned id, spi_data_type data )
@@ -724,8 +726,7 @@ void SysTick_Handler( void )
 #endif
 
   if( eth_initialized )
-  {
-  
+  {  
     // Indicate that a SysTick interrupt has occurred.
     eth_timer_fired = 1;
 
@@ -1459,7 +1460,6 @@ static void eth_int_handler( elua_int_resnum resnum )
     eth_prev_handler( resnum );
   if( eth_initialized && ( resnum == ETH_INT_RESNUM ) )
   {
-    platform_s_uart_send( 0, '_' );
     SetRXInterrupt( 0 );
     elua_uip_mainloop();
     SetRXInterrupt( 1 );
@@ -1482,12 +1482,12 @@ static void eth_init()
   eth_prev_handler = elua_int_set_c_handler( INT_GPIO_NEGEDGE, eth_int_handler ); 
   platform_cpu_set_interrupt( INT_GPIO_NEGEDGE, ETH_INT_RESNUM, PLATFORM_CPU_ENABLE );
   SetRXInterrupt( 1 );
-  eth_initialized = 1;
  
   // Let uIP run now
   for( i = 0; i < 6; i ++ )
     sTempAddr.addr[ i ] = macaddr[ i ];
-  elua_uip_init( &sTempAddr );  
+  elua_uip_init( &sTempAddr );
+  eth_initialized = 1;    
 }
 
 void platform_eth_send_packet( const void* src, u32 size )

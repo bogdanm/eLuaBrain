@@ -45,6 +45,7 @@ static void BankSel(u08);
 #define SEL_MAC(x) platform_pio_op( ENC28J60_CS_PORT, 1 << ENC28J60_CS_PIN, x == TRUE ? PLATFORM_IO_PIN_CLEAR : PLATFORM_IO_PIN_SET )
 /** MACRO for rev B5 fix.*/
 #define ERRATAFIX   do { SetBitField(ECON1, ECON1_TXRST);ClrBitField(ECON1, ECON1_TXRST);ClrBitField(EIR, EIR_TXERIF | EIR_TXIF); } while(0)
+//#define ERRATAFIX
 
 static u16 SPIWrite( u8 *pdata, u16 size )
 {
@@ -90,12 +91,13 @@ void initMAC( const u8* bytMacAddress )
 #if defined( ENC28J60_RESET_PORT ) && defined( ENC28J60_RESET_PIN )
   platform_pio_op( ENC28J60_RESET_PORT, 1 << ENC28J60_RESET_PIN, PLATFORM_IO_PIN_CLEAR );
   platform_pio_op( ENC28J60_RESET_PORT, 1 << ENC28J60_RESET_PIN, PLATFORM_IO_PIN_DIR_OUTPUT );
-  platform_timer_delay( 0, 100000 );
+  platform_timer_delay( 0, 30000 );
   platform_pio_op( ENC28J60_RESET_PORT, 1 << ENC28J60_RESET_PIN, PLATFORM_IO_PIN_SET );
 #endif
 
   ResetMac();       // erm. Resets the MAC.
                     // setup memory by defining ERXST and ERXND
+  platform_timer_delay( 0, 20000 );                    
   BankSel(0);       // select bank 0
   WriteCtrReg(ERXSTL,(u08)( RXSTART & 0x00ff));    
   WriteCtrReg(ERXSTH,(u08)((RXSTART & 0xff00)>> 8));
@@ -186,19 +188,18 @@ u16 MACWrite(u08 * ptrBuffer, u16 ui_Len)
   BankSel(0);                                          // select bank 0
   WriteCtrReg(ETXSTL,(u08)( TXSTART & 0x00ff));        // write ptr to start of Tx packet
   WriteCtrReg(ETXSTH,(u08)((TXSTART & 0xff00)>>8));
-
+  
   WriteCtrReg(EWRPTL,(u08)( TXSTART & 0x00ff));        // Set write buffer to point to start of Tx Buffer
-  WriteCtrReg(EWRPTH,(u08)((TXSTART & 0xff00)>>8));
+  WriteCtrReg(EWRPTH,(u08)((TXSTART & 0xff00)>>8));  
 
   WriteMacBuffer(&bytControl,1);                       // write per packet control byte
   address++;
   
   address+=WriteMacBuffer(ptrBuffer, ui_Len);          // write packet. Assume correct formating src, dst, type  + data
 
- WriteCtrReg(ETXNDL, (u08)( address & 0x00ff));       // Tell MAC when the end of the packet is
+  WriteCtrReg(ETXNDL, (u08)( address & 0x00ff));       // Tell MAC when the end of the packet is
   WriteCtrReg(ETXNDH, (u08)((address & 0xff00)>>8));
   
- 
   ClrBitField(EIR,EIR_TXIF);
   //SetBitField(EIE, EIE_TXIE |EIE_INTIE);
 
@@ -229,11 +230,12 @@ u16 MACWrite(u08 * ptrBuffer, u16 ui_Len)
     }
     ClrBitField(EIR, EIR_TXERIF | EIR_TXIF);
     ClrBitField(ESTAT,ESTAT_TXABRT);
-
+    printf( "NOT SENT\n" );
     return FALSE;                                          // packet transmit failed. Inform calling function
   }                                                        // calling function may inquire why packet failed by calling [TO DO] function
   else
   {
+    printf( "SENT\n" );
     return TRUE;                                           // all fan dabby dozy
   }
 }
