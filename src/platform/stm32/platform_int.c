@@ -314,7 +314,7 @@ void platform_int_init()
   }
 
   // Enable all EXTI interrupts in the NVIC
-  nvic_init_structure.NVIC_IRQChannelPreemptionPriority = 4;
+  nvic_init_structure.NVIC_IRQChannelPreemptionPriority = 5;
   for( i = 0; i < sizeof( exti_irq_table ) / sizeof( u8 ); i ++ )
   {
     nvic_init_structure.NVIC_IRQChannel = exti_irq_table[ i ];

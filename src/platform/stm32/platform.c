@@ -716,6 +716,9 @@ static TIM_TypeDef * const timer[] = { TIM1, TIM2, TIM3, TIM4, TIM5 };
 
 static u32 timer_set_clock( unsigned id, u32 clock );
 
+static u16 systick_eth_counter;
+#define SYSTICK_ETH_LIMIT_MS    SYSTICKMS       
+
 void SysTick_Handler( void )
 {
   // Handle virtual timers
@@ -727,12 +730,18 @@ void SysTick_Handler( void )
 
   if( eth_initialized )
   {  
-    // Indicate that a SysTick interrupt has occurred.
-    eth_timer_fired = 1;
+    systick_eth_counter += SYSTICKMS;
+    if( systick_eth_counter == SYSTICK_ETH_LIMIT_MS )
+    {
+      systick_eth_counter = 0;
 
-    // Generate a fake Ethernet interrupt.  This will perform the actual work
-    // of incrementing the timers and taking the appropriate actions.
-    platform_eth_force_interrupt();
+      // Indicate that a SysTick interrupt has occurred.
+      eth_timer_fired = 1;
+
+      // Generate a fake Ethernet interrupt.  This will perform the actual work
+      // of incrementing the timers and taking the appropriate actions.
+      platform_eth_force_interrupt();
+    }
   }
 }
 
@@ -1518,7 +1527,7 @@ u32 platform_eth_get_elapsed_time()
   if( eth_timer_fired )
   {
     eth_timer_fired = 0;
-    return SYSTICKMS;
+    return SYSTICK_ETH_LIMIT_MS;
   }
   else
     return 0;

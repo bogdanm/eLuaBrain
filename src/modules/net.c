@@ -180,8 +180,27 @@ static int net_lookup( lua_State* L )
   elua_net_ip res;
   
   res = elua_net_lookup( name );
-  lua_pushinteger( L, res.ipaddr );
+  lua_pushnumber( L, ( lua_Number )res.ipaddr );
   return 1;
+}
+
+// Lua: ip, netmask, dns, gw = netcfg()
+// Returns 'nil' if the network isn't initialized yet
+static int net_netcfg( lua_State *L )
+{
+  elua_net_ip ip;
+
+  ip = elua_net_get_config( ELUA_NET_CFG_IP );
+  if( ip.ipaddr == 0 )
+    return;
+  lua_pushinteger( L, ip.ipaddr );
+  ip = elua_net_get_config( ELUA_NET_CFG_NETMASK );
+  lua_pushinteger( L, ip.ipaddr );
+  ip = elua_net_get_config( ELUA_NET_CFG_DNS );
+  lua_pushinteger( L, ip.ipaddr );
+  ip = elua_net_get_config( ELUA_NET_CFG_GW );
+  lua_pushinteger( L, ip.ipaddr );
+  return 4;
 }
 
 // Module function map
@@ -198,6 +217,7 @@ const LUA_REG_TYPE net_map[] =
   { LSTRKEY( "send" ), LFUNCVAL( net_send ) },
   { LSTRKEY( "recv" ), LFUNCVAL( net_recv ) },
   { LSTRKEY( "lookup" ), LFUNCVAL( net_lookup ) },
+  { LSTRKEY( "netcfg" ), LFUNCVAL( net_netcfg ) },
 #if LUA_OPTIMIZE_MEMORY > 0
   { LSTRKEY( "SOCK_STREAM" ), LNUMVAL( ELUA_NET_SOCK_STREAM ) },
   { LSTRKEY( "SOCK_DGRAM" ), LNUMVAL( ELUA_NET_SOCK_DGRAM ) },

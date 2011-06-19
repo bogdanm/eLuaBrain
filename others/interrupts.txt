@@ -9,5 +9,5 @@ SysTick         3             0
 Keyboard        0             0
 Ethernet        2             0
 UARTs           1             0
-Other GPIOs     4             0
-
+Other GPIOs     5             0
+SD/MMC          4             0

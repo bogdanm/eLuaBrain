@@ -711,4 +711,40 @@ elua_net_ip elua_net_lookup( const char* hostname )
   return res;  
 }
 
+elua_net_ip elua_net_get_config( int what )
+{
+  elua_net_ip res = { 0 };
+  u16 *pdns;
+
+  if( !elua_uip_configured )
+    return res;
+  switch( what )
+  {
+    case ELUA_NET_CFG_IP:
+      res.ipwords[ 0 ] = (( u16* )uip_hostaddr )[ 0 ];
+      res.ipwords[ 1 ] = (( u16* )uip_hostaddr )[ 1 ];
+      break;
+
+    case ELUA_NET_CFG_NETMASK:
+      res.ipwords[ 0 ] = (( u16* )uip_netmask )[ 0 ];
+      res.ipwords[ 1 ] = (( u16* )uip_netmask )[ 1 ];
+      break;
+   
+    case ELUA_NET_CFG_DNS:
+      if( ( pdns = resolv_getserver() ) != NULL )
+      {
+        res.ipwords[ 0 ] = pdns[ 0 ];
+        res.ipwords[ 1 ] = pdns[ 1 ];
+      }
+      break;
+       
+    case ELUA_NET_CFG_GW:
+      res.ipwords[ 0 ] = (( u16* )uip_draddr )[ 0 ];
+      res.ipwords[ 1 ] = (( u16* )uip_draddr )[ 1 ];
+      break;
+  }
+  return res;
+}
+
 #endif // #ifdef BUILD_UIP
+

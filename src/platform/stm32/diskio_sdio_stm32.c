@@ -64,12 +64,13 @@ DSTATUS disk_initialize (
   if( drv == 0 )
   {
     SD_Init();
+    SD_InitializeCards();
     SD_GetCardInfo(&SDCardInfo2);
     SD_SelectDeselect((uint32_t) (SDCardInfo2.RCA << 16));
     SD_SetDeviceMode(SD_INTERRUPT_MODE);
     NVIC_InitTypeDef nvic_init_structure;
     nvic_init_structure.NVIC_IRQChannel = SDIO_IRQn;
-    nvic_init_structure.NVIC_IRQChannelPreemptionPriority = 0;
+    nvic_init_structure.NVIC_IRQChannelPreemptionPriority = 4;
     nvic_init_structure.NVIC_IRQChannelSubPriority = 0;
     nvic_init_structure.NVIC_IRQChannelCmd = ENABLE;
     NVIC_Init(&nvic_init_structure);

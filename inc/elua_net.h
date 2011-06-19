@@ -27,6 +27,15 @@ typedef union
   u16     ipwords[ 2 ];
 } elua_net_ip;
 
+// eLua network configuration constants
+enum
+{
+  ELUA_NET_CFG_IP,
+  ELUA_NET_CFG_NETMASK,
+  ELUA_NET_CFG_DNS,
+  ELUA_NET_CFG_GW
+};
+
 // eLua services ports
 #define ELUA_NET_TELNET_PORT          23
 
@@ -49,5 +58,7 @@ elua_net_ip elua_net_lookup( const char* hostname );
 
 int elua_net_get_last_err( int s );
 int elua_net_get_telnet_socket();
+
+elua_net_ip elua_net_get_config( int what );
 
 #endif
