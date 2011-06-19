@@ -141,6 +141,7 @@ void initMAC( const u8* bytMacAddress )
   WriteCtrReg(ECON1,  ECON1_RXEN);     //Enable the chip for reception of packets
 }
 
+#if 0
 void testMe()
 {
   unsigned i;
@@ -157,7 +158,7 @@ void testMe()
   printf( "Rev=%d\n", ReadETHReg( EREVID ) );
   printf( "***********************\n" );
 }
-
+#endif
 
 /***********************************************************************/
 /** \brief Writes a packet to the ENC28J60.

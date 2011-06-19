@@ -1,0 +1,13 @@
+Configuration:
+  3 bit(s) -> group
+  1 bit(s) -> subpriority
+
+Brain32 interrupts and their priorities
+=======================================
+                Group         Sub
+SysTick         3             0
+Keyboard        0             0
+Ethernet        2             0
+UARTs           1             0
+Other GPIOs     4             0
+

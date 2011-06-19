@@ -299,9 +299,12 @@ void platform_int_init()
 {
   NVIC_InitTypeDef nvic_init_structure;
   unsigned i;
+
+  // 3 bits preemption priority, 1 bit subgroup 
+  NVIC_PriorityGroupConfig(NVIC_PriorityGroup_3);
   
   // Enable all USART interrupts in the NVIC
-  nvic_init_structure.NVIC_IRQChannelPreemptionPriority = 0;
+  nvic_init_structure.NVIC_IRQChannelPreemptionPriority = 1;
   nvic_init_structure.NVIC_IRQChannelSubPriority = 0;
   nvic_init_structure.NVIC_IRQChannelCmd = ENABLE;  
   for( i = 0; i < sizeof( uart_irq_table ) / sizeof( u8 ); i ++ )
@@ -311,12 +314,23 @@ void platform_int_init()
   }
 
   // Enable all EXTI interrupts in the NVIC
+  nvic_init_structure.NVIC_IRQChannelPreemptionPriority = 4;
   for( i = 0; i < sizeof( exti_irq_table ) / sizeof( u8 ); i ++ )
   {
     nvic_init_structure.NVIC_IRQChannel = exti_irq_table[ i ];
     NVIC_Init( &nvic_init_structure );
   }
 
+  // Special priorites: KB clock line and ETH interrupt line
+  nvic_init_structure.NVIC_IRQChannelPreemptionPriority = 0;
+  nvic_init_structure.NVIC_IRQChannel = EXTI15_10_IRQn;
+  NVIC_Init( &nvic_init_structure );
+  nvic_init_structure.NVIC_IRQChannelPreemptionPriority = 2;
+  nvic_init_structure.NVIC_IRQChannel = EXTI9_5_IRQn;
+  NVIC_Init( &nvic_init_structure );
+  nvic_init_structure.NVIC_IRQChannelPreemptionPriority = 3;
+  nvic_init_structure.NVIC_IRQChannel = SysTick_IRQn;
+  NVIC_Init( &nvic_init_structure );
 }
 
 // ****************************************************************************
