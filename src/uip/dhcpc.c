@@ -281,7 +281,7 @@ PT_THREAD(handle_dhcp(void))
       break;
     }
 	uip_flags &= ~UIP_NEWDATA;
-    if(s.ticks < CLOCK_SECOND * 60) {
+    if(s.ticks < CLOCK_SECOND * 50) {
       s.ticks *= 2;
     } else {
 	  s.ipaddr[0] = 0;

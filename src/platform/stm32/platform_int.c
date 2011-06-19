@@ -13,6 +13,7 @@
 // Interrupt handlers
 
 extern USART_TypeDef *const stm32_usart[];
+extern void eth_int_handler();
 
 static void all_usart_irqhandler( int resnum )
 {
@@ -114,7 +115,16 @@ void EXTI9_5_IRQHandler()
   for( i = 5; i < 10; i++ )
   {
     if( EXTI_GetITStatus( exti_line[ i ] ) != RESET )
-      all_exti_irqhandler( i );
+    {
+      // NOTE: cheat here: serve Ethernet interrupt
+      if( i == ENC28J60_INT_PIN )
+      {
+        EXTI_ClearITPendingBit( exti_line[ i ] );
+        eth_int_handler();
+      }
+      else
+        all_exti_irqhandler( i );
+    }
   }
 }
 

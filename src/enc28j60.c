@@ -28,7 +28,7 @@ TXSTATUS TxStatus;
 static u08 ReadETHReg(u08);         // read a ETX reg
 static u08 ReadMacReg(u08);         // read a MAC reg
 static u16 ReadPhyReg(u08);         // read a PHY reg
-static u16 ReadMacBuffer(u08 * ,u08);    //read the mac buffer (ptrBuffer, no. of bytes)
+static u16 ReadMacBuffer(u08 * ,u16);    //read the mac buffer (ptrBuffer, no. of bytes)
 static u08 WriteCtrReg(u08,u08);               // write to control reg
 static u8 ReadCtrReg(u8,int);           // read a control reg
 static u08 WritePhyReg(u08,u16);               // write to a phy reg
@@ -136,7 +136,7 @@ void initMAC( const u8* bytMacAddress )
   WriteCtrReg(MAADR6,bytMacAddress[5]);
 
   // Initialise the PHY registes
-  WritePhyReg(PHCON1, 0x000);
+  WritePhyReg(PHCON1, 0x00);
   WritePhyReg(PHCON2, PHCON2_HDLDIS);
   WriteCtrReg(ECON1,  ECON1_RXEN);     //Enable the chip for reception of packets
 }
@@ -230,12 +230,12 @@ u16 MACWrite(u08 * ptrBuffer, u16 ui_Len)
     }
     ClrBitField(EIR, EIR_TXERIF | EIR_TXIF);
     ClrBitField(ESTAT,ESTAT_TXABRT);
-    printf( "NOT SENT\n" );
+    //printf( "NOT SENT\n" );
     return FALSE;                                          // packet transmit failed. Inform calling function
   }                                                        // calling function may inquire why packet failed by calling [TO DO] function
   else
   {
-    printf( "SENT\n" );
+    //printf( "SENT\n" );
     return TRUE;                                           // all fan dabby dozy
   }
 }
@@ -459,7 +459,7 @@ static u08 WriteCtrReg(u08 bytAddress,u08 bytData)
  * \return uint  Number of bytes read.
  */
 /**********************************************************************/
-static u16 ReadMacBuffer(u08 * bytBuffer,u08 byt_length)
+static u16 ReadMacBuffer(u08 * bytBuffer,u16 byt_length)
 {
   u08 bytOpcode;
   u16 len;

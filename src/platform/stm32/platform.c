@@ -1450,15 +1450,12 @@ static void vram_transfer_init()
 #ifdef BUILD_ENC28J60
 
 #define ETH_INT_RESNUM        PLATFORM_IO_ENCODE( ENC28J60_INT_PORT, ENC28J60_INT_PIN, PLATFORM_IO_ENC_PIN )
-static elua_int_c_handler eth_prev_handler;
+#define MAX_SEND_RETRY        5
 
 // Ethernet interrupt handler
-static void eth_int_handler( elua_int_resnum resnum )
+void eth_int_handler()
 {
-  // Chain handlers
-  if( eth_prev_handler && ( resnum != ETH_INT_RESNUM ) )
-    eth_prev_handler( resnum );
-  if( eth_initialized && ( resnum == ETH_INT_RESNUM ) )
+  if( eth_initialized )
   {
     SetRXInterrupt( 0 );
     elua_uip_mainloop();
@@ -1475,12 +1472,15 @@ static void eth_init()
   static const u8 macaddr[] = ENC28J60_MAC_ADDRESS;
   initMAC( macaddr );
 
+  // Setup Ethernet timer
+  platform_s_timer_op( ELUA_DHCP_TIMER_ID, PLATFORM_TIMER_OP_SET_CLOCK, 1200 );
+
   // Then the Ethernet interrupt
   platform_pio_op( ENC28J60_INT_PORT, 1 << ENC28J60_INT_PIN, PLATFORM_IO_PIN_DIR_INPUT );
   platform_pio_op( ENC28J60_INT_PORT, 1 << ENC28J60_INT_PIN, PLATFORM_IO_PIN_PULLUP );
   platform_uart_setup( RFS_UART_ID, RFS_UART_SPEED, 8, PLATFORM_UART_PARITY_NONE, PLATFORM_UART_STOPBITS_1 );
-  eth_prev_handler = elua_int_set_c_handler( INT_GPIO_NEGEDGE, eth_int_handler ); 
   platform_cpu_set_interrupt( INT_GPIO_NEGEDGE, ETH_INT_RESNUM, PLATFORM_CPU_ENABLE );
+  // Note: the handler will be called automatically from platform_int.c
   SetRXInterrupt( 1 );
  
   // Let uIP run now
@@ -1492,15 +1492,19 @@ static void eth_init()
 
 void platform_eth_send_packet( const void* src, u32 size )
 {
-  printf( "send %d bytes\n", ( int )size );
+  int retrcount = 0;
+  //printf( "send %d bytes\n", ( int )size );
+  //for( retrcount = 0; retrcount < MAX_SEND_RETRY; retrcount ++ )
+  //  if( MACWrite( ( u8* )src, ( u16 )size ) == TRUE )
+  //    return;
   MACWrite( ( u8* )src, ( u16 )size );
 }
 
 u32 platform_eth_get_packet_nb( void* buf, u32 maxlen )
 {
   u16 res = MACRead( buf, maxlen );
-  if( res > 0 )
-    printf( "got %d bytes\n", res );
+//  if( res > 0 )
+//    printf( "got %d bytes\n", res );
   return res;
 }
 
