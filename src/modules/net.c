@@ -21,16 +21,16 @@ static int net_accept( lua_State *L )
 {
   u16 port = ( u16 )luaL_checkinteger( L, 1 );
   unsigned timer_id = 0;
-  u32 timeout = 0;
+  s32 timeout = ELUA_NET_INF_TIMEOUT;
   elua_net_ip remip;
   int sock;
 
   if( lua_gettop( L ) >= 2 ) // check for timeout arguments
   {
     timer_id = ( unsigned )luaL_checkinteger( L, 2 );
-    timeout = ( u32 )luaL_checkinteger( L, 3 );
+    timeout = ( s32 )luaL_checkinteger( L, 3 );
   }  
-  lua_pushinteger( L, sock = elua_accept( port, timer_id, timeout, &remip ) );
+  lua_pushinteger( L, sock = elua_net_accept( port, timer_id, timeout, &remip ) );
   lua_puship( L, remip.ipaddr );
   lua_pushinteger( L, elua_net_get_last_err( sock ) );
   return 3;
@@ -152,7 +152,7 @@ static int net_recv( lua_State *L )
   elua_net_size maxsize;
   s16 lastchar = ELUA_NET_NO_LASTCHAR;
   unsigned timer_id = 0;
-  u32 timeout = 0;
+  s32 timeout = ELUA_NET_INF_TIMEOUT;
   luaL_Buffer net_recv_buff;
 
   if( lua_isnumber( L, 2 ) ) // invocation with maxsize
@@ -167,7 +167,7 @@ static int net_recv( lua_State *L )
   if( lua_gettop( L ) >= 3 ) // check for timeout arguments
   {
     timer_id = ( unsigned )luaL_checkinteger( L, 3 );
-    timeout = ( u32 )luaL_checkinteger( L, 4 );
+    timeout = ( s32 )luaL_checkinteger( L, 4 );
   }
   // Initialize buffer
   luaL_buffinit( L, &net_recv_buff );
@@ -233,7 +233,7 @@ static int net_recvfrom( lua_State *L )
   elua_net_size maxsize;
   s16 lastchar = ELUA_NET_NO_LASTCHAR;
   unsigned timer_id = 0;
-  u32 timeout = 0;
+  s32 timeout = ELUA_NET_INF_TIMEOUT;
   luaL_Buffer net_recv_buff;
   elua_net_ip remoteip;
   u16 remoteport;
@@ -250,7 +250,7 @@ static int net_recvfrom( lua_State *L )
   if( lua_gettop( L ) >= 3 ) // check for timeout arguments
   {
     timer_id = ( unsigned )luaL_checkinteger( L, 3 );
-    timeout = ( u32 )luaL_checkinteger( L, 4 );
+    timeout = ( s32 )luaL_checkinteger( L, 4 );
   }
   // Initialize buffer
   luaL_buffinit( L, &net_recv_buff );
@@ -287,7 +287,8 @@ const LUA_REG_TYPE net_map[] =
   { LSTRKEY( "ERR_CLOSED" ), LNUMVAL( ELUA_NET_ERR_CLOSED ) },
   { LSTRKEY( "ERR_ABORTED" ), LNUMVAL( ELUA_NET_ERR_ABORTED ) },
   { LSTRKEY( "ERR_OVERFLOW" ), LNUMVAL( ELUA_NET_ERR_OVERFLOW ) },
-  { LSTRKEY( "INVALID_SOCKET" ), LNUMVAL( -1 ) },
+  { LSTRKEY( "INVALID_SOCKET" ), LNUMVAL( ELUA_NET_INVALID_SOCKET ) },
+  { LSTRKEY( "INF_TIMEOUT" ), LNUMVAL( ELUA_NET_INF_TIMEOUT ) },
 #endif
   { LNILKEY, LNILVAL }
 };
@@ -307,7 +308,8 @@ LUALIB_API int luaopen_net( lua_State *L )
   MOD_REG_NUMBER( L, "ERR_CLOSED", ELUA_NET_ERR_CLOSED );
   MOD_REG_NUMBER( L, "ERR_ABORTED", ELUA_NET_ERR_ABORTED );
   MOD_REG_NUMBER( L, "ERR_OVERFLOW", ELUA_NET_ERR_OVERFLOW );
-  MOD_REG_NUMBER( L, "INVALID_SOCKET", -1 );
+  MOD_REG_NUMBER( L, "INVALID_SOCKET", ELUA_NET_INVALID_SOCKET );
+  MOD_REG_NUMBER( L, "INF_TIMEOUT", ELUA_NET_INF_TIMEOUT );
   
   return 1;
 #endif // #if LUA_OPTIMIZE_MEMORY > 0  

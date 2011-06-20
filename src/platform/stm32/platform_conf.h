@@ -36,6 +36,7 @@
 #define BUILD_ENC28J60
 
 #define MMCFS_SDIO_STM32
+#define RFS_TRANSPORT_UDP
 
 // *****************************************************************************
 // UART/Timer IDs configuration data (used in main.c)
@@ -210,10 +211,10 @@ u32 platform_s_cpu_get_frequency();
 
 // Remote file system data
 #define RFS_BUFFER_SIZE       BUF_SIZE_512
-#define RFS_UART_ID           0
-#define RFS_TIMER_ID          0
-#define RFS_TIMEOUT           100000
-#define RFS_UART_SPEED        115200
+//#define RFS_UART_ID           0
+#define RFS_TIMER_ID          2
+#define RFS_TIMEOUT           400000
+//#define RFS_UART_SPEED        115200
 
 // Linenoise buffer sizes
 #define LINENOISE_HISTORY_SIZE_LUA    50

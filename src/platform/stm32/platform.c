@@ -41,7 +41,7 @@
 // NOTE: when using virtual timers, SYSTICKHZ and VTMR_FREQ_HZ should have the
 // same value, as they're served by the same timer (the systick)
 // Max SysTick preload value is 16777215, for STM32F103RET6 @ 72 MHz, lowest acceptable rate would be about 5 Hz
-#define SYSTICKHZ               10  
+#define SYSTICKHZ               10
 #define SYSTICKMS               (1000 / SYSTICKHZ)
 // ****************************************************************************
 // Platform initialization
@@ -1461,9 +1461,14 @@ static void vram_transfer_init()
 #define ETH_INT_RESNUM        PLATFORM_IO_ENCODE( ENC28J60_INT_PORT, ENC28J60_INT_PIN, PLATFORM_IO_ENC_PIN )
 #define MAX_SEND_RETRY        5
 
+static u8 forced;
+
 // Ethernet interrupt handler
 void eth_int_handler()
 {
+  if( !forced )
+    platform_s_uart_send( 0, '@' );
+  forced = 0;
   if( eth_initialized )
   {
     SetRXInterrupt( 0 );
@@ -1476,6 +1481,9 @@ static void eth_init()
 {
   static struct uip_eth_addr sTempAddr;
   unsigned i;
+
+  // [REMOVE]
+  platform_uart_setup( 0, 115200, 8, PLATFORM_UART_PARITY_NONE, PLATFORM_UART_STOPBITS_1 );
   
   // Initialize the MAC first
   static const u8 macaddr[] = ENC28J60_MAC_ADDRESS;
@@ -1487,7 +1495,6 @@ static void eth_init()
   // Then the Ethernet interrupt
   platform_pio_op( ENC28J60_INT_PORT, 1 << ENC28J60_INT_PIN, PLATFORM_IO_PIN_DIR_INPUT );
   platform_pio_op( ENC28J60_INT_PORT, 1 << ENC28J60_INT_PIN, PLATFORM_IO_PIN_PULLUP );
-  platform_uart_setup( RFS_UART_ID, RFS_UART_SPEED, 8, PLATFORM_UART_PARITY_NONE, PLATFORM_UART_STOPBITS_1 );
   platform_cpu_set_interrupt( INT_GPIO_NEGEDGE, ETH_INT_RESNUM, PLATFORM_CPU_ENABLE );
   // Note: the handler will be called automatically from platform_int.c
   SetRXInterrupt( 1 );
@@ -1519,6 +1526,7 @@ u32 platform_eth_get_packet_nb( void* buf, u32 maxlen )
 
 void platform_eth_force_interrupt()
 {
+  forced = 1;
   EXTI_GenerateSWInterrupt( exti_line[ ENC28J60_INT_PIN ]  ); 
 }
 

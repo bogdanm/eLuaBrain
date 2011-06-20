@@ -9,6 +9,7 @@
 #include "client.h"
 #include "sermux.h"
 #include "buf.h"
+#include "elua_net.h"
 #include <fcntl.h>
 #ifdef ELUA_SIMULATOR
 #include "hostif.h"
@@ -149,6 +150,30 @@ static u32 rfs_recv( u8 *p, u32 size, s32 timeout )
 #endif
 
 // ****************************************************************************
+// UDP transport implementation
+
+#ifdef RFS_TRANSPORT_UDP
+static int rfs_socket;
+static elua_net_ip rfs_server_ip;
+
+static u32 rfs_send( const u8 *p, u32 size )
+{
+//  printf( "start send %d bytes\n", size );
+  u32 res = elua_net_sendto( rfs_socket, p, size, rfs_server_ip, RFS_UDP_PORT );
+  //printf( "end send\n" );
+  return res;
+}
+
+static u32 rfs_recv( u8 *p, u32 size, s32 timeout )
+{
+  //printf( "start read %d bytes\n", size );
+  u32 res = elua_net_recvfrom( rfs_socket, p, size, ELUA_NET_NO_LASTCHAR, NULL, NULL, RFS_TIMER_ID, timeout );
+  //printf( "end read with %u bytes\n", res );
+  return res;
+}
+#endif
+
+// ****************************************************************************
 // Remote FS pipe transport functions (used only in simulator)
 
 #ifdef ELUA_CPU_LINUX
@@ -189,7 +214,7 @@ const DM_DEVICE *remotefs_init()
     hostif_putstr( "unable to open read/write pipes\n" );
     return NULL;
   }
-#elif RFS_UART_ID < SERMUX_SERVICE_ID_FIRST  // if RFS runs on a virtual UART, buffers are already set in common.c
+#elif defined( RFS_UART_ID ) && RFS_UART_ID < SERMUX_SERVICE_ID_FIRST  // if RFS runs on a virtual UART, buffers are already set in common.c
   // Initialize RFS UART
   platform_uart_setup( RFS_UART_ID, RFS_UART_SPEED, 8, PLATFORM_UART_PARITY_NONE, PLATFORM_UART_STOPBITS_1 );
   platform_uart_set_flow_control( RFS_UART_ID, RFS_FLOW_TYPE );
@@ -198,6 +223,21 @@ const DM_DEVICE *remotefs_init()
     printf( "WARNING: unable to initialize RFS filesystem\n" );
     return NULL;
   } 
+#elif defined( RFS_TRANSPORT_UDP ) // goodie!
+  elua_net_ip ip;
+  while( 1 )
+  {
+    ip = elua_net_get_config( ELUA_NET_CFG_IP );
+    if( ip.ipaddr != 0 )
+      break;
+  }
+  if( ( rfs_socket = elua_net_socket( ELUA_NET_SOCK_DGRAM ) ) == ELUA_NET_INVALID_SOCKET )
+    return NULL;
+  // [TODO] CHANGE THIS!
+  rfs_server_ip.ipbytes[ 0 ] = 192;
+  rfs_server_ip.ipbytes[ 1 ] = 168;
+  rfs_server_ip.ipbytes[ 2 ] = 1;
+  rfs_server_ip.ipbytes[ 3 ] = 8;
 #endif
   rfsc_setup( rfs_buffer, rfs_send, rfs_recv, RFS_TIMEOUT );
   return &rfs_device;
