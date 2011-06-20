@@ -18,6 +18,11 @@ enum
   ELUA_UIP_STATE_CLOSE
 };
 
+#define ELUA_UIP_UDP_FIRST_ID      16384
+#define ELUA_UIP_IS_UDP( s )       ( ( s ) >= ELUA_UIP_UDP_FIRST_ID )
+#define ELUA_UIP_TO_UDP( s )       ( ( s ) >= 0 ? ( s ) + ELUA_UIP_UDP_FIRST_ID : ( s ) )
+#define ELUA_UIP_FROM_UDP( s )     ( ( s ) >= ELUA_UIP_UDP_FIRST_ID ? ( s ) - ELUA_UIP_UDP_FIRST_ID : -1 ) 
+
 // eLua UIP state
 struct elua_uip_state
 {

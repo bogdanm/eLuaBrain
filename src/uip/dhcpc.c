@@ -46,7 +46,7 @@
 #define STATE_OFFER_RECEIVED  2
 #define STATE_CONFIG_RECEIVED 3
 
-#define HOSTNAME "elua"
+#define HOSTNAME "STMBrain"
 
 static struct dhcpc_state s;
 
@@ -98,6 +98,7 @@ struct __attribute((packed)) dhcp_msg {
 
 static const u8_t xid[4] = {0xad, 0xde, 0x12, 0x23};
 static const u8_t magic_cookie[4] = {99, 130, 83, 99};
+int dhcpc_socket = -1;
 
 /*---------------------------------------------------------------------------*/
 static u8_t *
@@ -334,6 +335,7 @@ dhcpc_init(const void *mac_addr, int mac_len)
   s.state = STATE_INITIAL;
   uip_ipaddr(addr, 255,255,255,255);
   s.conn = uip_udp_new(&addr, HTONS(DHCPC_SERVER_PORT));
+  dhcpc_socket = s.conn->connidx;
   if(s.conn != NULL) {
     uip_udp_bind(s.conn, HTONS(DHCPC_CLIENT_PORT));
   }
@@ -360,6 +362,8 @@ dhcpc_request(void)
 /*---------------------------------------------------------------------------*/
 
 #else // #if defined(BUILD_UIP) && defined(BUILD_DHCPC)
+
+int dhcpc_socket = -1;
 
 void dhcpc_appcall(void)
 {

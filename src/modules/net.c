@@ -14,6 +14,8 @@
 #include "platform_conf.h"
 #ifdef BUILD_UIP
 
+#define lua_puship( L, ip )   lua_pushnumber( L, ( lua_Number )ip )
+
 // Lua: sock, remoteip, err = accept( port, [ timer_id, timeout ] )
 static int net_accept( lua_State *L )
 {
@@ -29,7 +31,7 @@ static int net_accept( lua_State *L )
     timeout = ( u32 )luaL_checkinteger( L, 3 );
   }  
   lua_pushinteger( L, sock = elua_accept( port, timer_id, timeout, &remip ) );
-  lua_pushinteger( L, remip.ipaddr );
+  lua_puship( L, remip.ipaddr );
   lua_pushinteger( L, elua_net_get_last_err( sock ) );
   return 3;
 }
@@ -74,7 +76,8 @@ static int net_connect( lua_State *L )
   int sock = ( int )luaL_checkinteger( L, 1 );
   u16 port = ( int )luaL_checkinteger( L, 3 );
   
-  ip.ipaddr = ( u32 )luaL_checkinteger( L, 2 );
+  luaL_checkinteger( L, 2 );
+  ip.ipaddr = ( u32 )luaL_checknumber( L, 2 );
   elua_net_connect( sock, ip, port );
   lua_pushinteger( L, elua_net_get_last_err( sock ) );
   return 1;  
@@ -110,7 +113,7 @@ static int net_packip( lua_State *L )
       ip.ipbytes[ i ] = ( u8 )temp[ i ];
     }
   }
-  lua_pushinteger( L, ip.ipaddr );
+  lua_puship( L, ip.ipaddr );
   return 1;
 }
 
@@ -122,7 +125,8 @@ static int net_unpackip( lua_State *L )
   unsigned i;  
   const char* fmt;
   
-  ip.ipaddr = ( u32 )luaL_checkinteger( L, 1 );
+  luaL_checkinteger( L, 1 );
+  ip.ipaddr = ( u32 )luaL_checknumber( L, 1 );
   fmt = luaL_checkstring( L, 2 );
   if( !strcmp( fmt, "*n" ) )
   {
@@ -180,7 +184,7 @@ static int net_lookup( lua_State* L )
   elua_net_ip res;
   
   res = elua_net_lookup( name );
-  lua_pushnumber( L, ( lua_Number )res.ipaddr );
+  lua_puship( L, res.ipaddr );
   return 1;
 }
 
@@ -192,14 +196,69 @@ static int net_netcfg( lua_State *L )
 
   ip = elua_net_get_config( ELUA_NET_CFG_IP );
   if( ip.ipaddr == 0 )
-    return;
-  lua_pushinteger( L, ip.ipaddr );
+    return 0;
+  lua_puship( L, ip.ipaddr );
   ip = elua_net_get_config( ELUA_NET_CFG_NETMASK );
-  lua_pushinteger( L, ip.ipaddr );
+  lua_puship( L, ip.ipaddr );
   ip = elua_net_get_config( ELUA_NET_CFG_DNS );
-  lua_pushinteger( L, ip.ipaddr );
+  lua_puship( L, ip.ipaddr );
   ip = elua_net_get_config( ELUA_NET_CFG_GW );
-  lua_pushinteger( L, ip.ipaddr );
+  lua_puship( L, ip.ipaddr );
+  return 4;
+}
+
+// Lua: res, err = sendto( socket, data, remoteip, remoteport )
+static int net_sendto( lua_State *L )
+{
+  int sock = luaL_checkinteger( L, 1 );
+  u16 port = ( u16 )luaL_checkinteger( L, 4 );
+  elua_net_ip ip;
+  const char *buf;
+  size_t len;
+    
+  luaL_checktype( L, 2, LUA_TSTRING );
+  buf = lua_tolstring( L, 2, &len );
+  luaL_checkinteger( L, 3 );
+  ip.ipaddr = ( u32 )luaL_checknumber( L, 3 );
+  lua_pushinteger( L, elua_net_sendto( sock, buf, len, ip, port ) );
+  lua_pushinteger( L, elua_net_get_last_err( sock ) );
+  return 2; 
+}
+
+// Lua: res, err, remoteip, remoteport = recvfrom( sock, maxsize, [ timer_id, timeout ] ) or
+//      res, err, remoteip, remoteport = recvfrom( sock, "*l", [ timer_id, timeout ] )
+static int net_recvfrom( lua_State *L )
+{
+  int sock = ( int )luaL_checkinteger( L, 1 );
+  elua_net_size maxsize;
+  s16 lastchar = ELUA_NET_NO_LASTCHAR;
+  unsigned timer_id = 0;
+  u32 timeout = 0;
+  luaL_Buffer net_recv_buff;
+  elua_net_ip remoteip;
+  u16 remoteport;
+
+  if( lua_isnumber( L, 2 ) ) // invocation with maxsize
+    maxsize = ( elua_net_size )luaL_checkinteger( L, 2 );
+  else // invocation with line mode
+  {
+    if( strcmp( luaL_checkstring( L, 2 ), "*l" ) )
+      return luaL_error( L, "invalid second argument to recv" );
+    lastchar = '\n';
+    maxsize = BUFSIZ;
+  }
+  if( lua_gettop( L ) >= 3 ) // check for timeout arguments
+  {
+    timer_id = ( unsigned )luaL_checkinteger( L, 3 );
+    timeout = ( u32 )luaL_checkinteger( L, 4 );
+  }
+  // Initialize buffer
+  luaL_buffinit( L, &net_recv_buff );
+  elua_net_recvfrombuf( sock, &net_recv_buff, maxsize, lastchar, &remoteip, &remoteport, timer_id, timeout );
+  luaL_pushresult( &net_recv_buff );
+  lua_pushinteger( L, elua_net_get_last_err( sock ) );
+  lua_puship( L, remoteip.ipaddr );
+  lua_pushinteger( L, remoteport );
   return 4;
 }
 
@@ -218,6 +277,8 @@ const LUA_REG_TYPE net_map[] =
   { LSTRKEY( "recv" ), LFUNCVAL( net_recv ) },
   { LSTRKEY( "lookup" ), LFUNCVAL( net_lookup ) },
   { LSTRKEY( "netcfg" ), LFUNCVAL( net_netcfg ) },
+  { LSTRKEY( "sendto" ), LFUNCVAL( net_sendto ) },
+  { LSTRKEY( "recvfrom" ), LFUNCVAL( net_recvfrom ) },
 #if LUA_OPTIMIZE_MEMORY > 0
   { LSTRKEY( "SOCK_STREAM" ), LNUMVAL( ELUA_NET_SOCK_STREAM ) },
   { LSTRKEY( "SOCK_DGRAM" ), LNUMVAL( ELUA_NET_SOCK_DGRAM ) },
@@ -226,6 +287,7 @@ const LUA_REG_TYPE net_map[] =
   { LSTRKEY( "ERR_CLOSED" ), LNUMVAL( ELUA_NET_ERR_CLOSED ) },
   { LSTRKEY( "ERR_ABORTED" ), LNUMVAL( ELUA_NET_ERR_ABORTED ) },
   { LSTRKEY( "ERR_OVERFLOW" ), LNUMVAL( ELUA_NET_ERR_OVERFLOW ) },
+  { LSTRKEY( "INVALID_SOCKET" ), LNUMVAL( -1 ) },
 #endif
   { LNILKEY, LNILVAL }
 };
@@ -245,6 +307,7 @@ LUALIB_API int luaopen_net( lua_State *L )
   MOD_REG_NUMBER( L, "ERR_CLOSED", ELUA_NET_ERR_CLOSED );
   MOD_REG_NUMBER( L, "ERR_ABORTED", ELUA_NET_ERR_ABORTED );
   MOD_REG_NUMBER( L, "ERR_OVERFLOW", ELUA_NET_ERR_OVERFLOW );
+  MOD_REG_NUMBER( L, "INVALID_SOCKET", -1 );
   
   return 1;
 #endif // #if LUA_OPTIMIZE_MEMORY > 0  

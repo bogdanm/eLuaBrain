@@ -562,6 +562,7 @@ uip_udp_new(uip_ipaddr_t *ripaddr, u16_t rport)
   
   conn->lport = HTONS(lastport);
   conn->rport = rport;
+  conn->connidx = c;
   if(ripaddr == NULL) {
     memset(conn->ripaddr, 0, sizeof(uip_ipaddr_t));
   } else {
