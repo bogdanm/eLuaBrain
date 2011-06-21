@@ -43,9 +43,6 @@ enum
 #define ELUA_NET_SOCK_STREAM          0
 #define ELUA_NET_SOCK_DGRAM           1
 
-// 'no lastchar' for read to char (recv)
-#define ELUA_NET_NO_LASTCHAR          ( -1 )
-
 // Invalid socket value
 #define ELUA_NET_INVALID_SOCKET       ( -1 )
 
@@ -64,15 +61,15 @@ int elua_net_get_telnet_socket();
 elua_net_ip elua_net_get_config( int what );
 
 // TCP operations
-elua_net_size elua_net_recvbuf( int s, luaL_Buffer *buf, elua_net_size maxsize, s16 readto, unsigned timer_id, s32 to_us );
-elua_net_size elua_net_recv( int s, void *buf, elua_net_size maxsize, s16 readto, unsigned timer_id, s32 to_us );
+elua_net_size elua_net_recvbuf( int s, luaL_Buffer *buf, elua_net_size maxsize, unsigned timer_id, s32 to_us );
+elua_net_size elua_net_recv( int s, void *buf, elua_net_size maxsize, unsigned timer_id, s32 to_us );
 elua_net_size elua_net_send( int s, const void* buf, elua_net_size len );
 int elua_net_accept( u16 port, unsigned timer_id, s32 to_us, elua_net_ip* pfrom );
 int elua_net_connect( int s, elua_net_ip addr, u16 port );
 
 // UDP operations
 unsigned elua_net_sendto( int s, const void* buf, elua_net_size len, elua_net_ip remoteip, u16 port );
-elua_net_size elua_net_recvfrombuf( int s, luaL_Buffer *buf, elua_net_size maxsize, s16 readto, elua_net_ip *p_remote_ip, u16 *p_remote_port, unsigned timer_id, s32 to_us );
-elua_net_size elua_net_recvfrom( int s, void *buf, elua_net_size maxsize, s16 readto, elua_net_ip *p_remote_ip, u16 *p_remote_port, unsigned timer_id, s32 to_us );
+elua_net_size elua_net_recvfrombuf( int s, luaL_Buffer *buf, elua_net_size maxsize, elua_net_ip *p_remote_ip, u16 *p_remote_port, unsigned timer_id, s32 to_us );
+elua_net_size elua_net_recvfrom( int s, void *buf, elua_net_size maxsize, elua_net_ip *p_remote_ip, u16 *p_remote_port, unsigned timer_id, s32 to_us );
 
 #endif

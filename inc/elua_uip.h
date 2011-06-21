@@ -29,7 +29,6 @@ struct elua_uip_state
   u8                state, res;
   char*             ptr; 
   elua_net_size     len;
-  s16               readto;
 };
 
 struct uip_eth_addr;

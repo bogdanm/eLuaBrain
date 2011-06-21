@@ -167,7 +167,7 @@ static u32 rfs_send( const u8 *p, u32 size )
 static u32 rfs_recv( u8 *p, u32 size, s32 timeout )
 {
   //printf( "start read %d bytes\n", size );
-  u32 res = elua_net_recvfrom( rfs_socket, p, size, ELUA_NET_NO_LASTCHAR, NULL, NULL, RFS_TIMER_ID, timeout );
+  u32 res = elua_net_recvfrom( rfs_socket, p, size, NULL, NULL, RFS_TIMER_ID, timeout );
   //printf( "end read with %u bytes\n", res );
   return res;
 }

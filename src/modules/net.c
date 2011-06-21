@@ -144,26 +144,15 @@ static int net_unpackip( lua_State *L )
     return luaL_error( L, "invalid format" );                                      
 }
 
-// Lua: res, err = recv( sock, maxsize, [ timer_id, timeout ] ) or
-//      res, err = recv( sock, "*l", [ timer_id, timeout ] )
+// Lua: res, err = recv( sock, maxsize, [ timer_id, timeout ] )
 static int net_recv( lua_State *L )
 {
   int sock = ( int )luaL_checkinteger( L, 1 );
-  elua_net_size maxsize;
-  s16 lastchar = ELUA_NET_NO_LASTCHAR;
+  elua_net_size maxsize = ( elua_net_size )luaL_checkinteger( L, 2 );
   unsigned timer_id = 0;
   s32 timeout = ELUA_NET_INF_TIMEOUT;
   luaL_Buffer net_recv_buff;
 
-  if( lua_isnumber( L, 2 ) ) // invocation with maxsize
-    maxsize = ( elua_net_size )luaL_checkinteger( L, 2 );
-  else // invocation with line mode
-  {
-    if( strcmp( luaL_checkstring( L, 2 ), "*l" ) )
-      return luaL_error( L, "invalid second argument to recv" );
-    lastchar = '\n';
-    maxsize = BUFSIZ;
-  }
   if( lua_gettop( L ) >= 3 ) // check for timeout arguments
   {
     timer_id = ( unsigned )luaL_checkinteger( L, 3 );
@@ -171,7 +160,7 @@ static int net_recv( lua_State *L )
   }
   // Initialize buffer
   luaL_buffinit( L, &net_recv_buff );
-  elua_net_recvbuf( sock, &net_recv_buff, maxsize, lastchar, timer_id, timeout );
+  elua_net_recvbuf( sock, &net_recv_buff, maxsize, timer_id, timeout );
   luaL_pushresult( &net_recv_buff );
   lua_pushinteger( L, elua_net_get_last_err( sock ) );
   return 2;
@@ -225,36 +214,25 @@ static int net_sendto( lua_State *L )
   return 2; 
 }
 
-// Lua: res, err, remoteip, remoteport = recvfrom( sock, maxsize, [ timer_id, timeout ] ) or
-//      res, err, remoteip, remoteport = recvfrom( sock, "*l", [ timer_id, timeout ] )
+// Lua: res, err, remoteip, remoteport = recvfrom( sock, maxsize, [ timer_id, timeout ] )
 static int net_recvfrom( lua_State *L )
 {
   int sock = ( int )luaL_checkinteger( L, 1 );
-  elua_net_size maxsize;
-  s16 lastchar = ELUA_NET_NO_LASTCHAR;
+  elua_net_size maxsize = ( elua_net_size )luaL_checkinteger( L, 2 );
   unsigned timer_id = 0;
   s32 timeout = ELUA_NET_INF_TIMEOUT;
   luaL_Buffer net_recv_buff;
   elua_net_ip remoteip;
   u16 remoteport;
 
-  if( lua_isnumber( L, 2 ) ) // invocation with maxsize
-    maxsize = ( elua_net_size )luaL_checkinteger( L, 2 );
-  else // invocation with line mode
-  {
-    if( strcmp( luaL_checkstring( L, 2 ), "*l" ) )
-      return luaL_error( L, "invalid second argument to recv" );
-    lastchar = '\n';
-    maxsize = BUFSIZ;
-  }
-  if( lua_gettop( L ) >= 3 ) // check for timeout arguments
+ if( lua_gettop( L ) >= 3 ) // check for timeout arguments
   {
     timer_id = ( unsigned )luaL_checkinteger( L, 3 );
     timeout = ( s32 )luaL_checkinteger( L, 4 );
   }
   // Initialize buffer
   luaL_buffinit( L, &net_recv_buff );
-  elua_net_recvfrombuf( sock, &net_recv_buff, maxsize, lastchar, &remoteip, &remoteport, timer_id, timeout );
+  elua_net_recvfrombuf( sock, &net_recv_buff, maxsize, &remoteip, &remoteport, timer_id, timeout );
   luaL_pushresult( &net_recv_buff );
   lua_pushinteger( L, elua_net_get_last_err( sock ) );
   lua_puship( L, remoteip.ipaddr );
