@@ -210,7 +210,7 @@ static void shell_ls( char* args )
     }
   }
   
-  term_enable_paging( TERM_PAGING_ON );
+  //term_enable_paging( TERM_PAGING_ON );
   // Iterate through all devices, looking for the ones that can do "opendir"
   for( dev = 0; dev < dm_get_num_devices(); dev ++ )
   {  

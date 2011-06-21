@@ -10,7 +10,9 @@
 #include "sermux.h"
 #include "buf.h"
 #include "elua_net.h"
+#include "utils.h"
 #include <fcntl.h>
+#include <string.h>
 #ifdef ELUA_SIMULATOR
 #include "hostif.h"
 #endif
@@ -154,22 +156,92 @@ static u32 rfs_recv( u8 *p, u32 size, s32 timeout )
 
 #ifdef RFS_TRANSPORT_UDP
 static int rfs_socket;
-static elua_net_ip rfs_server_ip;
+static volatile elua_net_ip rfs_server_ip;
+static volatile u8 rfs_recv_allowed = 0;
+static volatile u16 rfs_data_size;
+
+#define RFS_MAX_DISCOVERIES   3
+#define RFS_DISCOVERY_TO      40000
+
+// Receive callback (directly from the TCP stack)
+static void rfs_recv_cb( const u8 *pdata, unsigned size, elua_net_ip ip, u16 port )
+{
+  if( !rfs_recv_allowed )
+    return;
+  rfs_recv_allowed = 0;
+  if( rfs_server_ip.ipaddr == 0 && size == ELUARPC_START_OFFSET && eluarpc_is_discover_response_packet( pdata ) ) // this is a response for the discovery request
+  {
+    rfs_server_ip.ipaddr = ip.ipaddr;
+    rfs_data_size = size;
+  }
+  else // regular data packet
+  {
+    rfs_data_size = UMIN( size, 1 << RFS_BUFFER_SIZE );
+    memcpy( rfs_buffer, pdata, rfs_data_size );
+  }
+}
+
+// Check if the client is initialized, send a request for the server
+// if it is not
+static int rfs_lookup_server()
+{
+  elua_net_ip ip;
+  u32 tmrstart = 0;
+  int retries = 0;
+  u8 discover_packet[ ELUARPC_START_OFFSET ];
+
+  if( rfs_server_ip.ipaddr != 0 )
+    return 1;
+  ip.ipaddr = 0xFFFFFFFF;
+  eluarpc_build_discover_packet( discover_packet );
+  while( rfs_server_ip.ipaddr == 0 && retries < RFS_MAX_DISCOVERIES )
+  {
+    elua_net_sendto( rfs_socket, discover_packet, ELUARPC_START_OFFSET, ip, RFS_UDP_PORT );
+    rfs_data_size = 0;
+    rfs_recv_allowed = 1;
+    tmrstart = platform_timer_op( RFS_TIMER_ID, PLATFORM_TIMER_OP_START, 0 );
+    while( 1 )
+    {
+      if( rfs_data_size )
+        break;
+      if( platform_timer_get_diff_us( RFS_TIMER_ID, tmrstart, platform_timer_op( RFS_TIMER_ID, PLATFORM_TIMER_OP_READ, 0 ) ) >= RFS_DISCOVERY_TO )
+        break;
+    }
+    rfs_recv_allowed = 0;
+    retries ++;
+  }
+  return rfs_server_ip.ipaddr != 0;
+}
 
 static u32 rfs_send( const u8 *p, u32 size )
 {
-//  printf( "start send %d bytes\n", size );
+  if( !rfs_lookup_server() )
+    return 0;
   u32 res = elua_net_sendto( rfs_socket, p, size, rfs_server_ip, RFS_UDP_PORT );
-  //printf( "end send\n" );
+  rfs_data_size = 0;
+  rfs_recv_allowed = 1;
   return res;
 }
 
 static u32 rfs_recv( u8 *p, u32 size, s32 timeout )
 {
-  //printf( "start read %d bytes\n", size );
-  u32 res = elua_net_recvfrom( rfs_socket, p, size, NULL, NULL, RFS_TIMER_ID, timeout );
-  //printf( "end read with %u bytes\n", res );
-  return res;
+  u32 readbytes = 0;
+  u32 tmrstart = 0;
+
+  ( void )p;
+  ( void )size;
+  if( timeout > 0 )
+    tmrstart = platform_timer_op( RFS_TIMER_ID, PLATFORM_TIMER_OP_START, 0 );
+  while( 1 )
+  {
+    if( rfs_data_size )
+      break;
+    if( timeout == 0 || ( timeout > 0 && platform_timer_get_diff_us( RFS_TIMER_ID, tmrstart, platform_timer_op( RFS_TIMER_ID, PLATFORM_TIMER_OP_READ, 0 ) ) >= timeout ) )
+      break;
+  }
+  readbytes = rfs_data_size;
+  rfs_recv_allowed = rfs_data_size = 0;
+  return readbytes;
 }
 #endif
 
@@ -233,11 +305,7 @@ const DM_DEVICE *remotefs_init()
   }
   if( ( rfs_socket = elua_net_socket( ELUA_NET_SOCK_DGRAM ) ) == ELUA_NET_INVALID_SOCKET )
     return NULL;
-  // [TODO] CHANGE THIS!
-  rfs_server_ip.ipbytes[ 0 ] = 192;
-  rfs_server_ip.ipbytes[ 1 ] = 168;
-  rfs_server_ip.ipbytes[ 2 ] = 1;
-  rfs_server_ip.ipbytes[ 3 ] = 8;
+  elua_net_set_recv_callback( rfs_socket, rfs_recv_cb );
 #endif
   rfsc_setup( rfs_buffer, rfs_send, rfs_recv, RFS_TIMEOUT );
   return &rfs_device;

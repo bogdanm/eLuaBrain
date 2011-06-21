@@ -42,11 +42,17 @@ u32 eluarpc_replace_flag( u32 val, u32 origflag, u32 newflag );
 // Get packet size
 int eluarpc_get_packet_size( const u8 *p, u16 *psize );
 
+// Create a discover packet and return its size
+int eluarpc_build_discover_packet( u8 *p );
+
 // Check if this is a discover packet
 int eluarpc_is_discover_packet( const u8 *p );
 
 // Create a discover response and return its size
 int eluarpc_build_discover_response( u8 *p );
+
+// Is this a discovery response packet?
+int eluarpc_is_discover_response_packet( const u8 *p );
 
 // Generic write function
 // Specifiers: o - operation

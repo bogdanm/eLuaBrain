@@ -122,19 +122,19 @@ void elua_uip_mainloop()
   }
 
 #if UIP_UDP
-    for( temp = 0; temp < UIP_UDP_CONNS; temp ++ )
-    {
-      uip_udp_periodic( temp );
+  for( temp = 0; temp < UIP_UDP_CONNS; temp ++ )
+  {
+    uip_udp_periodic( temp );
 
-      // If the above function invocation resulted in data that
-      // should be sent out on the network, the global variable
-      // uip_len is set to a value > 0.
-      if( uip_len > 0 )
-      {
-        uip_arp_out();
-        device_driver_send();
-      }
+    // If the above function invocation resulted in data that
+    // should be sent out on the network, the global variable
+    // uip_len is set to a value > 0.
+    if( uip_len > 0 )
+    {
+      uip_arp_out();
+      device_driver_send();
     }
+  }
 #endif // UIP_UDP
   
   // Process ARP Timer here.
@@ -399,10 +399,11 @@ void elua_uip_appcall()
         return;
       }
 #endif   
+      sockno = ELUA_NET_ERR_OK;
       // Check overflow
       if( s->len < uip_datalen() )
       {
-        s->res = ELUA_NET_ERR_OVERFLOW;   
+        sockno = ELUA_NET_ERR_OVERFLOW;   
         temp = s->len;
       }
       else
@@ -411,7 +412,7 @@ void elua_uip_appcall()
       eluah_read_data_helper( s, temp );
       
       uip_stop();
-      s->res = ELUA_NET_ERR_OK;
+      s->res = sockno;
       s->state = ELUA_UIP_STATE_IDLE;
     }
     else
@@ -463,6 +464,8 @@ void elua_uip_init( const struct uip_eth_addr *paddr )
 extern int dhcpc_socket;
 extern int resolv_socket;
 
+extern void platform_s_uart_send( unsigned, u8 );
+
 void elua_uip_udp_appcall()
 {
   volatile struct elua_uip_state *s;
@@ -470,8 +473,7 @@ void elua_uip_udp_appcall()
   int sockno;
   
   s = ( struct elua_uip_state* )&( uip_udp_conn->appstate );
-  // [TODO] replace this with a pointer difference computation ...
-  sockno = uip_udp_conn->connidx;
+  sockno = uip_udp_conn - uip_udp_conns;
 
   // Is this the DHCP socket?
   if( sockno == dhcpc_socket )
@@ -496,29 +498,41 @@ void elua_uip_udp_appcall()
   if( uip_poll() && s->state == ELUA_UIP_STATE_SEND )
   {
     uip_send( s->ptr, s->len );
+    s->len = 0;
     s->state = ELUA_UIP_STATE_IDLE;
   }
   else if( s->state == ELUA_UIP_STATE_CLOSE ) // handle close (trivial)
   {
     uip_udp_conn->lport = 0;
     s->state = ELUA_UIP_STATE_IDLE;
-    return;
   }
-  else if( uip_newdata() && s->state == ELUA_UIP_STATE_RECV ) // handle data receive
+  else if( uip_newdata() ) // handle data receive
   {
-    // Check overflow
-    if( s->len < uip_datalen() )
+    if( s->recv_cb )
     {
-      s->res = ELUA_NET_ERR_OVERFLOW;   
-      temp = s->len;
-    }
-    else
-      temp = uip_datalen();
+      elua_net_ip ip;
 
-    eluah_read_data_helper( s, temp );
-    
-    uip_ipaddr_copy( uip_udp_conn->ripaddr, UDPBUF->srcipaddr );
-    s->state = ELUA_UIP_STATE_IDLE;
+      uip_ipaddr_copy( ( u16* )&ip, UDPBUF->srcipaddr );
+      s->recv_cb( uip_appdata, uip_datalen(), ip, HTONS( uip_udp_conn->rport ) );
+    }
+    else if( s->state == ELUA_UIP_STATE_RECV )
+    {
+      sockno = ELUA_NET_ERR_OK;
+      // Check overflow
+      if( s->len < uip_datalen() )
+      {
+        sockno = ELUA_NET_ERR_OVERFLOW;   
+        temp = s->len;
+      }
+      else
+        temp = uip_datalen();
+
+      eluah_read_data_helper( s, temp );
+      
+      uip_ipaddr_copy( uip_udp_conn->ripaddr, UDPBUF->srcipaddr );
+      s->res = sockno;
+      s->state = ELUA_UIP_STATE_IDLE;
+    }
   }
 }
 
@@ -542,7 +556,8 @@ int elua_net_socket( int type )
   struct uip_conn* pconn;
   struct uip_udp_conn* pudp;
   int old_status;
-  
+  volatile struct elua_uip_state *pstate = NULL;
+
   old_status = platform_cpu_set_global_interrupts( PLATFORM_CPU_DISABLE );
   if( type == ELUA_NET_SOCK_DGRAM )
   {
@@ -550,8 +565,7 @@ int elua_net_socket( int type )
       i = -1;
     else
     {
-      memset( &pudp->appstate, 0, sizeof( pudp->appstate ) );
-      pudp->appstate.state = ELUA_UIP_STATE_IDLE;
+      pstate = ( volatile struct elua_uip_state* )&( pudp->appstate );
       i = ELUA_UIP_TO_UDP( pudp->connidx );
     }
   }
@@ -570,22 +584,28 @@ int elua_net_socket( int type )
     }
     if( i == UIP_CONNS )
       i = -1;
+    else
+      pstate = ( volatile struct elua_uip_state* )&( pconn->appstate );
   }
   platform_cpu_set_global_interrupts( old_status );
+  if( pstate )
+  {
+    memset( ( void* )pstate, 0, sizeof( *pstate ) );
+    pstate->state = ELUA_UIP_STATE_IDLE;
+  }
   return i;
 }
 
 // Send data - internal helper (also works for 'sendto')
-static elua_net_size elua_net_send_internal( int s, const void* buf, elua_net_size len, elua_net_ip remoteip, u16 remoteport )
+static elua_net_size elua_net_send_internal( int s, const void* buf, elua_net_size len, elua_net_ip remoteip, u16 remoteport, int is_sendto )
 {
   volatile struct elua_uip_state *pstate;
-  int sendto_mode = ELUA_UIP_IS_UDP( s );
   elua_net_size tosend, sentbytes, totsent = 0;
   struct uip_udp_conn *pudp;
  
   if( len == 0 )
     return 0;
-  if( sendto_mode )
+  if( is_sendto )
   {
     if( !ELUA_UIP_IS_UDP_SOCK_OK( s ) )
       return 0;
@@ -605,7 +625,7 @@ static elua_net_size elua_net_send_internal( int s, const void* buf, elua_net_si
   // Send data in 'sendlimit' chunks
   while( len )
   {
-    tosend = UMIN( sendto_mode ? UIP_APPDATA_SIZE : uip_conns[ s ].mss, len );
+    tosend = UMIN( is_sendto ? UIP_APPDATA_SIZE : uip_conns[ s ].mss, len );
     elua_prep_socket_state( pstate, ( void* )buf, tosend, ELUA_NET_ERR_OK, ELUA_UIP_STATE_SEND );
     platform_eth_force_interrupt();
     while( pstate->state != ELUA_UIP_STATE_IDLE );
@@ -624,21 +644,20 @@ elua_net_size elua_net_send( int s, const void* buf, elua_net_size len )
   elua_net_ip dummy;
 
   dummy.ipaddr = 0;
-  return elua_net_send_internal( s, buf, len, dummy, 0 );
+  return elua_net_send_internal( s, buf, len, dummy, 0, 0 );
 }
 
 // Internal "read" function (also works for 'recvfrom' when 'p_remote_ip' and 'p_remote_port' are not NULL)
-static elua_net_size elua_net_recv_internal( int s, void* buf, elua_net_size maxsize, unsigned timer_id, s32 to_us, int with_buffer, elua_net_ip *p_remote_ip, u16 *p_remote_port )
+static elua_net_size elua_net_recv_internal( int s, void* buf, elua_net_size maxsize, unsigned timer_id, s32 to_us, int with_buffer, elua_net_ip *p_remote_ip, u16 *p_remote_port, int is_recvfrom )
 {
   volatile struct elua_uip_state *pstate;
   u32 tmrstart = 0;
   int old_status;
-  int recvfrom_mode = ELUA_UIP_IS_UDP( s );
   elua_net_size readsize, readbytes, totread = 0;
  
   if( maxsize == 0 )
     return 0;
-  if( recvfrom_mode )
+  if( is_recvfrom )
   {
     if( !ELUA_UIP_IS_UDP_SOCK_OK( s ) )
       return 0;
@@ -654,7 +673,8 @@ static elua_net_size elua_net_recv_internal( int s, void* buf, elua_net_size max
   // Read data in packets of maximum 'readlimit' bytes
   while( maxsize )
   {
-    readsize = UMIN( recvfrom_mode ? UIP_APPDATA_SIZE : uip_conns[ s ].mss, maxsize );
+    readsize = UMIN( is_recvfrom ? UIP_APPDATA_SIZE : uip_conns[ s ].mss, maxsize );
+    printf( "Reading %d bytes: start\n", readsize );
     elua_prep_socket_state( pstate, buf, readsize, with_buffer, ELUA_UIP_STATE_RECV );
     if( to_us > 0 )
       tmrstart = platform_timer_op( timer_id, PLATFORM_TIMER_OP_START, 0 );
@@ -675,6 +695,7 @@ static elua_net_size elua_net_recv_internal( int s, void* buf, elua_net_size max
       }
     }
     readbytes = readsize - pstate->len;
+    printf( "Requested %d bytes, got %d bytes\n", readsize, readbytes );
     totread += readbytes;
     if( readbytes < readsize || pstate->res != ELUA_NET_ERR_OK )
       break;
@@ -682,7 +703,8 @@ static elua_net_size elua_net_recv_internal( int s, void* buf, elua_net_size max
     if( !with_buffer )
       buf = ( u8* )buf + readbytes;
   }
-  if( recvfrom_mode )
+  printf( "Out of read\n" );
+  if( is_recvfrom )
   {
     *p_remote_port = HTONS( uip_udp_conns[ s ].rport );
     p_remote_ip->ipwords[ 0 ] = uip_udp_conns[ s ].ripaddr[ 0 ];
@@ -694,13 +716,13 @@ static elua_net_size elua_net_recv_internal( int s, void* buf, elua_net_size max
 // Receive data in buf, upto "maxsize" bytes, or upto the 'readto' character if it's not -1
 elua_net_size elua_net_recv( int s, void* buf, elua_net_size maxsize, unsigned timer_id, s32 to_us )
 {
-  return elua_net_recv_internal( s, buf, maxsize, timer_id, to_us, 0, NULL, NULL );
+  return elua_net_recv_internal( s, buf, maxsize, timer_id, to_us, 0, NULL, NULL, 0 );
 }
 
 // Same thing, but with a Lua buffer as argument
 elua_net_size elua_net_recvbuf( int s, luaL_Buffer* buf, elua_net_size maxsize, unsigned timer_id, s32 to_us )
 {
-  return elua_net_recv_internal( s, buf, maxsize, timer_id, to_us, 1, NULL, NULL );
+  return elua_net_recv_internal( s, buf, maxsize, timer_id, to_us, 1, NULL, NULL, 0 );
 }
 
 // Return the socket associated with the "telnet" application (or -1 if it does
@@ -760,6 +782,27 @@ int elua_net_get_last_err( int s )
     pstate = ( volatile struct elua_uip_state* )&( uip_conn[ s ].appstate );
   }
   return pstate->res;
+}
+
+// Sets the receive callback for the socket
+void elua_net_set_recv_callback( int s, p_elua_net_recv_cb callback )
+{
+  volatile struct elua_uip_state *pstate;
+
+  if( ELUA_UIP_IS_UDP( s ) )
+  {
+    if( !ELUA_UIP_IS_UDP_SOCK_OK( s ) )
+      return -1;
+    s = ELUA_UIP_FROM_UDP( s );
+    pstate = ( volatile struct elua_uip_state* )&( uip_udp_conns[ s ].appstate );
+  }
+  else
+  {
+    if( !ELUA_UIP_IS_SOCK_OK( s ) )
+      return -1;
+    pstate = ( volatile struct elua_uip_state* )&( uip_conn[ s ].appstate );
+  }
+  pstate->recv_cb = callback;
 }
 
 // Accept a connection on the given port, return its socket id (and the IP of the remote host by side effect)
@@ -848,14 +891,14 @@ elua_net_ip elua_net_lookup( const char* hostname )
 // UDP send to address
 unsigned elua_net_sendto( int s, const void* buf, elua_net_size len, elua_net_ip remoteip, u16 port )
 {
-  return elua_net_send_internal( s, buf, len, remoteip, port );
+  return elua_net_send_internal( s, buf, len, remoteip, port, 1 );
 }
 
 elua_net_size eluah_net_recvfrom_common( int s, void *buf, elua_net_size maxsize, elua_net_ip *p_remote_ip, u16 *p_remote_port, unsigned timer_id, u32 to_us, int with_buffer )
 {
   elua_net_ip remote_ip;
   u16 remote_port;
-  elua_net_size res = elua_net_recv_internal( s, buf, maxsize, timer_id, to_us, with_buffer, &remote_ip, &remote_port );
+  elua_net_size res = elua_net_recv_internal( s, buf, maxsize, timer_id, to_us, with_buffer, &remote_ip, &remote_port, 1 );
 
   if( p_remote_ip )
     p_remote_ip->ipaddr = remote_ip.ipaddr;

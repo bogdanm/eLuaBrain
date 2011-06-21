@@ -49,12 +49,16 @@ enum
 // Infinite timeout for timed operations
 #define ELUA_NET_INF_TIMEOUT          ( -1 )
 
+// Receive data callback type
+typedef void( *p_elua_net_recv_cb )( const u8*, unsigned, elua_net_ip, u16 );
+
 // eLua TCP/IP functions
 
 // Generic functions
 
 int elua_net_socket( int type );
 int elua_net_close( int s );
+void elua_net_set_recv_callback( int s, p_elua_net_recv_cb callback );
 elua_net_ip elua_net_lookup( const char* hostname );
 int elua_net_get_last_err( int s );
 int elua_net_get_telnet_socket();

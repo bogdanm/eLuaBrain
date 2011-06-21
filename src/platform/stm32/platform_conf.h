@@ -190,7 +190,7 @@
 #define ENC28J60_SPI_CLOCK    8000000
 #define ENC28J60_RESET_PORT   0
 #define ENC28J60_RESET_PIN    13
-#define ENC28J60_INT_PORT     3
+#define ENC28J60_INT_PORT     6
 #define ENC28J60_INT_PIN      7
 
 // Sound resources

@@ -27,8 +27,9 @@ enum
 struct elua_uip_state
 {
   u8                state, res;
-  char*             ptr; 
+  char              *ptr; 
   elua_net_size     len;
+  p_elua_net_recv_cb  recv_cb;
 };
 
 struct uip_eth_addr;

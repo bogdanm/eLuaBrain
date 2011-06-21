@@ -208,6 +208,14 @@ int eluarpc_get_packet_size( const u8 *p, u16 *psize )
   return eluarpc_err_flag;
 }
 
+// Build a discover packet and return its size
+int eluarpc_build_discover_packet( u8 *p )
+{
+  *p ++ = TYPE_DISCOVER;
+  memcpy( p, ELUARPC_DISCOVER_SIG, strlen( ELUARPC_DISCOVER_SIG ) );
+  return ELUARPC_START_OFFSET;
+}
+
 // Is this a discover packet?
 int eluarpc_is_discover_packet( const u8 *p )
 {
@@ -223,6 +231,11 @@ int eluarpc_build_discover_response( u8 *p )
 {
   memcpy( p, ELUARPC_DISCOVER_RESP, strlen( ELUARPC_DISCOVER_RESP ) );
   return strlen( ELUARPC_DISCOVER_RESP );
+}
+
+int eluarpc_is_discover_response_packet( const u8 *p )
+{
+  return strncmp( ( const char* )p, ELUARPC_DISCOVER_RESP, strlen( ELUARPC_DISCOVER_RESP ) ) == 0;
 }
 
 // Generic write function
