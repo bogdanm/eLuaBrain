@@ -580,7 +580,7 @@ static elua_net_size elua_net_send_internal( int s, const void* buf, elua_net_si
 {
   volatile struct elua_uip_state *pstate;
   int sendto_mode = ELUA_UIP_IS_UDP( s );
-  elua_net_size tosend, sentbytes, totsent = 0, sendlimit;
+  elua_net_size tosend, sentbytes, totsent = 0;
   struct uip_udp_conn *pudp;
  
   if( len == 0 )
@@ -595,19 +595,17 @@ static elua_net_size elua_net_send_internal( int s, const void* buf, elua_net_si
     pudp->ripaddr[ 0 ] = remoteip.ipwords[ 0 ];
     pudp->ripaddr[ 1 ] = remoteip.ipwords[ 1 ];
     pudp->rport = HTONS( remoteport ); 
-    sendlimit = UIP_APPDATA_SIZE;
   }
   else
   {
     if( !ELUA_UIP_IS_SOCK_OK( s ) || !uip_conn_active( s ) )
       return 0;
     pstate = ( volatile struct elua_uip_state* )&( uip_conns[ s ].appstate );
-    sendlimit = uip_conns[ s ].mss;
   }
   // Send data in 'sendlimit' chunks
   while( len )
   {
-    tosend = UMIN( sendlimit, len );
+    tosend = UMIN( sendto_mode ? UIP_APPDATA_SIZE : uip_conns[ s ].mss, len );
     elua_prep_socket_state( pstate, ( void* )buf, tosend, ELUA_NET_ERR_OK, ELUA_UIP_STATE_SEND );
     platform_eth_force_interrupt();
     while( pstate->state != ELUA_UIP_STATE_IDLE );
@@ -637,7 +635,6 @@ static elua_net_size elua_net_recv_internal( int s, void* buf, elua_net_size max
   int old_status;
   int recvfrom_mode = ELUA_UIP_IS_UDP( s );
   elua_net_size readsize, readbytes, totread = 0;
-  elua_net_size readlimit;
  
   if( maxsize == 0 )
     return 0;
@@ -647,19 +644,17 @@ static elua_net_size elua_net_recv_internal( int s, void* buf, elua_net_size max
       return 0;
     s = ELUA_UIP_FROM_UDP( s );
     pstate = ( volatile struct elua_uip_state* )&( uip_udp_conns[ s ].appstate );
-    readlimit = UIP_APPDATA_SIZE;
   }
   else
   {
     if( !ELUA_UIP_IS_SOCK_OK( s ) || !uip_conn_active( s ) )
       return 0;
     pstate = ( volatile struct elua_uip_state* )&( uip_conns[ s ].appstate );
-    readlimit = uip_conns[ s ].mss;
   }
   // Read data in packets of maximum 'readlimit' bytes
   while( maxsize )
   {
-    readsize = UMIN( readlimit, maxsize );
+    readsize = UMIN( recvfrom_mode ? UIP_APPDATA_SIZE : uip_conns[ s ].mss, maxsize );
     elua_prep_socket_state( pstate, buf, readsize, with_buffer, ELUA_UIP_STATE_RECV );
     if( to_us > 0 )
       tmrstart = platform_timer_op( timer_id, PLATFORM_TIMER_OP_START, 0 );
