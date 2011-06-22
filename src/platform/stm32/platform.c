@@ -1467,9 +1467,9 @@ static u8 forced;
 void eth_int_handler()
 {
   // [REMOVE]
-  if( !forced )
-    platform_s_uart_send( 0, '@' );
-  forced = 0;
+//  if( !forced )
+//    platform_s_uart_send( 0, '@' );
+//  forced = 0;
   if( eth_initialized )
   {
     SetRXInterrupt( 0 );

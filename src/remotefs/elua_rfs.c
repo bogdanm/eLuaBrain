@@ -157,7 +157,6 @@ static u32 rfs_recv( u8 *p, u32 size, s32 timeout )
 #ifdef RFS_TRANSPORT_UDP
 static int rfs_socket;
 static volatile elua_net_ip rfs_server_ip;
-static volatile u8 rfs_recv_allowed = 0;
 static volatile u16 rfs_data_size;
 
 #define RFS_MAX_DISCOVERIES   3
@@ -167,9 +166,6 @@ static volatile u16 rfs_data_size;
 static void rfs_recv_cb( int sockno, const u8 *pdata, unsigned size, elua_net_ip ip, u16 port )
 {
   ( void )sockno;
-  if( !rfs_recv_allowed )
-    return;
-  rfs_recv_allowed = 0;
   if( rfs_server_ip.ipaddr == 0 && size == ELUARPC_START_OFFSET && eluarpc_is_discover_response_packet( pdata ) ) // this is a response for the discovery request
   {
     rfs_server_ip.ipaddr = ip.ipaddr;
@@ -198,8 +194,6 @@ static int rfs_lookup_server()
   while( rfs_server_ip.ipaddr == 0 && retries < RFS_MAX_DISCOVERIES )
   {
     elua_net_sendto( rfs_socket, discover_packet, ELUARPC_START_OFFSET, ip, RFS_UDP_PORT );
-    rfs_data_size = 0;
-    rfs_recv_allowed = 1;
     tmrstart = platform_timer_op( RFS_TIMER_ID, PLATFORM_TIMER_OP_START, 0 );
     while( 1 )
     {
@@ -208,7 +202,7 @@ static int rfs_lookup_server()
       if( platform_timer_get_diff_us( RFS_TIMER_ID, tmrstart, platform_timer_op( RFS_TIMER_ID, PLATFORM_TIMER_OP_READ, 0 ) ) >= RFS_DISCOVERY_TO )
         break;
     }
-    rfs_recv_allowed = 0;
+    rfs_data_size = 0;
     retries ++;
   }
   return rfs_server_ip.ipaddr != 0;
@@ -218,10 +212,7 @@ static u32 rfs_send( const u8 *p, u32 size )
 {
   if( !rfs_lookup_server() )
     return 0;
-  u32 res = elua_net_sendto( rfs_socket, p, size, rfs_server_ip, RFS_UDP_PORT );
-  rfs_data_size = 0;
-  rfs_recv_allowed = 1;
-  return res;
+  return elua_net_sendto( rfs_socket, p, size, rfs_server_ip, RFS_UDP_PORT );
 }
 
 static u32 rfs_recv( u8 *p, u32 size, s32 timeout )
@@ -243,7 +234,7 @@ static u32 rfs_recv( u8 *p, u32 size, s32 timeout )
       break;
   }
   readbytes = rfs_data_size;
-  rfs_recv_allowed = rfs_data_size = 0;
+  rfs_data_size = 0;
   if( readbytes == 0 ) // server error, must search again
     rfs_server_ip.ipaddr = 0;
   return readbytes;

@@ -516,9 +516,8 @@ void elua_uip_udp_appcall()
     if( s->recv_cb )
     {
       elua_net_ip ip;
-
       uip_ipaddr_copy( ( u16* )&ip, UDPBUF->srcipaddr );
-      s->recv_cb( uip_appdata, uip_datalen(), ip, HTONS( uip_udp_conn->rport ) );
+      s->recv_cb( sockno, uip_appdata, uip_datalen(), ip, HTONS( uip_udp_conn->rport ) );
     }
     else if( s->buf )
       eluah_uip_read_to_buffer( s );

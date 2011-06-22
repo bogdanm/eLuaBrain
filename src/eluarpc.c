@@ -222,7 +222,7 @@ int eluarpc_is_discover_packet( const u8 *p )
   eluarpc_err_flag = ELUARPC_OK;
   p = eluarpc_read_expect( p, TYPE_DISCOVER );
   if( eluarpc_err_flag == ELUARPC_OK )
-    eluarpc_err_flag = !strcmp( ( const char* )p, ELUARPC_DISCOVER_SIG ) ? ELUARPC_OK : ELUARPC_ERR;
+    eluarpc_err_flag = !strncmp( ( const char* )p, ELUARPC_DISCOVER_SIG, strlen( ELUARPC_DISCOVER_SIG ) ) ? ELUARPC_OK : ELUARPC_ERR;
   return eluarpc_err_flag == ELUARPC_OK;
 }
 
