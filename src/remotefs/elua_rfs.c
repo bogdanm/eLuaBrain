@@ -230,6 +230,8 @@ static u32 rfs_recv( u8 *p, u32 size, s32 timeout )
 
   ( void )p;
   ( void )size;
+  if( rfs_server_ip.ipaddr == 0 ) // this shouldn't happen at all
+    return 0;
   if( timeout > 0 )
     tmrstart = platform_timer_op( RFS_TIMER_ID, PLATFORM_TIMER_OP_START, 0 );
   while( 1 )
@@ -241,6 +243,8 @@ static u32 rfs_recv( u8 *p, u32 size, s32 timeout )
   }
   readbytes = rfs_data_size;
   rfs_recv_allowed = rfs_data_size = 0;
+  if( readbytes == 0 ) // server error, must search again
+    rfs_server_ip.ipaddr = 0;
   return readbytes;
 }
 #endif
