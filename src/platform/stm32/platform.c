@@ -1541,6 +1541,11 @@ u32 platform_eth_get_elapsed_time()
     return 0;
 }
 
+void platform_eth_set_interrupt( int state )
+{
+  platform_cpu_set_interrupt( INT_GPIO_NEGEDGE, ETH_INT_RESNUM, state == PLATFORM_ETH_INT_ENABLE ? PLATFORM_CPU_ENABLE : PLATFORM_CPU_DISABLE );
+}
+
 #else // #ifdef BUILD_ENC28J60
 
 static void eth_init()

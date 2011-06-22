@@ -13,7 +13,6 @@ enum
   ELUA_UIP_STATE_IDLE = 0,
   ELUA_UIP_STATE_SEND,
   ELUA_UIP_STATE_RECV,
-  ELUA_UIP_STATE_RECV_2,
   ELUA_UIP_STATE_CONNECT,
   ELUA_UIP_STATE_CLOSE,
   ELUA_UIP_STATE_RETRY
@@ -28,8 +27,9 @@ enum
 struct elua_uip_state
 {
   u8                state, res;
-  char              *ptr; 
+  char              *ptr, *buf; 
   elua_net_size     len;
+  elua_net_size     buf_total, buf_crt, buf_ridx, buf_widx;
   p_elua_net_recv_cb  recv_cb;
 };
 

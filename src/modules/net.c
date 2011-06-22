@@ -45,6 +45,18 @@ static int net_socket( lua_State *L )
   return 1;
 }
 
+// Lua: set_buffer( sock, size )
+// Use '0' to disable buffering
+static int net_set_buffer( lua_State *L )
+{
+  int sock = luaL_checkinteger( L, 1 );
+  unsigned bufsize = ( unsigned )luaL_checkinteger( L, 2 );
+  
+  if( elua_net_set_buffer( sock, bufsize ) == 0 )
+    return luaL_error( L, "unable to set buffer" );
+  return 0;
+}
+
 // Lua: res = close( socket )
 static int net_close( lua_State* L )
 {
@@ -250,6 +262,7 @@ const LUA_REG_TYPE net_map[] =
   { LSTRKEY( "unpackip" ), LFUNCVAL( net_unpackip ) },
   { LSTRKEY( "connect" ), LFUNCVAL( net_connect ) },
   { LSTRKEY( "socket" ), LFUNCVAL( net_socket ) },
+  { LSTRKEY( "set_buffer" ), LFUNCVAL( net_set_buffer ) },
   { LSTRKEY( "close" ), LFUNCVAL( net_close ) },
   { LSTRKEY( "send" ), LFUNCVAL( net_send ) },
   { LSTRKEY( "recv" ), LFUNCVAL( net_recv ) },

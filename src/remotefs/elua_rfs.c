@@ -164,8 +164,9 @@ static volatile u16 rfs_data_size;
 #define RFS_DISCOVERY_TO      40000
 
 // Receive callback (directly from the TCP stack)
-static void rfs_recv_cb( const u8 *pdata, unsigned size, elua_net_ip ip, u16 port )
+static void rfs_recv_cb( int sockno, const u8 *pdata, unsigned size, elua_net_ip ip, u16 port )
 {
+  ( void )sockno;
   if( !rfs_recv_allowed )
     return;
   rfs_recv_allowed = 0;

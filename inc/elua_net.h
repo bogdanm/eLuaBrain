@@ -50,13 +50,14 @@ enum
 #define ELUA_NET_INF_TIMEOUT          ( -1 )
 
 // Receive data callback type
-typedef void( *p_elua_net_recv_cb )( const u8*, unsigned, elua_net_ip, u16 );
+typedef void( *p_elua_net_recv_cb )( int, const u8*, unsigned, elua_net_ip, u16 );
 
 // eLua TCP/IP functions
 
 // Generic functions
 
 int elua_net_socket( int type );
+int elua_net_set_buffer( int s, unsigned bufsize );
 int elua_net_close( int s );
 void elua_net_set_recv_callback( int s, p_elua_net_recv_cb callback );
 elua_net_ip elua_net_lookup( const char* hostname );
