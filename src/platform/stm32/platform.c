@@ -1466,6 +1466,7 @@ static u8 forced;
 // Ethernet interrupt handler
 void eth_int_handler()
 {
+  // [REMOVE]
   if( !forced )
     platform_s_uart_send( 0, '@' );
   forced = 0;
