@@ -353,8 +353,7 @@ uip_arp_arpin(void)
  * uip_len.
  */
 /*-----------------------------------------------------------------------------------*/
-void
-uip_arp_out(void)
+int uip_arp_out(void)
 {
   struct arp_entry *tabptr;
   
@@ -408,7 +407,7 @@ uip_arp_out(void)
       uip_appdata = &uip_buf[UIP_TCPIP_HLEN + UIP_LLH_LEN];
     
       uip_len = sizeof(struct arp_hdr);
-      return;
+      return 1;
     }
 
     /* Build an ethernet header. */
@@ -419,6 +418,7 @@ uip_arp_out(void)
   IPBUF->ethhdr.type = HTONS(UIP_ETHTYPE_IP);
 
   uip_len += sizeof(struct uip_eth_hdr);
+  return 0;
 }
 /*-----------------------------------------------------------------------------------*/
 

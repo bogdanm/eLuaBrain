@@ -95,7 +95,7 @@ typedef unsigned short uip_stats_t;
 //
 // Size of ARP table
 //
-#define UIP_CONF_ARPTAB_SIZE        4
+#define UIP_CONF_ARPTAB_SIZE        8
 
 //
 // uIP buffer size.

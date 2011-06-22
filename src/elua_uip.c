@@ -116,7 +116,8 @@ void elua_uip_mainloop()
     // uip_len is set to a value > 0.
     if( uip_len > 0 )
     {
-      uip_arp_out();
+      if( uip_arp_out() ) // packet was replaced with ARP, need to resend
+        uip_conns[ temp ].appstate.state = ELUA_UIP_STATE_RETRY;
       device_driver_send();
     }
   }
@@ -131,7 +132,8 @@ void elua_uip_mainloop()
     // uip_len is set to a value > 0.
     if( uip_len > 0 )
     {
-      uip_arp_out();
+      if( uip_arp_out() ) // packet was replaced with ARP, need to resend
+        uip_udp_conns[ temp ].appstate.state = ELUA_UIP_STATE_RETRY;
       device_driver_send();
     }
   }
@@ -295,12 +297,7 @@ void elua_uip_appcall()
     return;
     
   s = ( struct elua_uip_state* )&( uip_conn->appstate );
-  // Need to find the actual socket location, since UIP doesn't provide this ...
-  // [TODO] change this to use a simple pointer substitution ...
-  for( temp = 0; temp < UIP_CONNS; temp ++ )
-    if( uip_conns + temp == uip_conn )
-      break;
-  sockno = ( int )temp;
+  sockno = uip_conns - uip_conn;
 
   if( uip_connected() )
   {
@@ -628,7 +625,9 @@ static elua_net_size elua_net_send_internal( int s, const void* buf, elua_net_si
     tosend = UMIN( is_sendto ? UIP_APPDATA_SIZE : uip_conns[ s ].mss, len );
     elua_prep_socket_state( pstate, ( void* )buf, tosend, ELUA_NET_ERR_OK, ELUA_UIP_STATE_SEND );
     platform_eth_force_interrupt();
-    while( pstate->state != ELUA_UIP_STATE_IDLE );
+    while( pstate->state != ELUA_UIP_STATE_IDLE && pstate->state != ELUA_UIP_STATE_RETRY );
+    if( pstate->state == ELUA_UIP_STATE_RETRY ) // resend the exact same packet again
+      continue;
     sentbytes = tosend - pstate->len;
     totsent += sentbytes;
     if( sentbytes < tosend || pstate->res != ELUA_NET_ERR_OK )
@@ -792,14 +791,14 @@ void elua_net_set_recv_callback( int s, p_elua_net_recv_cb callback )
   if( ELUA_UIP_IS_UDP( s ) )
   {
     if( !ELUA_UIP_IS_UDP_SOCK_OK( s ) )
-      return -1;
+      return;
     s = ELUA_UIP_FROM_UDP( s );
     pstate = ( volatile struct elua_uip_state* )&( uip_udp_conns[ s ].appstate );
   }
   else
   {
     if( !ELUA_UIP_IS_SOCK_OK( s ) )
-      return -1;
+      return;
     pstate = ( volatile struct elua_uip_state* )&( uip_conn[ s ].appstate );
   }
   pstate->recv_cb = callback;
