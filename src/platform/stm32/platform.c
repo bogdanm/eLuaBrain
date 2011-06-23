@@ -717,7 +717,7 @@ static TIM_TypeDef * const timer[] = { TIM1, TIM2, TIM3, TIM4, TIM5 };
 static u32 timer_set_clock( unsigned id, u32 clock );
 
 static u16 systick_eth_counter;
-#define SYSTICK_ETH_LIMIT_MS    SYSTICKMS       
+#define SYSTICK_ETH_LIMIT_MS    500       
 
 void SysTick_Handler( void )
 {
@@ -1461,15 +1461,9 @@ static void vram_transfer_init()
 #define ETH_INT_RESNUM        PLATFORM_IO_ENCODE( ENC28J60_INT_PORT, ENC28J60_INT_PIN, PLATFORM_IO_ENC_PIN )
 #define MAX_SEND_RETRY        5
 
-static u8 forced;
-
 // Ethernet interrupt handler
 void eth_int_handler()
 {
-  // [REMOVE]
-//  if( !forced )
-//    platform_s_uart_send( 0, '@' );
-//  forced = 0;
   if( eth_initialized )
   {
     SetRXInterrupt( 0 );
@@ -1527,7 +1521,6 @@ u32 platform_eth_get_packet_nb( void* buf, u32 maxlen )
 
 void platform_eth_force_interrupt()
 {
-  forced = 1;
   EXTI_GenerateSWInterrupt( exti_line[ ENC28J60_INT_PIN ]  ); 
 }
 

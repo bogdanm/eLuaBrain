@@ -210,7 +210,7 @@ static void shell_ls( char* args )
     }
   }
   
-  //term_enable_paging( TERM_PAGING_ON );
+  term_enable_paging( TERM_PAGING_ON );
   // Iterate through all devices, looking for the ones that can do "opendir"
   for( dev = 0; dev < dm_get_num_devices(); dev ++ )
   {  
@@ -290,8 +290,11 @@ static void shell_edit( char *args )
     *strchr( args, ' ' ) = 0;
     if( ( fp = fopen( args, "rb" ) ) == NULL )
     {
-      printf( "Unable to open %s\n", args );
-      return;
+      if( ( fp = fopen( args, "wb" ) ) == NULL )
+      {
+        printf( "Unable to create file %s\n", args );
+        return;
+      }
     }
     fclose( fp );
   }

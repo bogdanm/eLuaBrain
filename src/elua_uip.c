@@ -281,12 +281,12 @@ static void eluah_uip_read_to_buffer( volatile struct elua_uip_state *s )
   elua_net_size available = s->buf_total - s->buf_crt;
   int total = uip_datalen(), temp;
 
-  if( total < available )
+  if( total > available )
   {
     total = available;
     s->res = ELUA_NET_ERR_OVERFLOW;
   }
-  if( available == 0 )
+  if( available == 0 || total == 0 )
     return;
   // First transfer: widx -> end of buffer
   temp = UMIN( total, s->buf_total - s->buf_widx );
@@ -339,11 +339,10 @@ void elua_uip_appcall()
     }
     else if( s->state == ELUA_UIP_STATE_CONNECT )
       s->state = ELUA_UIP_STATE_IDLE;
-    return;
   }
 
-  if( s->state == ELUA_UIP_STATE_IDLE )
-    return;
+//  if( s->state == ELUA_UIP_STATE_IDLE )
+  //  return;
  
   if( uip_aborted() || uip_timedout() || uip_closed() )
   {
@@ -391,7 +390,7 @@ void elua_uip_appcall()
   }
           
   // Handle data receive  
-  if( uip_newdata() )
+  if( uip_newdata() && uip_datalen() > 0 )
   {
     if( s->recv_cb )
     {
@@ -580,7 +579,7 @@ int elua_net_socket( int type )
     for( i = 0; i < UIP_CONNS; i ++ )
     { 
       pconn = uip_conns + i;
-      if( pconn->tcpstateflags == UIP_CLOSED )
+      if( pconn->tcpstateflags == UIP_CLOSED || pconn->tcpstateflags == UIP_RESERVED )
       { 
         // Found a free connection, reserve it for later use
         uip_conn_reserve( i );
@@ -691,6 +690,7 @@ static elua_net_size elua_net_recv_internal( int s, void* buf, elua_net_size max
   // Read data in packets of maximum 'readlimit' bytes
   if( to_us > 0 )
     tmrstart = platform_timer_op( timer_id, PLATFORM_TIMER_OP_START, 0 );
+  res = 0; // 'res' will keep the match status in split mode
   while( maxsize )
   {
     if( pstate->buf ) // this is a buffered read, look for data
@@ -711,23 +711,23 @@ static elua_net_size elua_net_recv_internal( int s, void* buf, elua_net_size max
         if( pstate->split != ELUA_NET_NO_SPLIT )
         {
           readsize = 0;
-          while( readsize < readbytes )
+          while( readsize < readbytes && res == 0 )
           {
             b = pstate->buf[ pstate->buf_ridx ];
             if( with_buffer )
-              luaL_addlstring( ( luaL_Buffer* )buf, ( const char* )&b, 1 );
+              luaL_addchar( ( luaL_Buffer* )buf, ( char )b );
             else              
               *( ( u8* )buf + readsize ) = b;
             if( ++ pstate->buf_ridx == pstate->buf_total )
               pstate->buf_ridx = 0;
             readsize ++;
             if( b == pstate->split )
-              break;
+              res = 1;
           }
         }
         else // split not needed, just copy the data in the output buffer
         {
-          // First transfer: widx -> end of buffer
+          // First transfer: ridx -> end of buffer
           readsize = UMIN( readbytes, pstate->buf_total - pstate->buf_ridx );
           eluah_uip_generic_read( buf, pstate->buf + pstate->buf_ridx, readsize, with_buffer );
           pstate->buf_ridx += readsize;
@@ -773,7 +773,7 @@ static elua_net_size elua_net_recv_internal( int s, void* buf, elua_net_size max
       readbytes = readsize - pstate->len;
     }
     totread += readbytes;
-    if( readbytes == 0 || readbytes < readsize || pstate->res != ELUA_NET_ERR_OK )
+    if( res || readbytes == 0 || readbytes < readsize || pstate->res != ELUA_NET_ERR_OK )
       break;
     maxsize -= readbytes;
     if( !with_buffer )

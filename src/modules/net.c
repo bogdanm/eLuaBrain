@@ -97,7 +97,7 @@ static int net_connect( lua_State *L )
 {
   elua_net_ip ip;
   int sock = ( int )luaL_checkinteger( L, 1 );
-  u16 port = ( int )luaL_checkinteger( L, 3 );
+  u16 port = ( u16 )luaL_checkinteger( L, 3 );
   
   luaL_checkinteger( L, 2 );
   ip.ipaddr = ( u32 )luaL_checknumber( L, 2 );
