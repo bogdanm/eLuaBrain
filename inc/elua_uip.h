@@ -29,6 +29,7 @@ struct elua_uip_state
   u8                state, res;
   char              *ptr, *buf; 
   elua_net_size     len;
+  s16               split;
   elua_net_size     buf_total, buf_crt, buf_ridx, buf_widx;
   p_elua_net_recv_cb  recv_cb;
 };

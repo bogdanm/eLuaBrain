@@ -57,6 +57,17 @@ static int net_set_buffer( lua_State *L )
   return 0;
 }
 
+// Lua: set_split( sock, [split_char])
+// Defaults to 'no split' if not specified
+static int net_set_split( lua_State *L )
+{
+  int sock = luaL_checkinteger( L, 1 );
+  int schar = luaL_optinteger( L, 2, ELUA_NET_NO_SPLIT );
+
+  lua_pushinteger( L, elua_net_set_split( sock, schar ) );
+  return 1;
+}
+
 // Lua: res = close( socket )
 static int net_close( lua_State* L )
 {
@@ -263,6 +274,7 @@ const LUA_REG_TYPE net_map[] =
   { LSTRKEY( "connect" ), LFUNCVAL( net_connect ) },
   { LSTRKEY( "socket" ), LFUNCVAL( net_socket ) },
   { LSTRKEY( "set_buffer" ), LFUNCVAL( net_set_buffer ) },
+  { LSTRKEY( "set_split" ), LFUNCVAL( net_set_split ) },
   { LSTRKEY( "close" ), LFUNCVAL( net_close ) },
   { LSTRKEY( "send" ), LFUNCVAL( net_send ) },
   { LSTRKEY( "recv" ), LFUNCVAL( net_recv ) },
@@ -280,6 +292,7 @@ const LUA_REG_TYPE net_map[] =
   { LSTRKEY( "ERR_OVERFLOW" ), LNUMVAL( ELUA_NET_ERR_OVERFLOW ) },
   { LSTRKEY( "INVALID_SOCKET" ), LNUMVAL( ELUA_NET_INVALID_SOCKET ) },
   { LSTRKEY( "INF_TIMEOUT" ), LNUMVAL( ELUA_NET_INF_TIMEOUT ) },
+  { LSTRKEY( "NO_SPLIT" ), LNUMVAL( ELUA_NET_NO_SPLIT ) },
 #endif
   { LNILKEY, LNILVAL }
 };
@@ -301,6 +314,7 @@ LUALIB_API int luaopen_net( lua_State *L )
   MOD_REG_NUMBER( L, "ERR_OVERFLOW", ELUA_NET_ERR_OVERFLOW );
   MOD_REG_NUMBER( L, "INVALID_SOCKET", ELUA_NET_INVALID_SOCKET );
   MOD_REG_NUMBER( L, "INF_TIMEOUT", ELUA_NET_INF_TIMEOUT );
+  MOD_REG_NUMEBR( L, "NO_SPLIT", ELUA_NET_NO_SPLIT );
   
   return 1;
 #endif // #if LUA_OPTIMIZE_MEMORY > 0  

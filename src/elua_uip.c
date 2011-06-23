@@ -597,6 +597,7 @@ int elua_net_socket( int type )
   {
     memset( ( void* )pstate, 0, sizeof( *pstate ) );
     pstate->state = ELUA_UIP_STATE_IDLE;
+    pstate->split = ELUA_NET_NO_SPLIT;
   }
   return i;
 }
@@ -678,6 +679,7 @@ static elua_net_size elua_net_recv_internal( int s, void* buf, elua_net_size max
   u32 tmrstart = 0;
   elua_net_size readsize, readbytes, totread = 0;
   int res;
+  u8 b;
  
   if( maxsize == 0 )
     return 0;
@@ -705,25 +707,48 @@ static elua_net_size elua_net_recv_internal( int s, void* buf, elua_net_size max
       if( readbytes > 0 )
       {
         // Got some data, copy it in our buffer
-        // First transfer: widx -> end of buffer
-        readsize = UMIN( readbytes, pstate->buf_total - pstate->buf_ridx );
-        eluah_uip_generic_read( buf, pstate->buf + pstate->buf_ridx, readsize, with_buffer );
-        pstate->buf_ridx += readsize;
-        if( pstate->buf_ridx == pstate->buf_total )
+        // If the read operation uses split chars we read byte by byte until we find the split char or the end of buffer
+        if( pstate->split != ELUA_NET_NO_SPLIT )
         {
-          pstate->buf_ridx = 0;
-          if( readsize < readbytes ) // second transfer: from the start of buffer
+          readsize = 0;
+          while( readsize < readbytes )
           {
-            eluah_uip_generic_read( with_buffer ? buf : ( u8* )buf + readsize, pstate->buf, readbytes - readsize, with_buffer );
-            pstate->buf_ridx += readbytes - readsize;
+            b = pstate->buf[ pstate->buf_ridx ];
+            if( with_buffer )
+              luaL_addlstring( ( luaL_Buffer* )buf, ( const char* )&b, 1 );
+            else              
+              *( ( u8* )buf + readsize ) = b;
+            if( ++ pstate->buf_ridx == pstate->buf_total )
+              pstate->buf_ridx = 0;
+            readsize ++;
+            if( b == pstate->split )
+              break;
           }
         }
+        else // split not needed, just copy the data in the output buffer
+        {
+          // First transfer: widx -> end of buffer
+          readsize = UMIN( readbytes, pstate->buf_total - pstate->buf_ridx );
+          eluah_uip_generic_read( buf, pstate->buf + pstate->buf_ridx, readsize, with_buffer );
+          pstate->buf_ridx += readsize;
+          if( pstate->buf_ridx == pstate->buf_total )
+          {
+            pstate->buf_ridx = 0;
+            if( readsize < readbytes ) // second transfer: from the start of buffer
+            {
+              eluah_uip_generic_read( with_buffer ? buf : ( u8* )buf + readsize, pstate->buf, readbytes - readsize, with_buffer );
+              pstate->buf_ridx += readbytes - readsize;
+            }
+          }
+          readsize = readbytes;
+        }
       }
+      else
+        readsize = 0;
       platform_eth_set_interrupt( PLATFORM_ETH_INT_DISABLE );
-      pstate->buf_crt -= readbytes;
+      pstate->buf_crt -= readsize;
       pstate->res = readbytes > 0 ? ELUA_NET_ERR_OK : ELUA_NET_ERR_TIMEDOUT;
       platform_eth_set_interrupt( PLATFORM_ETH_INT_ENABLE );
-      readsize = readbytes;
     }
     else // direct read
     {
@@ -821,6 +846,20 @@ void elua_net_set_recv_callback( int s, p_elua_net_recv_cb callback )
   pstate->recv_cb = callback;
 }
 
+// Set the "split char": recv/recvfrom will return if this char is
+// found in the input stream. Only works on buffered sockets
+int elua_net_set_split( int s, int schar )
+{
+  volatile struct elua_uip_state *pstate;
+
+  if( eluah_get_socket_state( &s, &pstate, 0 ) == -1 )
+    return 0;
+  if( !pstate->buf && schar != ELUA_NET_NO_SPLIT )
+    return 0;
+  pstate->split = schar;
+  return 1;
+}
+
 int elua_net_set_buffer( int s, unsigned bufsize )
 {
   volatile struct elua_uip_state *pstate;
@@ -849,7 +888,8 @@ int elua_net_set_buffer( int s, unsigned bufsize )
     }
   }
   platform_eth_set_interrupt( PLATFORM_ETH_INT_DISABLE );
-  pstate->buf = newp;
+  if( ( pstate->buf = newp ) == NULL )
+    pstate->split = ELUA_NET_NO_SPLIT;
   if( res )
     pstate->buf_total = bufsize;
   pstate->buf_crt = pstate->buf_ridx = pstate->buf_widx = 0;
