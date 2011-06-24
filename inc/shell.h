@@ -6,7 +6,7 @@
 #include "term.h"
 
 #define SHELL_WELCOMEMSG    "\neLua %s  Copyright (C) 2007-2010 www.eluaproject.org\n"
-#define SHELL_PROMPT        "eLua# "
+#define SHELL_PROMPT        "brain> "
 #define SHELL_PROMPT_COLOR  TERM_FGCOL_LIGHT_RED 
 #define SHELL_COMMAND_COLOR TERM_FGCOL_LIGHT_GREEN
 #define SHELL_ERRMSG        "Invalid command, type 'help' for help\n"
