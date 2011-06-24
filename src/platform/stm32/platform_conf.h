@@ -131,7 +131,7 @@
 // *****************************************************************************
 // Configuration data
 
-//#define EGC_INITIAL_MODE      1
+#define EGC_INITIAL_MODE      1
 
 // Virtual timers (0 if not used)
 #define VTMR_NUM_TIMERS       4
