@@ -94,7 +94,7 @@ static int traceback (lua_State *L) {
 }
 
 
-static int docall (lua_State *L, int narg, int clear) {
+int docall (lua_State *L, int narg, int clear) {
   int status;
   int base = lua_gettop(L) - narg;  /* function index */
   lua_pushcfunction(L, traceback);  /* push traceback function */

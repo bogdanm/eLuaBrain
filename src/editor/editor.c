@@ -26,11 +26,13 @@
 // ****************************************************************************
 // Private functions and helpers
 
+extern int docall( lua_State *L, int narg, int clear );
+
 // Helper: print the error from a Lua state
 static void editorh_print_lua_error( lua_State *L, void *buf )
 {
   edhw_gotoxy( 0, 0 );
-  edhw_writetext( "\nERROR!\n\n" );
+  edhw_writetext( "ERROR!\n\n" );
   edhw_writetext( lua_tostring( L, -1 ) );
   edhw_getkey();
   edhw_init();
@@ -74,7 +76,7 @@ static void editor_run()
       luaL_openlibs( L );
       if( luaL_loadbuffer( L, buf, res, "editor" ) == 0 )
       {
-        if( lua_pcall( L, 0, LUA_MULTRET, 0 ) == 0 )
+        if( /*lua_pcall( L, 0, LUA_MULTRET, 0 )*/ docall( L, 0, 1 ) == 0 )
         {
           edhw_writetext( "Press any key to return to the editor" );
           edhw_getkey();
