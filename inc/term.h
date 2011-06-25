@@ -121,6 +121,7 @@ void term_reset();
 void* term_box( unsigned x, unsigned y, unsigned width, unsigned height, const char *title, u16 flags );
 void term_close_box( void *pbox );
 void term_enable_paging( int enabled );
+void term_set_last_line( int line );
 
 #define TERM_KEYCODES\
   _D( KC_UP ),\
