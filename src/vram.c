@@ -303,6 +303,7 @@ void vram_putchar( char c )
     *vram_p_cx = 0;
   else if( c == '\n' )
   {
+    *vram_p_cx = 0; // '\n' implies '\r'
     if( *vram_p_cy == vram_last_line )
     {
       // This is the last line and a NL was requested: shift the whole screen up one line
