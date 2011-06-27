@@ -356,7 +356,7 @@ void elua_uip_appcall()
 #endif   
     }
     s->state = ELUA_UIP_STATE_IDLE;
-    return;
+    //return;
   }
 
   // Handle data receive  
@@ -681,15 +681,15 @@ static elua_net_size elua_net_recv_internal( int s, void* buf, elua_net_size max
   volatile struct elua_uip_state *pstate;
   u32 tmrstart = 0;
   elua_net_size readsize, readbytes, totread = 0;
-  int res;
+  int res, socktype;
   u8 b;
  
   if( maxsize == 0 )
     return 0;
-  if( ( res = eluah_get_socket_state( &s, &pstate, 1 ) ) == -1 )
+  if( ( socktype = eluah_get_socket_state( &s, &pstate, 1 ) ) == -1 )
     return 0;
   // Check for valid operation (recvfrom on UDP, recv on TCP)
-  if( ( ( res == ELUA_NET_SOCK_DGRAM ) && !is_recvfrom ) || ( ( res == ELUA_NET_SOCK_STREAM ) && is_recvfrom ) )
+  if( ( ( socktype == ELUA_NET_SOCK_DGRAM ) && !is_recvfrom ) || ( ( socktype == ELUA_NET_SOCK_STREAM ) && is_recvfrom ) )
     return 0;
   // Read data in packets of maximum 'readlimit' bytes
   if( to_us > 0 )
@@ -704,6 +704,8 @@ static elua_net_size elua_net_recv_internal( int s, void* buf, elua_net_size max
         if( ( readbytes = pstate->buf_crt ) > 0 )
           break;
         if( to_us == 0 || ( to_us > 0 && platform_timer_get_diff_us( timer_id, tmrstart, platform_timer_op( timer_id, PLATFORM_TIMER_OP_READ, 0 ) ) >= to_us ) )
+          break;
+        if( socktype == ELUA_NET_SOCK_STREAM && !uip_conn_active( s ) )
           break;
       }
       if( readbytes > maxsize )
@@ -773,6 +775,8 @@ static elua_net_size elua_net_recv_internal( int s, void* buf, elua_net_size max
           platform_eth_set_interrupt( PLATFORM_ETH_INT_ENABLE );
           break;
         }
+        if( socktype == ELUA_NET_SOCK_STREAM && !uip_conn_active( s ) )
+          break;
       }
       readbytes = readsize - pstate->len;
     }
@@ -821,9 +825,12 @@ int elua_net_get_telnet_socket()
 int elua_net_close( int s )
 {
   volatile struct elua_uip_state *pstate;
+  int res;
 
-  if( eluah_get_socket_state( &s, &pstate, 1 ) == -1 )
-    return -1;
+  if( ( res = eluah_get_socket_state( &s, &pstate, 1 ) ) == -1 )
+    return -1;   
+  if( res == ELUA_NET_SOCK_STREAM && !uip_conn_active( s ) )
+    return 0;
   elua_prep_socket_state( pstate, NULL, 0, ELUA_NET_ERR_OK, ELUA_UIP_STATE_CLOSE );
   platform_eth_force_interrupt();
   while( pstate->state != ELUA_UIP_STATE_IDLE );
