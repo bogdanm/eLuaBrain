@@ -942,10 +942,11 @@ int elua_net_accept( u16 port, unsigned timer_id, s32 to_us, elua_net_ip* pfrom 
 }
 
 // Connect to a specified machine
-int elua_net_connect( int s, elua_net_ip addr, u16 port )
+int elua_net_connect( int s, elua_net_ip addr, u16 port, unsigned timer_id, s32 to_us )
 {
   volatile struct elua_uip_state *pstate = ( volatile struct elua_uip_state* )&( uip_conns[ s ].appstate );
   uip_ipaddr_t ipaddr;
+  u32 tmrstart;
   
   if( !ELUA_UIP_IS_SOCK_OK( s ) )
     return -1;
@@ -958,7 +959,16 @@ int elua_net_connect( int s, elua_net_ip addr, u16 port )
   if( uip_connect_socket( s, &ipaddr, htons( port ) ) == NULL )
     return -1;
   // And wait for it to finish
-  while( pstate->state != ELUA_UIP_STATE_IDLE );
+  if( to_us > 0 )
+    tmrstart = platform_timer_op( timer_id, PLATFORM_TIMER_OP_START, 0 );
+  while( pstate->state != ELUA_UIP_STATE_IDLE )
+  {
+    if( to_us == 0 || ( to_us > 0 && platform_timer_get_diff_us( timer_id, tmrstart, platform_timer_op( timer_id, PLATFORM_TIMER_OP_READ, 0 ) ) >= to_us ) )
+    {
+      elua_net_close( s );
+      return -1;
+    }
+  }
   return pstate->res == ELUA_NET_ERR_OK ? 0 : -1;
 }
 

@@ -91,17 +91,19 @@ static int net_send( lua_State* L )
   return 2;  
 }
 
-// Lua: err = connect( sock, iptype, port )
+// Lua: err = connect( sock, iptype, port, [timer_id, timeout] )
 // "iptype" is actually an int returned by "net.packip"
 static int net_connect( lua_State *L )
 {
   elua_net_ip ip;
   int sock = ( int )luaL_checkinteger( L, 1 );
   u16 port = ( u16 )luaL_checkinteger( L, 3 );
+  unsigned timer_id = ( unsigned )luaL_optinteger( L, 4, 0 );
+  s32 timeout = ( s32 )luaL_optinteger( L, 5, ELUA_NET_INF_TIMEOUT );
   
   luaL_checkinteger( L, 2 );
   ip.ipaddr = ( u32 )luaL_checknumber( L, 2 );
-  elua_net_connect( sock, ip, port );
+  elua_net_connect( sock, ip, port, timer_id, timeout );
   lua_pushinteger( L, elua_net_get_last_err( sock ) );
   return 1;  
 }

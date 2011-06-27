@@ -76,7 +76,7 @@ elua_net_size elua_net_recvbuf( int s, luaL_Buffer *buf, elua_net_size maxsize, 
 elua_net_size elua_net_recv( int s, void *buf, elua_net_size maxsize, unsigned timer_id, s32 to_us );
 elua_net_size elua_net_send( int s, const void* buf, elua_net_size len );
 int elua_net_accept( u16 port, unsigned timer_id, s32 to_us, elua_net_ip* pfrom );
-int elua_net_connect( int s, elua_net_ip addr, u16 port );
+int elua_net_connect( int s, elua_net_ip addr, u16 port, unsigned timer_id, s32 to_us );
 
 // UDP operations
 unsigned elua_net_sendto( int s, const void* buf, elua_net_size len, elua_net_ip remoteip, u16 port );
