@@ -346,49 +346,19 @@ void elua_uip_appcall()
  
   if( uip_aborted() || uip_timedout() || uip_closed() )
   {
-    // Signal this error
-    s->res = uip_aborted() ? ELUA_NET_ERR_ABORTED : ( uip_timedout() ? ELUA_NET_ERR_TIMEDOUT : ELUA_NET_ERR_CLOSED );
+    if( !uip_closed() || s->state == ELUA_UIP_STATE_CLOSE_ACK ) // not an error, this is a close request
+    {
+      // Signal this error
+      s->res = uip_aborted() ? ELUA_NET_ERR_ABORTED : ( uip_timedout() ? ELUA_NET_ERR_TIMEDOUT : ELUA_NET_ERR_CLOSED );
 #ifdef BUILD_CON_TCP    
-    if( sockno == elua_uip_telnet_socket )
-      elua_uip_telnet_socket = -1;      
-#endif    
-    s->state = ELUA_UIP_STATE_IDLE;
-    return;
-  }
-       
-  // Handle data send  
-  if( ( uip_acked() || uip_rexmit() || uip_poll() ) && ( s->state == ELUA_UIP_STATE_SEND ) )
-  {
-    // Special translation for TELNET: prepend all '\n' with '\r'
-    // We write directly in UIP's buffer 
-    if( uip_acked() )
-    {
-      s->len = 0;
-      s->state = ELUA_UIP_STATE_IDLE;
-    }
-    if( s->len > 0 ) // need to (re)transmit?
-    {
-#ifdef BUILD_CON_TCP
       if( sockno == elua_uip_telnet_socket )
-      {
-        temp = elua_uip_telnet_prep_send( s->ptr, s->len );
-        uip_send( uip_sappdata, temp );
-      }
-      else
-#endif      
-        uip_send( s->ptr, s->len );
+        elua_uip_telnet_socket = -1;      
+#endif   
     }
-    return;
-  }
-  
-  // Handle close
-  if( s->state == ELUA_UIP_STATE_CLOSE )
-  {
-    uip_close();
     s->state = ELUA_UIP_STATE_IDLE;
     return;
   }
-          
+
   // Handle data receive  
   if( uip_newdata() && uip_datalen() > 0 )
   {
@@ -424,6 +394,38 @@ void elua_uip_appcall()
       s->state = ELUA_UIP_STATE_IDLE;
     }
   }
+      
+  // Handle data send  
+  if( ( uip_acked() || uip_rexmit() || uip_poll() ) && ( s->state == ELUA_UIP_STATE_SEND ) )
+  {
+    // Special translation for TELNET: prepend all '\n' with '\r'
+    // We write directly in UIP's buffer 
+    if( uip_acked() )
+    {
+      s->len = 0;
+      s->state = ELUA_UIP_STATE_IDLE;
+    }
+    if( s->len > 0 ) // need to (re)transmit?
+    {
+#ifdef BUILD_CON_TCP
+      if( sockno == elua_uip_telnet_socket )
+      {
+        temp = elua_uip_telnet_prep_send( s->ptr, s->len );
+        uip_send( uip_sappdata, temp );
+      }
+      else
+#endif      
+        uip_send( s->ptr, s->len );
+    }
+    //return;
+  }
+  
+  // Handle close
+  if( s->state == ELUA_UIP_STATE_CLOSE )
+  {
+    uip_close();
+    s->state = ELUA_UIP_STATE_CLOSE_ACK;
+  }       
 }
 
 static void elua_uip_conf_static()
@@ -498,19 +500,7 @@ void elua_uip_udp_appcall()
   }
 
   // Must be an application socket, so check its state
-  // Anything to send?
-  if( uip_poll() && s->state == ELUA_UIP_STATE_SEND )
-  {
-    uip_send( s->ptr, s->len );
-    s->len = 0;
-    s->state = ELUA_UIP_STATE_IDLE;
-  }
-  else if( s->state == ELUA_UIP_STATE_CLOSE ) // handle close (trivial)
-  {
-    uip_udp_conn->lport = 0;
-    s->state = ELUA_UIP_STATE_IDLE;
-  }
-  else if( uip_newdata() ) // handle data receive
+  if( uip_newdata() && uip_datalen() > 0 ) // handle data receive
   {
     if( s->recv_cb )
     {
@@ -538,6 +528,20 @@ void elua_uip_udp_appcall()
       s->res = sockno;
       s->state = ELUA_UIP_STATE_IDLE;
     }
+  }
+ 
+  // Anything to send ?
+  if( uip_poll() && s->state == ELUA_UIP_STATE_SEND )
+  {
+    uip_send( s->ptr, s->len );
+    s->len = 0;
+    s->state = ELUA_UIP_STATE_IDLE;
+  }
+
+  if( s->state == ELUA_UIP_STATE_CLOSE ) // handle close (trivial)
+  {
+    uip_udp_conn->lport = 0;
+    s->state = ELUA_UIP_STATE_IDLE;
   }
 }
 

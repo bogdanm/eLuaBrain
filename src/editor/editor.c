@@ -29,6 +29,7 @@
 // Helper: print the error from a Lua state
 static void editorh_print_lua_error( lua_State *L, void *buf )
 {
+  edhw_gotoxy( 0, 0 );
   edhw_writetext( "\nERROR!\n\n" );
   edhw_writetext( lua_tostring( L, -1 ) );
   edhw_getkey();

@@ -306,6 +306,15 @@ static int luaterm_getstr( lua_State *L )
   return 1;
 }
 
+// Lua: set_last_line( line )
+static int luaterm_set_last_line( lua_State *L )
+{
+  int line = luaL_checkinteger( L, 1 );
+
+  term_set_last_line( line );
+  return 0;
+}
+
 // Key codes by name
 #undef _D
 #define _D( x ) #x
@@ -360,6 +369,7 @@ const LUA_REG_TYPE term_map[] =
   { LSTRKEY( "close_box" ), LFUNCVAL( luaterm_close_box ) },
   { LSTRKEY( "setpaging" ), LFUNCVAL( luaterm_setpaging ) },
   { LSTRKEY( "getstr" ), LFUNCVAL( luaterm_getstr ) },
+  { LSTRKEY( "set_last_line" ), LFUNCVAL( luaterm_set_last_line ) },
 #if LUA_OPTIMIZE_MEMORY > 0
   { LSTRKEY( "__metatable" ), LROVAL( term_map ) },
   { LSTRKEY( "NOWAIT" ), LNUMVAL( TERM_INPUT_DONT_WAIT ) },

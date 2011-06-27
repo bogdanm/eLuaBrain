@@ -25,6 +25,7 @@ static u8 vram_fg_col = VRAM_DEFAULT_FG_COL;
 static u8 vram_bg_col = VRAM_DEFAULT_BG_COL;
 static u8 vram_paging_enabled;
 static u8 vram_paging_lines;
+static u8 vram_last_line;
 
 #define VRAM_CHARADDR( x, y )   ( ( y ) * VRAM_COLS + ( x ) + ( VRAM_FIRST_DATA >> 1 ) )
 #define VRAM_CHARADDR8( x, y )  ( ( char* )vram_data + ( ( ( y ) * VRAM_COLS + ( x ) ) << 1 ) + VRAM_FIRST_DATA )
@@ -269,7 +270,8 @@ void vram_init()
   vram_p_cx = pv + VRAM_OFF_CX;
   vram_p_cy = pv + VRAM_OFF_CY;
   vram_p_type = pv + VRAM_OFF_TYPE;
-  *vram_p_type = VRAM_CURSOR_BLOCK_BLINK;   
+  *vram_p_type = VRAM_CURSOR_BLOCK_BLINK;
+  vram_last_line = VRAM_LINES - 1;
   vram_clrscr();  
 } 
 
@@ -301,17 +303,17 @@ void vram_putchar( char c )
     *vram_p_cx = 0;
   else if( c == '\n' )
   {
-    if( *vram_p_cy == VRAM_LINES - 1 )
+    if( *vram_p_cy == vram_last_line )
     {
       // This is the last line and a NL was requested: shift the whole screen up one line
-      memmove( ( u8* )vram_data + VRAM_FIRST_DATA, ( u8* )vram_data + VRAM_FIRST_DATA + VRAM_LINE_SIZE, VRAM_SIZE_VMEM_ONLY - VRAM_LINE_SIZE );
-      vram_clear_line( VRAM_LINES - 1 );
+      memmove( ( u8* )vram_data + VRAM_FIRST_DATA, ( u8* )vram_data + VRAM_FIRST_DATA + VRAM_LINE_SIZE, vram_last_line * VRAM_LINE_SIZE );
+      vram_clear_line( vram_last_line );
     }
     else
       *vram_p_cy += 1;
     if( vram_paging_enabled )
     {
-      if( ++ vram_paging_lines == VRAM_LINES - 2 )
+      if( ++ vram_paging_lines == vram_last_line - 1 )
       {
         term_getch( TERM_INPUT_WAIT );
         vram_paging_lines = 0;
@@ -528,5 +530,10 @@ void vram_get_color( int *pfgcol, int *pbgcol )
 {
   *pfgcol = vram_fg_col;
   *pbgcol = vram_bg_col;
+}
+
+void vram_set_last_line( int line )
+{
+  vram_last_line = line;
 }
 
