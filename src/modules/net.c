@@ -263,6 +263,62 @@ static int net_recvfrom( lua_State *L )
   return 4;
 }
 
+// Lua: res = net.expect( sock, s, [timer_id, timeout] )
+static int net_expect( lua_State *L )
+{
+  const char *s;
+  size_t len;
+  s32 timeout;
+  unsigned timer_id;
+  int sock = ( int )luaL_checkinteger( L, 1 );
+
+  s = luaL_checklstring( L, 2, &len );
+  timer_id = ( unsigned )luaL_optinteger( L, 3, 0 );
+  timeout = ( unsigned )luaL_optinteger( L, 4, ELUA_NET_INF_TIMEOUT );
+  lua_pushinteger( L, elua_net_expect( sock, ( const u8* )s, len, timer_id, timeout ) );
+  return 1;
+}
+
+// Lua: buf = net.readto( sock, s, [timer_id, timeout] ) 
+static int net_readto( lua_State *L )
+{
+  const char *s;
+  size_t len;
+  s32 timeout;
+  unsigned timer_id;
+  int sock = ( int )luaL_checkinteger( L, 1 );
+  luaL_Buffer b;
+
+  s = luaL_checklstring( L, 2, &len );
+  timer_id = ( unsigned )luaL_optinteger( L, 3, 0 );
+  timeout = ( unsigned )luaL_optinteger( L, 4, ELUA_NET_INF_TIMEOUT );
+  luaL_buffinit( L, &b );
+  elua_net_readto( sock, &b, ( const u8* )s, len, timer_id, timeout );
+  luaL_pushresult( &b );
+  return 1;
+}
+
+// Lua: buf = net.readto( sock, tag1, tag2, [timer_id, timeout])
+static int net_read_tags( lua_State *L )
+{
+  const char *tag1, *tag2;
+  size_t len1, len2;
+  s32 timeout;
+  unsigned timer_id;
+  int sock = ( int )luaL_checkinteger( L, 1 );
+  luaL_Buffer b;
+
+  tag1 = luaL_checklstring( L, 2, &len1 );
+  tag2 = luaL_checklstring( L, 3, &len2 );
+  timer_id = ( unsigned )luaL_optinteger( L, 4, 0 );
+  timeout = ( unsigned )luaL_optinteger( L, 5, ELUA_NET_INF_TIMEOUT );
+  luaL_buffinit( L, &b );
+  if( elua_net_expect( sock, ( const u8* )tag1, len1, timer_id, timeout ) )
+    elua_net_readto( sock, &b, ( const u8* )tag2, len2, timer_id, timeout );
+  luaL_pushresult( &b );
+  return 1; 
+}
+
 // Module function map
 #define MIN_OPT_LEVEL 2
 #include "lrodefs.h"
@@ -282,6 +338,9 @@ const LUA_REG_TYPE net_map[] =
   { LSTRKEY( "netcfg" ), LFUNCVAL( net_netcfg ) },
   { LSTRKEY( "sendto" ), LFUNCVAL( net_sendto ) },
   { LSTRKEY( "recvfrom" ), LFUNCVAL( net_recvfrom ) },
+  { LSTRKEY( "expect" ), LFUNCVAL( net_expect ) },
+  { LSTRKEY( "readto" ), LFUNCVAL( net_readto ) },
+  { LSTRKEY( "read_tags" ), LFUNCVAL( net_read_tags ) },
 #if LUA_OPTIMIZE_MEMORY > 0
   { LSTRKEY( "SOCK_STREAM" ), LNUMVAL( ELUA_NET_SOCK_STREAM ) },
   { LSTRKEY( "SOCK_DGRAM" ), LNUMVAL( ELUA_NET_SOCK_DGRAM ) },

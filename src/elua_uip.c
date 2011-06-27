@@ -1033,5 +1033,91 @@ elua_net_ip elua_net_get_config( int what )
   return res;
 }
 
+// [TODO] these should probably go in a common_net.c source file
+
+// Helper: read a char from a socket, wait for more data if needed
+static int eluah_expect_read_char( int s, volatile struct elua_uip_state *pstate, unsigned timer_id, s32 to_us, u32 tmrstart )
+{
+  static int leftbytes = 0;
+  int c;
+
+  if( leftbytes == 0 )
+  {
+    while( 1 )
+    {
+      if( ( leftbytes = pstate->buf_crt ) > 0 )
+        break;
+      if( to_us == 0 || ( to_us > 0 && platform_timer_get_diff_us( timer_id, tmrstart, platform_timer_op( timer_id, PLATFORM_TIMER_OP_READ, 0 ) ) >= to_us ) )
+        break;
+    }
+    if( leftbytes == 0 )
+      return -1;
+  }
+  c = pstate->buf[ pstate->buf_ridx ];
+  leftbytes --;
+  pstate->buf_ridx = pstate->buf_ridx + 1;
+  if( pstate->buf_ridx == pstate->buf_total )
+    pstate->buf_ridx = 0;
+  platform_eth_set_interrupt( PLATFORM_ETH_INT_DISABLE );
+  pstate->buf_crt --;
+  platform_eth_set_interrupt( PLATFORM_ETH_INT_DISABLE );
+  return c;
+}
+
+// Helper: read until a string is found, skip data or keep it in the
+// given buffer according to the "buffer" argument
+static int eluah_expect_internal( int s, luaL_Buffer *b, const u8 *str, unsigned len, unsigned timer_id, s32 to_us )
+{
+  u8 *backbuf = NULL;
+  int bidx = 0;
+  int c;
+  u32 tmrstart = 0;
+  volatile struct elua_uip_state *pstate;
+
+  if( eluah_get_socket_state( &s, &pstate, 1 ) == -1 )
+    return 0;
+  if( !pstate->buf )
+    return 0;
+  if( b )
+    if( ( backbuf = ( u8* )malloc( len ) ) == NULL )
+      return 0;
+  if( to_us > 0 )
+    tmrstart = platform_timer_op( timer_id, PLATFORM_TIMER_OP_START, 0 );
+  while( 1 )
+  {
+    if( ( c = eluah_expect_read_char( s, pstate, timer_id, to_us, tmrstart ) ) == -1 ) 
+      break;
+    if( c == str[ bidx ] )
+    {
+      if( b )
+        backbuf[ bidx ] = c;
+      if( ++ bidx == len )
+        break;
+    }
+    else
+    {
+      if( b )
+      {
+        luaL_addlstring( b, ( const char* )backbuf, bidx );
+        luaL_addchar( b, ( char )c );
+      }
+      bidx = 0;
+    }
+  }
+  if( backbuf )
+    free( backbuf );
+  return c == -1 ? 0 : 1;
+}
+
+int elua_net_expect( int s, const u8 *str, unsigned len, unsigned timer_id, s32 to_us )
+{
+  return eluah_expect_internal( s, NULL, str, len, timer_id, to_us );
+}
+
+int elua_net_readto( int s, luaL_Buffer *b, const u8 *str, unsigned len, unsigned timer_id, s32 to_us )
+{
+  return eluah_expect_internal( s, b, str, len, timer_id, to_us );
+}
+
 #endif // #ifdef BUILD_UIP
 

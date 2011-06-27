@@ -68,6 +68,8 @@ elua_net_ip elua_net_lookup( const char* hostname );
 int elua_net_get_last_err( int s );
 int elua_net_get_telnet_socket();
 elua_net_ip elua_net_get_config( int what );
+int elua_net_expect( int s, const u8 *str, unsigned len, unsigned timer_id, s32 to_us );
+int elua_net_readto( int s, luaL_Buffer *b, const u8 *str, unsigned len, unsigned timer_id, s32 to_us );
 
 // TCP operations
 elua_net_size elua_net_recvbuf( int s, luaL_Buffer *buf, elua_net_size maxsize, unsigned timer_id, s32 to_us );
