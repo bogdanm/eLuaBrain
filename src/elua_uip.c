@@ -828,13 +828,13 @@ int elua_net_close( int s )
   int res;
 
   if( ( res = eluah_get_socket_state( &s, &pstate, 1 ) ) == -1 )
-    return -1;   
+    return 0;   
   if( res == ELUA_NET_SOCK_STREAM && !uip_conn_active( s ) )
     return 0;
   elua_prep_socket_state( pstate, NULL, 0, ELUA_NET_ERR_OK, ELUA_UIP_STATE_CLOSE );
   platform_eth_force_interrupt();
   while( pstate->state != ELUA_UIP_STATE_IDLE );
-  return pstate->res == ELUA_NET_ERR_OK ? 0 : -1;
+  return pstate->res == ELUA_NET_ERR_OK ? 0 : 1;
 }
 
 // Get last error on specific socket
@@ -1043,7 +1043,7 @@ elua_net_ip elua_net_get_config( int what )
 // [TODO] these should probably go in a common_net.c source file
 
 // Helper: read a char from a socket, wait for more data if needed
-static int eluah_expect_read_char( int s, volatile struct elua_uip_state *pstate, unsigned timer_id, s32 to_us, u32 tmrstart )
+static int eluah_expect_read_char( int s, int socktype, volatile struct elua_uip_state *pstate, unsigned timer_id, s32 to_us, u32 tmrstart )
 {
   static int leftbytes = 0;
   int c;
@@ -1056,6 +1056,8 @@ static int eluah_expect_read_char( int s, volatile struct elua_uip_state *pstate
         break;
       if( to_us == 0 || ( to_us > 0 && platform_timer_get_diff_us( timer_id, tmrstart, platform_timer_op( timer_id, PLATFORM_TIMER_OP_READ, 0 ) ) >= to_us ) )
         break;
+      if( socktype == ELUA_NET_SOCK_STREAM && !uip_conn_active( s ) )
+        break;
     }
     if( leftbytes == 0 )
       return -1;
@@ -1067,7 +1069,7 @@ static int eluah_expect_read_char( int s, volatile struct elua_uip_state *pstate
     pstate->buf_ridx = 0;
   platform_eth_set_interrupt( PLATFORM_ETH_INT_DISABLE );
   pstate->buf_crt --;
-  platform_eth_set_interrupt( PLATFORM_ETH_INT_DISABLE );
+  platform_eth_set_interrupt( PLATFORM_ETH_INT_ENABLE );
   return c;
 }
 
@@ -1077,11 +1079,11 @@ static int eluah_expect_internal( int s, luaL_Buffer *b, const u8 *str, unsigned
 {
   u8 *backbuf = NULL;
   int bidx = 0;
-  int c;
+  int c, socktype;
   u32 tmrstart = 0;
   volatile struct elua_uip_state *pstate;
 
-  if( eluah_get_socket_state( &s, &pstate, 1 ) == -1 )
+  if( ( socktype = eluah_get_socket_state( &s, &pstate, 1 ) ) == -1 )
     return 0;
   if( !pstate->buf )
     return 0;
@@ -1092,7 +1094,7 @@ static int eluah_expect_internal( int s, luaL_Buffer *b, const u8 *str, unsigned
     tmrstart = platform_timer_op( timer_id, PLATFORM_TIMER_OP_START, 0 );
   while( 1 )
   {
-    if( ( c = eluah_expect_read_char( s, pstate, timer_id, to_us, tmrstart ) ) == -1 ) 
+    if( ( c = eluah_expect_read_char( s, socktype, pstate, timer_id, to_us, tmrstart ) ) == -1 ) 
       break;
     if( c == str[ bidx ] )
     {
