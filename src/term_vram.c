@@ -144,6 +144,11 @@ void term_set_last_line( int line )
   vram_set_last_line( line );
 }
 
+void term_change_attr( unsigned x, unsigned y, unsigned len, int newfg, int newbg )
+{
+  vram_change_attr( x, y, len, newfg, newbg );
+}
+
 // Return a char read from the terminal
 // If "mode" is TERM_INPUT_DONT_WAIT, return the char only if it is available,
 // otherwise return -1

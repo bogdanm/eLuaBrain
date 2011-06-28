@@ -29,7 +29,7 @@ static u8 vram_last_line;
 
 #define VRAM_CHARADDR( x, y )   ( ( y ) * VRAM_COLS + ( x ) + ( VRAM_FIRST_DATA >> 1 ) )
 #define VRAM_CHARADDR8( x, y )  ( ( char* )vram_data + ( ( ( y ) * VRAM_COLS + ( x ) ) << 1 ) + VRAM_FIRST_DATA )
-#define MKCOL( fg, bg )         ( ( ( bg ) << 4 ) + fg )
+#define VRAM_MKCOL( fg, bg )         ( ( ( bg ) << 4 ) + fg )
 #define VRAM_ANSI_ESC           0x1B
 
 // This defines a box (window)
@@ -245,13 +245,13 @@ static void vram_putchar_internal( int x, int y, char c )
 {
   u16 *pdata = ( u16* )vram_data + VRAM_CHARADDR( x, y );
  
-  *pdata = ( c << 8 ) | MKCOL( vram_fg_col, vram_bg_col );      
+  *pdata = ( c << 8 ) | VRAM_MKCOL( vram_fg_col, vram_bg_col );      
 }
 
 static void vram_clear_line( int y )
 {
   u32 *pdata = ( u32* )vram_data + ( VRAM_CHARADDR( 0, y ) >> 1 );
-  u32 fill = ( ' ' << 8 ) | MKCOL( vram_fg_col, vram_bg_col );
+  u32 fill = ( ' ' << 8 ) | VRAM_MKCOL( vram_fg_col, vram_bg_col );
   unsigned i;
   
   fill = ( fill < 16 ) | fill;
@@ -377,7 +377,7 @@ void vram_clrscr()
   u32 *pdata = vram_data + ( VRAM_FIRST_DATA >> 2 );
   u32 fill;
   
-  fill = ( ' ' << 8 ) | MKCOL( vram_fg_col, vram_bg_col );
+  fill = ( ' ' << 8 ) | VRAM_MKCOL( vram_fg_col, vram_bg_col );
   fill = ( fill << 16 ) | fill;
   for( i = 0; i < VRAM_SIZE_VMEM_ONLY >> 2; i ++ )
     *pdata ++ = fill;
@@ -417,7 +417,7 @@ u8 vram_get_cy()
 void vram_clreol()
 {
   u16 *pdata = ( u16* )vram_data + VRAM_CHARADDR( *vram_p_cx, *vram_p_cy );
-  u16 fill = ( ' ' << 8 ) | MKCOL( vram_fg_col, vram_bg_col );
+  u16 fill = ( ' ' << 8 ) | VRAM_MKCOL( vram_fg_col, vram_bg_col );
   unsigned i;
    
   for( i = *vram_p_cx; i < VRAM_COLS; i ++ )
@@ -536,5 +536,15 @@ void vram_get_color( int *pfgcol, int *pbgcol )
 void vram_set_last_line( int line )
 {
   vram_last_line = line;
+}
+
+void vram_change_attr( unsigned x, unsigned y, unsigned len, int newfg, int newbg )
+{
+  u8 *pdata = VRAM_CHARADDR8( x, y );
+  u8 newcol = VRAM_MKCOL( newfg, newbg );
+  unsigned i;
+  
+  for( i = 0; i < len; i ++, pdata += 2 )
+    *pdata = newcol;
 }
 

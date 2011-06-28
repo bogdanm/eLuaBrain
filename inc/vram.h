@@ -72,6 +72,7 @@ void vram_close_box( void *pbox );
 void vram_get_color( int *pfgcol, int *pbgcol );
 void vram_enable_paging( int enabled );
 void vram_set_last_line( int line );
+void vram_change_attr( unsigned x, unsigned y, unsigned len, int newfg, int newbg );
 
 #endif
 

@@ -122,6 +122,7 @@ void* term_box( unsigned x, unsigned y, unsigned width, unsigned height, const c
 void term_close_box( void *pbox );
 void term_enable_paging( int enabled );
 void term_set_last_line( int line );
+void term_change_attr( unsigned x, unsigned y, unsigned len, int newfg, int newbg );
 
 #define TERM_KEYCODES\
   _D( KC_UP ),\

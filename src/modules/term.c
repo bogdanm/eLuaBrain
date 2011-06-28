@@ -8,6 +8,7 @@
 #include "term.h"
 #include "platform_conf.h"
 #include "lrotable.h"
+#include "utils.h"
 #include <string.h>
 #include <stdlib.h>
 
@@ -315,6 +316,58 @@ static int luaterm_set_last_line( lua_State *L )
   return 0;
 }
 
+// Lua: result = get_menu( choices, default, sx, sy, width, height, [fgsel, bgsel])
+static int luaterm_get_menu( lua_State *L )
+{
+  int sel = ( int )luaL_checkinteger( L, 2 );
+  int fgsel, bgsel;
+  int nchoices = lua_objlen( L, 1 );
+  int width = ( int )luaL_checkinteger( L, 3 );
+  int height = ( int )luaL_checkinteger( L, 4 );
+  int sx = ( int )luaL_checkinteger( L, 5 );
+  int sy = ( int )luaL_checkinteger( L, 6 );
+  const char *pentry;
+  int first = 1, last, i, j, must_refresh = 1;
+
+  if( !lua_istable( L, 1 ) )
+    return luaL_error( L, "expected a table as the list of entries" );
+  if( nchoices == 0 )
+    return 0;
+  term_get_color( &bgsel, &fgsel );
+  fgsel = luaL_optinteger( L, 7, fgsel );
+  bgsel = luaL_optinteger( L, 8, bgsel );
+  while( 1 )
+  {
+    // Display current items _if needed_
+    if( must_refresh )
+    {
+      last = first + height - 1;
+      if( last > nchoices )
+        last = nchoices;
+      // Display visible items
+      for( i = first; i <= last; i ++ )
+      {
+        lua_rawgeti( L, 1, i );
+        pentry = luaL_checkstring( L, -1 );
+        term_gotoxy( sx, sy + i - first );
+        term_putstr( pentry, UMIN( strlen( pentry ), width ) );
+        for( j = strlen( pentry ); j < width; j ++ )
+          term_putch( ' ' );
+        lua_pop( L, 1 );
+      }
+      // Highlight current items
+      term_change_attr( sx, sy + sel - first, width, fgsel, bgsel );
+      must_refresh = 0;
+    }
+    j = term_getch( TERM_INPUT_WAIT );
+    if( j == KC_UP && sel > 1 ) {}
+    else if( j == KC_DOWN && sel < nchoices ) {}
+    else if( j == KC_ENTER ) {}
+    else if( j == KC_ESC )
+      return -1;
+  }
+}
+
 // Key codes by name
 #undef _D
 #define _D( x ) #x
@@ -370,6 +423,7 @@ const LUA_REG_TYPE term_map[] =
   { LSTRKEY( "setpaging" ), LFUNCVAL( luaterm_setpaging ) },
   { LSTRKEY( "getstr" ), LFUNCVAL( luaterm_getstr ) },
   { LSTRKEY( "set_last_line" ), LFUNCVAL( luaterm_set_last_line ) },
+  { LSTRKEY( "get_menu" ), LFUNCVAL( luaterm_get_menu ) },
 #if LUA_OPTIMIZE_MEMORY > 0
   { LSTRKEY( "__metatable" ), LROVAL( term_map ) },
   { LSTRKEY( "NOWAIT" ), LNUMVAL( TERM_INPUT_DONT_WAIT ) },
