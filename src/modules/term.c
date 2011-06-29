@@ -12,6 +12,10 @@
 #include <string.h>
 #include <stdlib.h>
 
+// Menu attributes
+#define TERM_MENU_ATTR_NO_ENTER   1
+#define TERM_MENU_ATTR_NO_ESC     2
+
 // Lua: clrscr()
 static int luaterm_clrscr( lua_State* L )
 {
@@ -316,56 +320,123 @@ static int luaterm_set_last_line( lua_State *L )
   return 0;
 }
 
-// Lua: result = get_menu( choices, default, sx, sy, width, height, [fgsel, bgsel])
-static int luaterm_get_menu( lua_State *L )
+// Lua: result = menu( choices, default, configuration )
+// configuration is a table with: x, y, width, height -> required
+//                                attrs, callback, fgsel, bgsel -> optional
+// callback will be called when selection changes like cb( crtsel )
+static int luaterm_menu( lua_State *L )
 {
   int sel = ( int )luaL_checkinteger( L, 2 );
-  int fgsel, bgsel;
   int nchoices = lua_objlen( L, 1 );
-  int width = ( int )luaL_checkinteger( L, 3 );
-  int height = ( int )luaL_checkinteger( L, 4 );
-  int sx = ( int )luaL_checkinteger( L, 5 );
-  int sy = ( int )luaL_checkinteger( L, 6 );
+  int sx = 0, sy = 0, width = 0, height = 0, attrs = 0, fgsel = -1, bgsel = -1;
   const char *pentry;
-  int first = 1, last, i, j, must_refresh = 1;
+  int first = 0, last = 0, i, j, newfirst = 1, prevsel;
+  int origfg, origbg;
+  static const char * const fields[] = { "x", "y", "width", "height", "attrs", "fgsel", "bgsel" };
+  int* pdatap[] = { &sx, &sy,  &width, &height, &attrs, &fgsel, &bgsel };
+  const int last_required = 3;
+  int hascb = 0;
 
   if( !lua_istable( L, 1 ) )
     return luaL_error( L, "expected a table as the list of entries" );
+  if( !lua_istable( L, 3 ) )
+    return luaL_error( L, "expected a table for the menu configuration" );
   if( nchoices == 0 )
     return 0;
-  term_get_color( &bgsel, &fgsel );
-  fgsel = luaL_optinteger( L, 7, fgsel );
-  bgsel = luaL_optinteger( L, 8, bgsel );
+  // Get configuration data
+  for( i = 0; i < sizeof( fields ) / sizeof( char* ); i ++ )
+  {
+    lua_pushstring( L, fields[ i ] );
+    lua_rawget( L, 3 );
+    if( lua_isnil( L, -1 ) )
+    {
+      lua_pop( L, 1 );
+      if( i <= last_required )
+        return luaL_error( L, "field '%s' not found in the configuration table", fields[ i ] );
+    }
+    else
+    {
+      *pdatap[ i ] = ( int )luaL_checkinteger( L, -1 );
+      lua_pop( L, 1 );
+    }
+  }
+  term_get_color( &origfg, &origbg );
+  if( fgsel == -1 )
+    fgsel = origbg;
+  if( bgsel == -1 )
+    bgsel = origfg;
+  // Get callback 
+  lua_pushstring( L, "callback" );
+  lua_rawget( L, 3 );
+  if( lua_type( L, -1 ) == LUA_TFUNCTION )
+    hascb = 1;
+  else
+    lua_pop( L, 1 );
+  fgsel = luaL_optinteger( L, 7, origbg );
+  bgsel = luaL_optinteger( L, 8, origfg );
+  // Find the proper page for 'sel' and adjust 'first' accordingly
+  newfirst = ( ( sel - 1 ) / height ) * height + 1;
+  prevsel = -1;
   while( 1 )
   {
-    // Display current items _if needed_
-    if( must_refresh )
+    // Display current items if needed
+    if( newfirst != -1 )
     {
-      last = first + height - 1;
-      if( last > nchoices )
-        last = nchoices;
+      first = newfirst;
+      last = UMIN( first + height - 1, nchoices );
+      term_set_color( origfg, origbg );
       // Display visible items
       for( i = first; i <= last; i ++ )
       {
         lua_rawgeti( L, 1, i );
         pentry = luaL_checkstring( L, -1 );
         term_gotoxy( sx, sy + i - first );
-        term_putstr( pentry, UMIN( strlen( pentry ), width ) );
-        for( j = strlen( pentry ); j < width; j ++ )
+        term_putch( ' ' );
+        term_putstr( pentry, UMIN( strlen( pentry ), width - 2 ) );
+        for( j = strlen( pentry ); j < width - 2; j ++ )
           term_putch( ' ' );
         lua_pop( L, 1 );
       }
-      // Highlight current items
-      term_change_attr( sx, sy + sel - first, width, fgsel, bgsel );
-      must_refresh = 0;
     }
+    if( prevsel != sel )
+    {
+      // Highlight current item
+      if( newfirst == -1 )
+        term_change_attr( sx, sy + prevsel - first, width, origfg, origbg );
+      term_change_attr( sx, sy + sel - first, width, fgsel, bgsel );
+      if( hascb ) // callback is on top of the stack 
+      {
+        lua_pushinteger( L, sel );
+        lua_call( L, 1, 0 );
+      }
+      prevsel = sel;
+    }
+    newfirst = -1;
     j = term_getch( TERM_INPUT_WAIT );
-    if( j == KC_UP && sel > 1 ) {}
-    else if( j == KC_DOWN && sel < nchoices ) {}
-    else if( j == KC_ENTER ) {}
-    else if( j == KC_ESC )
-      return -1;
+    if( j == KC_UP && sel > 1 )
+    {
+      if( -- sel < first )
+        newfirst = first - 1;
+    }
+    else if( j == KC_DOWN && sel < nchoices )
+    {
+      if( ++ sel > last )
+        newfirst = first + 1;
+    }
+    else if( j == KC_ENTER && ( ( attrs & TERM_MENU_ATTR_NO_ENTER ) == 0 ) )
+      break;
+    else if( j == KC_ESC && ( ( attrs & TERM_MENU_ATTR_NO_ESC ) == 0 ) )
+    {
+      sel = -1;
+      break;
+    }
+   
   }
+  if( hascb )
+    lua_pop( L, 1 );
+  term_set_color( origfg, origbg );
+  lua_pushinteger( L, sel );
+  return 1;
 }
 
 // Key codes by name
@@ -423,7 +494,7 @@ const LUA_REG_TYPE term_map[] =
   { LSTRKEY( "setpaging" ), LFUNCVAL( luaterm_setpaging ) },
   { LSTRKEY( "getstr" ), LFUNCVAL( luaterm_getstr ) },
   { LSTRKEY( "set_last_line" ), LFUNCVAL( luaterm_set_last_line ) },
-  { LSTRKEY( "get_menu" ), LFUNCVAL( luaterm_get_menu ) },
+  { LSTRKEY( "menu" ), LFUNCVAL( luaterm_menu ) },
 #if LUA_OPTIMIZE_MEMORY > 0
   { LSTRKEY( "__metatable" ), LROVAL( term_map ) },
   { LSTRKEY( "NOWAIT" ), LNUMVAL( TERM_INPUT_DONT_WAIT ) },
@@ -432,6 +503,8 @@ const LUA_REG_TYPE term_map[] =
   { LSTRKEY( "COL_DEFAULT" ), LNUMVAL( TERM_COL_DEFAULT ) },  
   { LSTRKEY( "BOX_RESTORE" ), LNUMVAL( TERM_BOX_FLAG_RESTORE ) },
   { LSTRKEY( "BOX_BORDER" ), LNUMVAL( TERM_BOX_FLAG_BORDER ) },
+  { LSTRKEY( "MENU_NO_ENTER" ), LNUMVAL( TERM_MENU_ATTR_NO_ENTER ) },
+  { LSTRKEY( "MENU_NO_ESC" ), LNUMVAL( TERM_MENU_ATTR_NO_ESC ) },
   COLLINE( COL_BLACK ),
   COLLINE( COL_DARK_BLUE ),
   COLLINE( COL_DARK_GREEN ),
