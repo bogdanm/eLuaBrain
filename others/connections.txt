@@ -6,6 +6,8 @@ MISO        PB14              PA1
 MOSI        PB15              PA2
 CLK         PB13              PA3
 Prop.reset  PB12              Reset (with pull-down resistor)
+vram.spin also uses PA4 and PA6
+VGA output 
 
 Keyboard:
 DATA        PG13 with 4k7 pullup to +5V

@@ -117,6 +117,7 @@ unsigned term_get_cy();
 void term_set_color( int fgcol, int bgcol );
 void term_get_color( int *pfgcol, int *pbgcol );
 void term_set_cursor( int type );
+int term_get_cursor();
 void term_reset();
 void* term_box( unsigned x, unsigned y, unsigned width, unsigned height, const char *title, u16 flags );
 void term_close_box( void *pbox );

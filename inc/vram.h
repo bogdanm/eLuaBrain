@@ -67,6 +67,7 @@ u8 vram_get_cx();
 u8 vram_get_cy();
 void vram_clreol();
 void vram_set_cursor( int type );
+int vram_get_cursor();
 void* vram_box( unsigned x, unsigned y, unsigned width, unsigned height, const char *title, u16 flags );
 void vram_close_box( void *pbox );
 void vram_get_color( int *pfgcol, int *pbgcol );

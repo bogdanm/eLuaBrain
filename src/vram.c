@@ -442,6 +442,21 @@ void vram_set_cursor( int type )
   }
 }
 
+int vram_get_cursor()
+{
+  switch( *vram_p_type )
+  {
+    case VRAM_CURSOR_OFF:
+      return TERM_CURSOR_OFF;
+
+    case VRAM_CURSOR_BLOCK_BLINK:
+      return TERM_CURSOR_BLOCK;
+
+    case VRAM_CURSOR_LINE_BLINK:
+      return TERM_CURSOR_UNDERLINE;
+  }
+}
+
 // Enable/disable paging
 void vram_enable_paging( int enabled )
 {

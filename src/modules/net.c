@@ -53,7 +53,7 @@ static int net_set_buffer( lua_State *L )
   unsigned bufsize = ( unsigned )luaL_checkinteger( L, 2 );
   
   if( elua_net_set_buffer( sock, bufsize ) == 0 )
-    return luaL_error( L, "unable to set buffer" );
+    return luaL_error( L, "unable to set buffer on socket %d", sock );
   return 0;
 }
 

@@ -149,6 +149,11 @@ void term_change_attr( unsigned x, unsigned y, unsigned len, int newfg, int newb
   vram_change_attr( x, y, len, newfg, newbg );
 }
 
+int term_get_cursor()
+{
+  return vram_get_cursor();
+}
+
 // Return a char read from the terminal
 // If "mode" is TERM_INPUT_DONT_WAIT, return the char only if it is available,
 // otherwise return -1

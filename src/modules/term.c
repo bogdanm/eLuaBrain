@@ -335,7 +335,8 @@ static int luaterm_menu( lua_State *L )
   static const char * const fields[] = { "x", "y", "width", "height", "attrs", "fgsel", "bgsel" };
   int* pdatap[] = { &sx, &sy,  &width, &height, &attrs, &fgsel, &bgsel };
   const int last_required = 3;
-  int hascb = 0;
+  int origc = term_get_cursor();
+  int key = -1;
 
   if( !lua_istable( L, 1 ) )
     return luaL_error( L, "expected a table as the list of entries" );
@@ -361,19 +362,11 @@ static int luaterm_menu( lua_State *L )
     }
   }
   term_get_color( &origfg, &origbg );
+  term_set_cursor( TERM_CURSOR_OFF );
   if( fgsel == -1 )
     fgsel = origbg;
   if( bgsel == -1 )
     bgsel = origfg;
-  // Get callback 
-  lua_pushstring( L, "callback" );
-  lua_rawget( L, 3 );
-  if( lua_type( L, -1 ) == LUA_TFUNCTION )
-    hascb = 1;
-  else
-    lua_pop( L, 1 );
-  fgsel = luaL_optinteger( L, 7, origbg );
-  bgsel = luaL_optinteger( L, 8, origfg );
   // Find the proper page for 'sel' and adjust 'first' accordingly
   newfirst = ( ( sel - 1 ) / height ) * height + 1;
   prevsel = -1;
@@ -398,43 +391,50 @@ static int luaterm_menu( lua_State *L )
         lua_pop( L, 1 );
       }
     }
-    if( prevsel != sel )
+    if( prevsel != sel || key != -1 )
     {
       // Highlight current item
-      if( newfirst == -1 )
-        term_change_attr( sx, sy + prevsel - first, width, origfg, origbg );
-      term_change_attr( sx, sy + sel - first, width, fgsel, bgsel );
-      if( hascb ) // callback is on top of the stack 
+      if( prevsel != sel )
+      {
+        if( newfirst == -1 )
+          term_change_attr( sx, sy + prevsel - first, width, origfg, origbg );
+        term_change_attr( sx, sy + sel - first, width, fgsel, bgsel );
+        prevsel = sel;
+      }
+      // Do we need to call the callback?
+      lua_pushstring( L, "callback" );
+      lua_rawget( L, 3 );
+      if( lua_type( L, -1 ) == LUA_TFUNCTION )
       {
         lua_pushinteger( L, sel );
-        lua_call( L, 1, 0 );
+        lua_pushinteger( L, key );
+        lua_call( L, 2, 0 );
       }
-      prevsel = sel;
+      else
+        lua_pop( L, 1 );
     }
     newfirst = -1;
-    j = term_getch( TERM_INPUT_WAIT );
-    if( j == KC_UP && sel > 1 )
+    key = term_getch( TERM_INPUT_WAIT );
+    if( key == KC_UP && sel > 1 )
     {
       if( -- sel < first )
         newfirst = first - 1;
     }
-    else if( j == KC_DOWN && sel < nchoices )
+    else if( key == KC_DOWN && sel < nchoices )
     {
       if( ++ sel > last )
         newfirst = first + 1;
     }
-    else if( j == KC_ENTER && ( ( attrs & TERM_MENU_ATTR_NO_ENTER ) == 0 ) )
-      break;
-    else if( j == KC_ESC && ( ( attrs & TERM_MENU_ATTR_NO_ESC ) == 0 ) )
+    else if( ( key == KC_ENTER ) && ( ( attrs & TERM_MENU_ATTR_NO_ENTER ) == 0 ) )
+        break;
+    else if( ( key == KC_ESC ) && ( ( attrs & TERM_MENU_ATTR_NO_ESC ) == 0 ) )
     {
       sel = -1;
       break;
     }
-   
   }
-  if( hascb )
-    lua_pop( L, 1 );
   term_set_color( origfg, origbg );
+  term_set_cursor( origc );
   lua_pushinteger( L, sel );
   return 1;
 }

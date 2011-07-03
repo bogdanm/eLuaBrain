@@ -346,7 +346,7 @@ void elua_uip_appcall()
  
   if( uip_aborted() || uip_timedout() || uip_closed() )
   {
-    if( !uip_closed() || s->state == ELUA_UIP_STATE_CLOSE_ACK ) // not an error, this is a close request
+    if( !uip_closed() || s->state != ELUA_UIP_STATE_CLOSE_ACK ) // not an error, this is a close request
     {
       // Signal this error
       s->res = uip_aborted() ? ELUA_NET_ERR_ABORTED : ( uip_timedout() ? ELUA_NET_ERR_TIMEDOUT : ELUA_NET_ERR_CLOSED );
@@ -827,14 +827,29 @@ int elua_net_close( int s )
   volatile struct elua_uip_state *pstate;
   int res;
 
-  if( ( res = eluah_get_socket_state( &s, &pstate, 1 ) ) == -1 )
+  if( ( res = eluah_get_socket_state( &s, &pstate, 0 ) ) == -1 )
     return 0;   
   if( res == ELUA_NET_SOCK_STREAM && !uip_conn_active( s ) )
-    return 0;
+  {
+    if( pstate->buf )
+    {
+      free( pstate->buf );
+      pstate->buf = NULL;
+      pstate->buf_total = pstate->buf_crt = 0;
+    }
+    return 1;
+  }
   elua_prep_socket_state( pstate, NULL, 0, ELUA_NET_ERR_OK, ELUA_UIP_STATE_CLOSE );
   platform_eth_force_interrupt();
   while( pstate->state != ELUA_UIP_STATE_IDLE );
-  return pstate->res == ELUA_NET_ERR_OK ? 0 : 1;
+  if( pstate->buf )
+  {
+    free( pstate->buf );
+    pstate->buf = NULL;
+    pstate->buf_total = pstate->buf_crt = 0;
+  }
+  pstate->split = ELUA_NET_NO_SPLIT;
+  return pstate->res == ELUA_NET_ERR_OK ? 1 : 0;
 }
 
 // Get last error on specific socket
@@ -946,7 +961,7 @@ int elua_net_connect( int s, elua_net_ip addr, u16 port, unsigned timer_id, s32 
 {
   volatile struct elua_uip_state *pstate = ( volatile struct elua_uip_state* )&( uip_conns[ s ].appstate );
   uip_ipaddr_t ipaddr;
-  u32 tmrstart;
+  u32 tmrstart = 0;
   
   if( !ELUA_UIP_IS_SOCK_OK( s ) )
     return -1;
