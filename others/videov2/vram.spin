@@ -13,7 +13,7 @@ CON
     RAM_CLK_MASK            = 1 << RAM_CLK_PIN    
     VBUF_PIN                = 4
     VBUF_MSK                = 1 << VBUF_PIN    
-    TEMP_PIN                = 6
+    TEMP_PIN                = 5
     TEMP_PIN_MASK           = 1 << TEMP_PIN
 
     VMEM_SIZE_LONGS         = (80 * 30 * 2) / 4
