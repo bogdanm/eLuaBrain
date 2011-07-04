@@ -10,7 +10,7 @@ OBJ
         vram    : "vram"
         serial  : "serial"
 
-PUB main|tmp, ramcnt, i
+PUB main|tmp
         
         ' Start components                    
         vga.start(16, @screen, @screen2, @cursor, @sync)
@@ -26,4 +26,4 @@ DAT
         screen          word    $0720[CHAR_W*CHAR_H]
         screen2         word    $0720[CHAR_W*CHAR_H]
         cursor          byte    0,0,%010,0
-        sync            long    0                                                                               
+        sync            long    0

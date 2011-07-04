@@ -109,6 +109,12 @@ int platform_init()
 
   cmn_platform_init();
 
+  // Setup the nRF UART
+  // NOTE: this should happen BEFORE vram_transfer_init
+  platform_uart_setup( NRF_UART_ID, 115200, 8, PLATFORM_UART_PARITY_NONE, PLATFORM_UART_STOPBITS_1 );
+  platform_uart_set_flow_control( NRF_UART_ID, NRF_FLOW_CONTROL );
+  platform_uart_set_buffer( NRF_UART_ID, NRF_BUFFER_SIZE );
+
 #ifdef BUILD_VRAM
   vram_transfer_init();
 #endif  
@@ -1477,9 +1483,6 @@ static void eth_init()
   static struct uip_eth_addr sTempAddr;
   unsigned i;
 
-  // [REMOVE]
-  platform_uart_setup( 0, 115200, 8, PLATFORM_UART_PARITY_NONE, PLATFORM_UART_STOPBITS_1 );
-  
   // Initialize the MAC first
   static const u8 macaddr[] = ENC28J60_MAC_ADDRESS;
   initMAC( macaddr );

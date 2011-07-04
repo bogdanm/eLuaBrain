@@ -16,7 +16,7 @@
  RR20090817  _rr003   Add mode bit 4 (add LF after CR), remove some calls
  RR20090818  _rr004   Remove mode bit 4 (add LF after CR) as per Dr_Acula
 
-Adapted by BogdanM for STMBrain: added hardware flow control, moved pin declaration to compile time 
+Adapted by BogdanM for STMBrain: added hardware flow control (CTS only for now), moved pin declaration to compile time 
 }
 
 CON

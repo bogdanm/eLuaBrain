@@ -1,17 +1,28 @@
 ------------------------------------------------------------------------------
 New configuration:
 
+Video:
 Pin         On STM32          On Propeller
 MISO        PB14              PA1
 MOSI        PB15              PA2
 CLK         PB13              PA3
 Prop.reset  PB12              Reset (with pull-down resistor)
 
+
+Serial:
+Pin         On STM32          On Propeller
+UART2.RX    PA3               PA6 (TX) 
+UART2.TX    PA2               PA7 (RX)
+UART2.RTS   PA1               PA8 (CTS)
+UART2.CTS   PA0               PA9 (RTS)
+
+nRF:
+
 vram.spin also uses PA4 and PA5 (PA5 is for signaling only)
 P16-P23 are used by the VGA interface
 P28-P29 are used by the I2C EEPROM
 P30-P31 are used by the on-board bootloader (but are still available)
-Free propeller pins: PA6-PA15, P24-P27
+Free propeller pins: PA10-PA15, P24-P27
 
 Keyboard:
 DATA        PG13 with 4k7 pullup to +5V
@@ -40,4 +51,5 @@ Removed R112 to R116 (joystick pullups)
 Removed C95 to C99 (joystick debounce filters)
 Removed R35 and R37 (Flash CS and Flash MISO)
 Removed R67 and R68 (connections to audio DAC)
+Removed R29 and R30 (UART2RX/CTS, now connected directly to the propeller)
 

@@ -38,6 +38,10 @@
 #define MMCFS_SDIO_STM32
 #define RFS_TRANSPORT_UDP
 
+#define NRF_UART_ID           1
+#define NRF_BUFFER_SIZE       BUF_SIZE_1024
+#define NRF_FLOW_CONTROL      ( PLATFORM_UART_FLOW_RTS | PLATFORM_UART_FLOW_CTS )
+
 // *****************************************************************************
 // UART/Timer IDs configuration data (used in main.c)
 
