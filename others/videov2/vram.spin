@@ -1,5 +1,5 @@
 {{
-Video RAM engine
+Video RAM engine by BogdanM
 Uses the SPI engine by Beau Schwabe, optimized for speed
 }}
 

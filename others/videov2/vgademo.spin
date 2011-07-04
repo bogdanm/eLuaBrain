@@ -8,15 +8,18 @@ CON
 OBJ
         vga     : "vgacolour"
         vram    : "vram"
+        serial  : "serial"
 
 PUB main|tmp, ramcnt, i
         
         ' Start components                    
         vga.start(16, @screen, @screen2, @cursor, @sync)
         vram.start(@sync, @screen, @screen2, @cursor)
+        serial.start(115200)
                 
         repeat
-          waitcnt(10)
+          tmp := serial.rx
+          serial.tx( tmp )
 
 
 DAT
