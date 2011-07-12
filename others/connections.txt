@@ -17,6 +17,10 @@ UART2.RTS   PA1               PA8 (CTS)
 UART2.CTS   PA0               PA9 (RTS)
 
 nRF:
+Pin         On nRF module     On Propeller       
+MOSI                          10
+MISO                          11
+CLK                           12
 
 vram.spin also uses PA4 and PA5 (PA5 is for signaling only)
 P16-P23 are used by the VGA interface
