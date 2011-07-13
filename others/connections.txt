@@ -16,23 +16,23 @@ UART2.TX    PA2               PA7 (RX)
 UART2.RTS   PA1               PA8 (CTS)
 UART2.CTS   PA0               PA9 (RTS)
 
-nRF to Propeller (TODO):
-Pin         On nRF module     On Propeller       
-MOSI        6                 PA10
-MISO        7                 PA11
-CLK         5                 PA12
-
-nRF to STM32 (TODO):
+nRF module connections:
 Pin         On nRF module     On STM32
-CE          3                 PG11 
-CSN         4                 PG12
-IRQ         8                 PG8
+GND         1                 GND
+VCC         2                 +3.3V from own regulator
+CE          3                 STM32 -> PG11 
+CSN         4                 STM32 -> PG12
+SCK         5                 Propeller PA12 (17)
+MOSI        6                 Propeller PA10 (15)
+MISO        7                 Propeller PA11 (16)
+IRQ         8                 STM32 -> PG8
 
 vram.spin also uses PA4 and PA5 (PA5 is for signaling only)
 P16-P23 are used by the VGA interface
 P28-P29 are used by the I2C EEPROM
 P30-P31 are used by the on-board bootloader (but are still available)
-Free propeller pins: PA10-PA15, P24-P27
+P10-P12 are used by nRF24L01
+Free propeller pins: PA13-PA15, P24-P27
 
 Keyboard:
 DATA        PG13 with 4k7 pullup to +5V
@@ -62,7 +62,7 @@ Removed C95 to C99 (joystick debounce filters)
 Removed R35 and R37 (Flash CS and Flash MISO)
 Removed R67 and R68 (connections to audio DAC)
 Removed R29 and R30 (UART2RX/CTS, now connected directly to the propeller)
-TODO: Removed R106 (user buttton), frees PG8
-TODO: Removed R128 (DAC powerdown), frees PG11
-TODO: Removed R77 (LCD CS), frees PG12
+Removed R106 (user buttton), frees PG8
+Removed R128 (DAC powerdown), frees PG11
+Removed R77 (LCD CS), frees PG12
 
