@@ -71,12 +71,13 @@ send          rcl       t1,     #1            wc        '' MSB in carry bit
               xor       outa,   clk_mask                '' send bit
               shl       t4,     #1                      '' prepare position for new bit from device
               nop                                       '' a bit more delay (maybe not needed?)
+              nop
               xor       outa,   clk_mask                '' read bit edge (falling)
               test      ina,    miso_mask     wz        '' bit set?
               muxnz     t4,     #1
               djnz      t3,     #send
               '' Done with write/read cycle, send data back to spin
-              add       t2,     #4                      '' slip argument, write back data
+              add       t2,     #4                      '' skip argument, write back data
               wrlong    t4,     t2                      
               wrlong    zero,   par                     '' signal end of operation                                                                                      
 NotUsed_      jmp       #loop
