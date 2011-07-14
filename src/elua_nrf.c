@@ -12,6 +12,8 @@
 
 void nrf_ll_init( void )
 {
+  unsigned i;
+
   // GPIO configuration
   nrf_ll_ce_low();
   nrf_ll_csn_high();
@@ -20,7 +22,10 @@ void nrf_ll_init( void )
   platform_pio_op( NRF24L01_IRQ_PORT, 1 << NRF24L01_IRQ_PIN, PLATFORM_IO_PIN_DIR_INPUT );
   // UART configuration is already done in platform.c
   // Empty UART buffer
-  while( platform_uart_recv( NRF24L01_UART_ID, 0, 0 ) != -1 );
+  i = 0;
+  while( platform_uart_recv( NRF24L01_UART_ID, 0, 0 ) != -1 )
+    i++;
+  printf( "nrf_ll_init() flushed %d bytes\n", i );
 }
 
 void nrf_ll_set_ce( int state )
@@ -53,7 +58,7 @@ void nrf_ll_read_packet( u8 *packet, u16 len )
 
   for( i = 0; i < len; i ++ )
   {
-    data = platform_uart_recv( NRF24L01_UART_ID, 0, 0 );
+    data = platform_uart_recv( NRF24L01_UART_ID, 0, NRF24L01_TIMEOUT );
     if( data == -1 )
       printf( "INVALID DATA RECEIVED ON NRF_LL_READ_PACKET!\n" );
     packet[ i ] = data;
@@ -67,7 +72,7 @@ void nrf_ll_flush( u16 len )
 
   for( i = 0; i < len; i ++ )
   {
-    data = platform_uart_recv( NRF24L01_UART_ID, 0, 0 );
+    data = platform_uart_recv( NRF24L01_UART_ID, 0, NRF24L01_TIMEOUT );
     if( data == -1 )
       printf( "INVALID DATA RECEIVED ON NRF_LL_FLUSH!\n" );
   }

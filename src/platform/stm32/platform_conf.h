@@ -205,6 +205,7 @@
 #define NRF24L01_UART_ID      1
 #define NRF24L01_BUF_SIZE     BUF_SIZE_1024
 #define NRF24L01_TMR_ID       0 // [TODO] change this?
+#define NRF24L01_TIMEOUT      100000
 
 // Sound resources
 #define SND_PWM_ID            1          

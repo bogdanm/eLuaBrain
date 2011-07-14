@@ -455,6 +455,7 @@ int vram_get_cursor()
     case VRAM_CURSOR_LINE_BLINK:
       return TERM_CURSOR_UNDERLINE;
   }
+  return TERM_CURSOR_OFF;
 }
 
 // Enable/disable paging
@@ -555,8 +556,8 @@ void vram_set_last_line( int line )
 
 void vram_change_attr( unsigned x, unsigned y, unsigned len, int newfg, int newbg )
 {
-  u8 *pdata = VRAM_CHARADDR8( x, y );
-  u8 newcol = VRAM_MKCOL( newfg, newbg );
+  char *pdata = VRAM_CHARADDR8( x, y );
+  char newcol = VRAM_MKCOL( newfg, newbg );
   unsigned i;
   
   for( i = 0; i < len; i ++, pdata += 2 )

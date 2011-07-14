@@ -46,7 +46,8 @@ PUB start : okay
     outa[NRF_SPI_CLK]~
     dira[NRF_SPI_MOSI]~~
     dira[NRF_SPI_CLK]~~
-    dira[NRF_SPI_MISO]~    
+    dira[NRF_SPI_MISO]~
+    command := 0    
     okay := cog := cognew(@loop, @command) + 1
     
 PUB stop
@@ -56,7 +57,7 @@ PUB stop
     command := 0
     
 '################################################################################################################
-DAT           org
+DAT           org       0
 '  
 '' SPI Engine - main loop
 '
