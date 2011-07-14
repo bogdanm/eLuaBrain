@@ -111,9 +111,9 @@ int platform_init()
 
   // Setup the nRF UART
   // NOTE: this should happen BEFORE vram_transfer_init
-  platform_uart_setup( NRF_UART_ID, 115200, 8, PLATFORM_UART_PARITY_NONE, PLATFORM_UART_STOPBITS_1 );
-  platform_uart_set_flow_control( NRF_UART_ID, NRF_FLOW_CONTROL );
-  platform_uart_set_buffer( NRF_UART_ID, NRF_BUFFER_SIZE );
+  platform_uart_setup( NRF24L01_UART_ID, 115200, 8, PLATFORM_UART_PARITY_NONE, PLATFORM_UART_STOPBITS_1 );
+  platform_uart_set_flow_control( NRF24L01_UART_ID, PLATFORM_UART_FLOW_RTS | PLATFORM_UART_FLOW_CTS );
+  platform_uart_set_buffer( NRF24L01_UART_ID, NRF24L01_BUF_SIZE );
 
 #ifdef BUILD_VRAM
   vram_transfer_init();

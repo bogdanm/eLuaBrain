@@ -9,6 +9,7 @@
 #include "stm32f10x.h"
 #include "elua_int.h"
 #include "sermux.h"
+#include "buf.h"
 
 // *****************************************************************************
 // Define here what components you want for this platform
@@ -34,13 +35,10 @@
 #define BUILD_PS2
 #define ENABLE_ENC
 #define BUILD_ENC28J60
+#define BUILD_NRF
 
 #define MMCFS_SDIO_STM32
 #define RFS_TRANSPORT_UDP
-
-#define NRF_UART_ID           1
-#define NRF_BUFFER_SIZE       BUF_SIZE_1024
-#define NRF_FLOW_CONTROL      ( PLATFORM_UART_FLOW_RTS | PLATFORM_UART_FLOW_CTS )
 
 // *****************************************************************************
 // UART/Timer IDs configuration data (used in main.c)
@@ -196,6 +194,17 @@
 #define ENC28J60_RESET_PIN    13
 #define ENC28J60_INT_PORT     6
 #define ENC28J60_INT_PIN      7
+
+// nRF24L01 configuration
+#define NRF24L01_CE_PORT      6
+#define NRF24L01_CE_PIN       11 
+#define NRF24L01_CSN_PORT     6
+#define NRF24L01_CSN_PIN      12
+#define NRF24L01_IRQ_PORT     6
+#define NRF24L01_IRQ_PIN      8
+#define NRF24L01_UART_ID      1
+#define NRF24L01_BUF_SIZE     BUF_SIZE_1024
+#define NRF24L01_TMR_ID       0 // [TODO] change this?
 
 // Sound resources
 #define SND_PWM_ID            1          
