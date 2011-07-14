@@ -33,26 +33,114 @@
 #define NRF_REG_RX_ADDR_P4    0x0E
 #define NRF_REG_RX_ADDR_P5    0x0F
 #define NRF_REG_RX_ADDR( n )  ( ( n ) + NRF_REG_RX_ADDR_P0 )
-#define NRF_REG_RX_ADDR       0x10
+#define NRF_REG_TX_ADDR       0x10
 #define NRF_REG_RX_PW_P0      0x11
 #define NRF_REG_RX_PW_P1      0x12
 #define NRF_REG_RX_PW_P2      0x13
 #define NRF_REG_RX_PW_P3      0x14
 #define NRF_REG_RX_PW_P4      0x15
 #define NRF_REG_RX_PW_P5      0x16
-#define NRF_REG_RW_PW( n )    ( ( n ) + NRF_REG_RX_PW_P0 )
+#define NRF_REG_RX_PW( n )    ( ( n ) + NRF_REG_RX_PW_P0 )
 #define NRF_REG_FIFO_STATUS   0x17
 
-// Status register (mask, shift) pairs
-#define NRF_STAT_TX_FULL_M    1
-#define NRF_STAT_TX_FULL_S    0
-#define NRF_STAT_RX_P_NO_M    7
-#define NRF_STAT_RX_P_NO_S    1
-#
+// CONFIG reg constants
+#define NRF_CONFIG_CRC_1BYTE  0
+#define NRF_CONFIG_CRC_2BYTES 1
+#define NRF_CONFIG_MODE_PTX   0
+#define NRF_CONFIG_MODE_PRX   1
 
-// Configuration data
-#define NRF_CFG_PAYLOAD_SIZE  32
-#define NRF_CFG_ADDR_SIZE     5
+// STAT reg constants
+#define NRF_STAT_RX_P_NONE    6
+#define NRF_STAT_RX_P_EMPTY   7
+
+// SETUP_AW reg constants
+#define NRF_SETUP_AW_SIZE_3   1
+#define NRF_SETUP_AW_SIZE_4   2
+#define NRF_SETUP_AW_SIZE_5   3
+
+// RF_SETUP reg constants
+#define NRF_RF_SETUP_DR_1MBPS 0
+#define NRF_RF_SETUP_DR_2MBPS 1
+#define NRF_RF_SETUP_PWR_0    3
+#define NRF_RF_SETUP_PWR_M6   2
+#define NRF_RF_SETUP_PWR_M12  1
+#define NRF_RF_SETUP_PWR_M18  0
+
+// Other constants
+#define NRF_PAYLOAD_SIZE      32
+
+// CONFIG register
+typedef union
+{
+  u8 val;
+  struct
+  {
+    unsigned reserved : 1;
+    unsigned mask_rx_dr : 1;
+    unsigned mask_tx_ds : 1;
+    unsigned mask_max_rt : 1;
+    unsigned en_crc : 1;
+    unsigned crco : 1;
+    unsigned pwr_up : 1;
+    unsigned prim_rx : 1;
+  } fields;
+} nrf_config_reg_t;
+
+// STAT register
+typedef union
+{
+  u8 val;
+  struct 
+  {
+    unsigned reserved : 1;
+    unsigned rx_dr : 1;
+    unsigned tx_ds : 1;
+    unsigned max_rt : 1;
+    unsigned rx_p_no : 3;
+    unsigned tx_full : 1;
+  } fields;
+} nrf_stat_reg_t;
+
+// SETUP_RETR register
+typedef union
+{
+  u8 val;
+  struct
+  {
+    unsigned ard : 4;
+    unsigned arc : 4;
+  } fields;
+} nrf_setup_retr_t;
+
+// RF_SETUP register
+typedef union
+{
+  u8 val;
+  struct
+  {
+    unsigned reserved : 3;
+    unsigned pll_lock : 1;
+    unsigned rf_dr : 1;
+    unsigned rf_pwr : 2;
+    unsigned lna_hcurr : 1;
+  } fields;
+} nrf_rf_setup_t;
+
+// FIFO_STATUS register
+typedef union
+{
+  u8 val;
+  struct
+  {
+    unsigned reserved : 1;
+    unsigned tx_reuse : 1;
+    unsigned tx_full : 1;
+    unsigned tx_empty : 1;
+    unsigned reserved2: 2;
+    unsigned rx_full : 1;
+    unsigned rx_empty : 1;
+  } fields;
+} nrf_fifo_status_t;
 
 // Basic nRF commands
 void nrf_read_register( u8 address, u8 *dataptr, u16 len );
@@ -63,16 +151,24 @@ void nrf_get_rx_payload( u8 *dataptr, u16 len );
 void nrf_write_tx_payload( const u8 *dataptr, u16 len );
 void nrf_flush_rx();
 void nrf_flush_tx();
-u8 nrf_get_status();
+nrf_stat_reg_t nrf_get_status();
 
 // Higher level nRF commands
-void nrf_set_rx_addr( u8 pipe, const u8* paddr );
+nrf_config_reg_t nrf_get_config();
+void nrf_set_config( nrf_config_reg_t conf );
+nrf_setup_retr_t nrf_get_setup_retr();
+void nrf_set_setup_retr( unsigned delay, unsigned count );
+nrf_rf_setup_t nrf_get_rf_setup();
+void nrf_set_rf_setup( int data_rate, int pwr, int lna );
+nrf_fifo_status_t nrf_get_fifo_status();
+
+void nrf_set_rx_addr( int pipe, const u8* paddr );
 void nrf_set_tx_addr( const u8 *paddr );
-void nrf_set_payload_size( u8 pipe, u8 size );
-void nrf_set_interrupt( 
+void nrf_set_payload_size( int pipe, u8 size );
 
 // Other public functions
 void nrf_init();
+void nrf_irq_handler();
 
 #endif
 
