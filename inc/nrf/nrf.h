@@ -161,8 +161,8 @@ void nrf_set_setup_retr( unsigned delay, unsigned count );
 nrf_rf_setup_t nrf_get_rf_setup();
 void nrf_set_rf_setup( int data_rate, int pwr, int lna );
 nrf_fifo_status_t nrf_get_fifo_status();
-
 void nrf_set_rx_addr( int pipe, const u8* paddr );
+void nrf_get_rx_addr( int pipe, u8 *addrbuf );
 void nrf_set_tx_addr( const u8 *paddr );
 void nrf_set_payload_size( int pipe, u8 size );
 

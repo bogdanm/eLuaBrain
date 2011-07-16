@@ -36,19 +36,14 @@ CON
 VAR
     long     cog, command
     
-PUB rw(data)|val
-    command := data << 24 + @data
+PUB rw(data):out|val
+    command := ( data << 24 ) + @val
     repeat while command
-    Result := val
+    out := val
     
 PUB start : okay
-    outa[NRF_SPI_MOSI]~
-    outa[NRF_SPI_CLK]~
-    dira[NRF_SPI_MOSI]~~
-    dira[NRF_SPI_CLK]~~
-    dira[NRF_SPI_MISO]~
-    command := 0    
-    okay := cog := cognew(@loop, @command) + 1
+    command := 0                                                                                                                                  
+    okay := cog := cognew(@spientry, @command) + 1
     
 PUB stop
 '' Stop SPI Engine - frees a cog
@@ -60,7 +55,13 @@ PUB stop
 DAT           org       0
 '  
 '' SPI Engine - main loop
-'
+
+spientry      mov       t1,     mosi_mask               '' setup pins
+              or        t1,     clk_mask      wz        '' t1 has masks for MOSI and SCK now, z is 0
+              muxz      outa,   t1
+              muxnz     dira,   t1              
+              mov       t1,     miso_mask               '' MISO is an input
+              muxz      dira,   t1
 loop          rdlong    t1,     par           wz        '' wait for command
         if_z  jmp       #loop           
               mov       t2,     t1
@@ -71,15 +72,12 @@ send          rcl       t1,     #1            wc        '' MSB in carry bit
               muxc      outa,   mosi_mask
               xor       outa,   clk_mask                '' send bit
               shl       t4,     #1                      '' prepare position for new bit from device
-              nop                                       '' a bit more delay (maybe not needed?)
-              nop
-              xor       outa,   clk_mask                '' read bit edge (falling)
-              test      ina,    miso_mask     wz        '' bit set?
+              test      miso_mask, ina        wz        '' bit set?
               muxnz     t4,     #1
-              djnz      t3,     #send
-              '' Done with write/read cycle, send data back to spin
-              add       t2,     #4                      '' skip argument, write back data
-              wrlong    t4,     t2                      
+              xor       outa,   clk_mask                '' read bit edge (falling)
+              djnz      t3,     #send            
+              '' Done with write/read cycle, send data back to spin code
+              wrlong    t4,     t2               
               wrlong    zero,   par                     '' signal end of operation                                                                                      
 NotUsed_      jmp       #loop
 

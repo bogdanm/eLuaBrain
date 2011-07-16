@@ -24,15 +24,8 @@ static void nrfh_generic_read( u8 cmd, u8 *dataptr, u16 len )
 {
   nrf_ll_csn_low();
   nrfh_ll_send_byte( cmd );
-  // Special case: if called with len == 0 return the response to command
-  // (this is used for NOP to return the status register)
-  if( len > 0 )
-  {
-    nrf_ll_flush( 1 );
-    nrf_ll_read_packet( dataptr, len );
-  }
-  else
-    nrf_ll_read_packet( dataptr, 1 );
+  nrf_ll_flush( 1 );
+  nrf_ll_read_packet( dataptr, len );
   nrf_ll_csn_high();
 }
 
@@ -42,8 +35,8 @@ static void nrfh_generic_write( u8 cmd, const u8  *dataptr, u16 len )
   nrfh_ll_send_byte( cmd );
   if( len > 0 )
     nrf_ll_send_packet( dataptr, len );
+  nrf_ll_flush( len + 1 );    
   nrf_ll_csn_high();
-  nrf_ll_flush( len + 1 );
 }
 
 // ****************************************************************************
@@ -96,7 +89,7 @@ nrf_stat_reg_t nrf_get_status()
 {
   nrf_stat_reg_t r;
 
-  nrfh_generic_read( NRF_CMD_NOP, &r.val, 0 );
+  r.val = nrf_read_register_byte( NRF_REG_STATUS );
   return r;
 }
 
@@ -166,6 +159,11 @@ void nrf_set_rx_addr( int pipe, const u8* paddr )
   nrf_write_register( NRF_REG_RX_ADDR( pipe ), paddr, 5 ); 
 }
 
+void nrf_get_rx_addr( int pipe, u8 *addrbuf )
+{
+  nrf_read_register( NRF_REG_RX_ADDR( pipe ), addrbuf, 5 );
+}
+
 void nrf_set_tx_addr( const u8 *paddr )
 {
   nrf_write_register( NRF_REG_TX_ADDR, paddr, 5 );
@@ -182,13 +180,24 @@ void nrf_set_payload_size( int pipe, u8 size )
 // Initialize nRF interface
 void nrf_init()
 {
+  u8 t[5];
+  unsigned i, j;
+  
   // Do low-level setup first
   nrf_ll_init();
 
   printf( "STAT: %d\n", nrf_read_register_byte( NRF_REG_STATUS ) );
   printf( "CONFIG: %d\n", nrf_read_register_byte( NRF_REG_CONFIG ) );
+  printf( "ADDRESSES: \n");
+  for( i = 0; i < 2; i ++ )
+  {
+    printf( "  %d -> ", i );
+    nrf_get_rx_addr( i, t );
+    for( j = 0; j < 5; j ++ )
+      printf( "%02X%s", t[ j ], j == 4 ? "\n" : ":" );
+  }
 
-#if 0
+#if 1
   // Setup the actual nRF configuration now
   // Enable 'auto acknowledgement' function on all pipes
   nrf_write_register_byte( NRF_REG_EN_AA, 0x3F );
@@ -221,6 +230,18 @@ void nrf_init()
   // Power up, transmitter, 2 bytes CRC, interrupts disabled
   nrf_write_register_byte( NRF_REG_CONFIG, 0x0E );
 #endif  
+
+  // Power up, transmitter, 2 bytes CRC, interrupts disabled
+  printf( "\nAFTER\n\nSTAT: %d\n", nrf_read_register_byte( NRF_REG_STATUS ) );
+  printf( "CONFIG: %d\n", nrf_read_register_byte( NRF_REG_CONFIG ) );
+  printf( "ADDRESSES: \n");
+  for( i = 0; i < 2; i ++ )
+  {
+    printf( "  %d -> ", i );
+    nrf_get_rx_addr( i, t );
+    for( j = 0; j < 5; j ++ )
+      printf( "%02X%s", t[ j ], j == 4 ? "\n" : ":" );
+  }
 }
 
 // nRF IRQ handler

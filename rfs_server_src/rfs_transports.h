@@ -20,3 +20,4 @@ extern const RFS_TRANSPORT_DATA ser_transport_data;
 extern u8 rfs_buffer[ MAX_PACKET_SIZE + ELUARPC_WRITE_REQUEST_EXTRA ];
 
 #endif
+

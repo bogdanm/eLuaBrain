@@ -1457,6 +1457,7 @@ static void vram_transfer_init()
   // Now it's a good time to get the Propeller out of reset
   platform_pio_op( PROP_RESET_PORT, 1 << PROP_RESET_PIN, PLATFORM_IO_PIN_SET );  
   platform_pio_op( PROP_RESET_PORT, 1 << PROP_RESET_PIN, PLATFORM_IO_PIN_DIR_OUTPUT );
+  platform_timer_delay( 0, 1000000 );
 }
 
 // ****************************************************************************

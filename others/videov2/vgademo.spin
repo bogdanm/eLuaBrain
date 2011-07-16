@@ -3,7 +3,7 @@ CON
         _clkmode                = xtal1 + pll16x                ' System clock is 80MHz
 
          CHAR_W                 = 80
-         CHAR_H                 = 30
+         CHAR_H                 = 30   
 
 OBJ
         vga     : "vgacolour"
@@ -18,11 +18,13 @@ PUB main|tmp
         vram.start(@sync, @screen, @screen2, @cursor)
         serial.start(115200)
         spi.start
-                        
+
         repeat
           tmp := serial.rx
+          outa[ serial#RTS_PIN] := 1
           tmp := spi.rw( tmp )
           serial.tx( tmp )
+          outa[ serial#RTS_PIN] := 0
 
 
 DAT
