@@ -13,6 +13,9 @@
 #define NRF_CMD_FLUSH_TX      0xE1
 #define NRF_CMD_FLUSH_RX      0xE2
 #define NRF_CMD_REUSE_TX_PL   0xE3
+#define NRF_CMD_ACTIVATE      0x50
+#define NRF_CMD_R_RX_PL_WID   0x60
+#define NRF_CMD_W_ACK_PAYLOAD 0xA8
 #define NRF_CMD_NOP           0xFF
 
 // Register addresses
@@ -42,6 +45,8 @@
 #define NRF_REG_RX_PW_P5      0x16
 #define NRF_REG_RX_PW( n )    ( ( n ) + NRF_REG_RX_PW_P0 )
 #define NRF_REG_FIFO_STATUS   0x17
+#define NRF_REG_DYNPD         0x1C
+#define NRF_REG_FEATURE       0x1D
 
 // CONFIG reg constants
 #define NRF_CONFIG_CRC_1BYTE  0
@@ -161,6 +166,9 @@ void nrf_write_tx_payload( const u8 *dataptr, u16 len );
 void nrf_flush_rx();
 void nrf_flush_tx();
 nrf_stat_reg_t nrf_get_status();
+void nrf_activate();
+int nrf_get_payload_size();
+void nrf_write_ack_payload( const u8 *dataptr, u16 len );
 
 // Higher level nRF commands
 nrf_config_reg_t nrf_get_config();

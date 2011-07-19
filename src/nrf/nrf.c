@@ -45,6 +45,14 @@ static void nrfh_generic_read( u8 cmd, u8 *dataptr, u16 len )
   nrf_ll_csn_high();
 }
 
+static u8 nrfh_generic_read_byte( u8 cmd )
+{
+  u8 data;
+
+  nrfh_generic_read( cmd, &data, 1 );
+  return data;
+}
+
 static void nrfh_generic_write( u8 cmd, const u8  *dataptr, u16 len )
 {
   nrf_ll_csn_low();
@@ -53,6 +61,11 @@ static void nrfh_generic_write( u8 cmd, const u8  *dataptr, u16 len )
     nrf_ll_send_packet( dataptr, len );
   nrf_ll_flush( len + 1 );    
   nrf_ll_csn_high();
+}
+
+static void nrfh_generic_write_byte( u8 cmd, u8 data )
+{
+  nrfh_generic_write( cmd, &data, 1 );
 }
 
 // LFSR based pseudo RNG from http://en.wikipedia.org/wiki/Linear_feedback_shift_register
@@ -114,6 +127,21 @@ nrf_stat_reg_t nrf_get_status()
 
   r.val = nrf_read_register_byte( NRF_REG_STATUS );
   return r;
+}
+
+void nrf_activate()
+{
+  nrfh_generic_write_byte( NRF_CMD_ACTIVATE, 0x73 );
+}
+
+int nrf_get_payload_size()
+{
+  return nrfh_generic_read_byte( NRF_CMD_R_RX_PL_WID );
+}
+
+void nrf_write_ack_payload( const u8 *dataptr, u16 len )
+{
+  nrfh_generic_write( NRF_CMD_W_ACK_PAYLOAD, dataptr, len );
 }
 
 // ****************************************************************************
@@ -222,15 +250,12 @@ int nrf_has_data()
 
 unsigned nrf_send_packet( const u8 *addr, const u8 *pdata, unsigned len )
 {
-  static u8 txdata[ NRF_PAYLOAD_SIZE ];
   nrf_stat_reg_t stat;
 
   nrf_set_mode( NRF_MODE_TX );
   nrf_set_tx_addr( addr );
   nrf_set_rx_addr( 0, addr );
-  memset( txdata, 0, NRF_PAYLOAD_SIZE );
-  memcpy( txdata, pdata, UMIN( len, NRF_PAYLOAD_SIZE ) );
-  nrf_write_tx_payload( txdata, NRF_PAYLOAD_SIZE );
+  nrf_write_tx_payload( pdata, UMIN( len, NRF_PAYLOAD_SIZE ) );
   nrf_ll_ce_high();
   nrf_ll_delay_us( 10 );
   nrf_ll_ce_low();
@@ -257,18 +282,17 @@ unsigned nrf_send_packet( const u8 *addr, const u8 *pdata, unsigned len )
 unsigned nrf_get_packet( u8 *pdata, unsigned maxlen, int *pipeno )
 {
   nrf_stat_reg_t stat;
-  static u8 rxdata[ NRF_PAYLOAD_SIZE ];
 
   maxlen = UMIN( maxlen, NRF_PAYLOAD_SIZE );
   stat = nrf_get_status();
   if( !stat.fields.rx_dr )
     return 0;
+  // [TODO] this should probably be repeated while the RX FIFO still 
+  // has data
   nrf_ll_ce_low();
   if( pipeno )
     *pipeno = stat.fields.rx_p_no;
-  memset( rxdata, 0, NRF_PAYLOAD_SIZE );
-  nrf_get_rx_payload( rxdata, NRF_PAYLOAD_SIZE );
-  memcpy( pdata, rxdata, maxlen );
+  nrf_get_rx_payload( pdata, UMIN( maxlen, nrf_get_payload_size() ) );
   nrf_clear_interrupt( NRF_INT_RX_DR_MASK );
   nrf_ll_ce_high();
   return maxlen;
@@ -322,16 +346,23 @@ void nrf_init()
   nrf_write_register_byte( NRF_REG_RF_CH, NRF_CFG_RF_CHANNEL );
   // RF setup (LNA is set to 1)
   nrf_set_rf_setup( NRF_CFG_DATA_RATE, NRF_CFG_TX_POWER, 1 );
-  // Setup pipe address(es)
+  // 'Activate' to enable some commands
+  nrf_activate(); 
+  // Enable dynamic payload length
+  // [TODO] this must be modified to 0x06 to enable payload with ack
+  nrf_write_register_byte( NRF_REG_FEATURE, 0x04 );
+  // Setup pipe(s)
 #ifdef NRF_CFG_PROFILE_SERVER
   // Enable the first two pipes
   nrf_write_register_byte( NRF_REG_EN_RXADDR, 0x03 );
   // Set addresses
   nrf_set_rx_addr( 0, nrf_p0_addr );
   nrf_set_rx_addr( 1, nrf_srv_p1_addr );
-  // Set payload size
+  // Set payload size (not sure if this is actually needed)
   nrf_set_payload_size( 0, NRF_PAYLOAD_SIZE );
   nrf_set_payload_size( 1, NRF_PAYLOAD_SIZE ); 
+  // Enable dynamic payload
+  nrf_write_register_byte( NRF_REG_DYNPD, 0x03 );
 #else // #ifdef NRF_CFG_PROFILE_SERVER
   // Enable the first pipe
   nrf_write_register_byte( NRF_REG_EN_RXADDR, 0x01 );
@@ -339,6 +370,8 @@ void nrf_init()
   nrf_set_client_address();
   // Set payload size
   nrf_set_payload_size( 0, NRF_PAYLOAD_SIZE );
+  // Enable dynamic payload
+  nrf_write_register_byte( NRF_REG_DYNPD, 0x01 );
 #endif // #ifdef NRF_CFG_PROFILE_SERVER
   // Finally set the CONFIG register
   // Power up, 2 bytes CRC, interrupts disabled
@@ -361,6 +394,7 @@ void nrf_init()
     for( j = 0; j < 5; j ++ )
       nrfprint( "%02X%s", t[ j ], j == 4 ? "\n" : ":" );
   }
+  nrfprint( "FEATURE: %d\n", nrf_read_register_byte( NRF_REG_FEATURE ) );
 }
 
 // nRF IRQ handler
