@@ -5,16 +5,13 @@
 int main()
 {  
   u8 c;
-  u16 i;
 
   uart_init();
   sei();
   while( 1 )
   {
-    //c = uart_getchar();
-    //uart_putchar( c );
-    uart_putchar( 'A' );
-    for( i = 0; i < 65535; i ++ ) nop2();
+    c = uart_getchar();
+    uart_putchar( c == ' ' ? c : ( c - 'a' + 13 ) % 26 + 'a' );
   }
   return 0;
 }
