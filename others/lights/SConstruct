@@ -1,8 +1,12 @@
+import platform
+
 # Project-specific data
 output = "lights"
 mcu = "atmega8"
-comport = '/dev/ttyUSB0'
-#comport = 'com5'
+if platform.system() == "Windows":
+  comport = 'com5'
+else:
+  comport = '/dev/ttyUSB0'
 local_include = "-Iinc -I../../inc/nrf"
 source_files = "main.c uart.c avr_nrf.c ../../src/nrf/nrf.c"
 local_libs = ""

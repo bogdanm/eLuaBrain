@@ -109,73 +109,22 @@ void nrf_flush_tx()
   nrfh_generic_write( NRF_CMD_FLUSH_TX, NULL, 0 );
 }
 
-nrf_stat_reg_t nrf_get_status()
+u8 nrf_get_status()
 {
-  nrf_stat_reg_t r;
-
-  r.val = nrf_read_register_byte( NRF_REG_STATUS );
-  return r;
+  return nrf_read_register_byte( NRF_REG_STATUS );
 }
 
 // ****************************************************************************
 // Higher level nRF commands
 
-nrf_config_reg_t nrf_get_config()
-{
-  nrf_config_reg_t data;
-
-  data.val = nrf_read_register_byte( NRF_REG_CONFIG );
-  return data;
-}
-
-void nrf_set_config( nrf_config_reg_t conf )
-{
-  nrf_write_register_byte( NRF_REG_CONFIG, conf.val );
-}
-
-nrf_setup_retr_t nrf_get_setup_retr()
-{
-  nrf_setup_retr_t data;
-
-  data.val = nrf_read_register_byte( NRF_REG_SETUP_RETR );
-  return data;
-}
-
 void nrf_set_setup_retr( unsigned delay, unsigned count )
 {
-  nrf_setup_retr_t data;
-
-  data.val = 0;
-  data.fields.ard = delay;
-  data.fields.arc = count;
-  nrf_write_register_byte( NRF_REG_SETUP_RETR, data.val );
-}
-
-nrf_rf_setup_t nrf_get_rf_setup()
-{
-  nrf_rf_setup_t data;
-
-  data.val = nrf_read_register_byte( NRF_REG_RF_SETUP );
-  return data;
+  nrf_write_register_byte( NRF_REG_SETUP_RETR, ( delay << 4 ) | count );
 }
 
 void nrf_set_rf_setup( int data_rate, int pwr, int lna )
 {
-  nrf_rf_setup_t data;
-
-  data.val = 0;
-  data.fields.rf_dr = data_rate;
-  data.fields.rf_pwr = pwr;
-  data.fields.lna_hcurr = lna;
-  nrf_write_register_byte( NRF_REG_RF_SETUP, data.val );
-}
-
-nrf_fifo_status_t nrf_get_fifo_status()
-{
-  nrf_fifo_status_t data;
-
-  data.val = nrf_read_register_byte( NRF_REG_FIFO_STATUS );
-  return data;
+  nrf_write_register_byte( NRF_REG_RF_SETUP, ( data_rate << 3 ) | ( pwr << 1 ) | lna );
 }
 
 void nrf_set_rx_addr( int pipe, const u8* paddr )
@@ -200,12 +149,9 @@ void nrf_set_payload_size( int pipe, u8 size )
 
 void nrf_set_mode( int mode )
 {
-  nrf_config_reg_t conf = nrf_get_config();
-
   if( mode == nrf_crt_mode )
     return;
-  conf.fields.prim_rx = mode;
-  nrf_set_config( conf );
+  nrf_write_register_byte( NRF_REG_CONFIG, ( nrf_read_register_byte( NRF_REG_CONFIG ) & 0xFE ) | mode );
   nrf_ll_set_ce( mode == NRF_MODE_RX ? 1 : 0 );
   nrf_set_rx_addr( 0, nrf_p0_addr );
   nrf_crt_mode = ( u8 )mode;
@@ -224,9 +170,8 @@ int nrf_has_data()
 unsigned nrf_send_packet( const u8 *addr, const u8 *pdata, unsigned len )
 {
   static u8 txdata[ NRF_PAYLOAD_SIZE ];
-  nrf_stat_reg_t stat;
+  u8 stat;
 
-  nrf_set_mode( NRF_MODE_TX );
   nrf_set_tx_addr( addr );
   nrf_set_rx_addr( 0, addr );
   memset( txdata, 0, NRF_PAYLOAD_SIZE );
@@ -239,14 +184,14 @@ unsigned nrf_send_packet( const u8 *addr, const u8 *pdata, unsigned len )
   while( 1 )
   {
     stat = nrf_get_status();
-    if( stat.fields.max_rt )
+    if( stat & NRF_INT_MAX_RT_MASK )
     {
       nrf_clear_interrupt( NRF_INT_MAX_RT_MASK );
       nrf_flush_tx();
       len = 0;
       break;
     }
-    if( stat.fields.tx_ds )
+    if( stat & NRF_INT_TX_DS_MASK )
     {
       nrf_clear_interrupt( NRF_INT_TX_DS_MASK );
       break;
@@ -257,16 +202,16 @@ unsigned nrf_send_packet( const u8 *addr, const u8 *pdata, unsigned len )
 
 unsigned nrf_get_packet( u8 *pdata, unsigned maxlen, int *pipeno )
 {
-  nrf_stat_reg_t stat;
+  u8 stat;
   static u8 rxdata[ NRF_PAYLOAD_SIZE ];
 
   maxlen = NRFMIN( maxlen, NRF_PAYLOAD_SIZE );
   stat = nrf_get_status();
-  if( !stat.fields.rx_dr )
+  if( ( stat & NRF_INT_RX_DR_MASK ) == 0 )
     return 0;
   nrf_ll_ce_low();
   if( pipeno )
-    *pipeno = stat.fields.rx_p_no;
+    *pipeno = ( stat >> 1 ) & 0x07;
   memset( rxdata, 0, NRF_PAYLOAD_SIZE );
   nrf_get_rx_payload( rxdata, NRF_PAYLOAD_SIZE );
   memcpy( pdata, rxdata, maxlen );
@@ -312,6 +257,8 @@ void nrf_init()
   }
 
   // Setup the actual nRF configuration now
+  // Put the chip in low power mode in order to access all its registers
+  nrf_write_register_byte( NRF_REG_CONFIG, 0x08 );
   // Enable 'auto acknowledgement' function on all pipes
   nrf_write_register_byte( NRF_REG_EN_AA, 0x3F );
   // 5 bytes for the address field
