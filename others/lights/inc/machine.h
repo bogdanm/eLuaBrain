@@ -4,18 +4,7 @@
 #define __MACHINE_H__
 
 #include <avr/io.h>
-
-//******************************************************************************
-// Data types
-
-typedef char s8;
-typedef unsigned char u8;
-typedef int s16;
-typedef unsigned int u16;
-typedef long s32;
-typedef unsigned long u32;
-typedef long long s64;
-typedef unsigned long long u64;
+#include "type.h"
 
 // *****************************************************************************
 // CPU clock (Hz)
@@ -35,6 +24,15 @@ typedef unsigned long long u64;
 #define UART_TMASK                        ( UART_TBUFSIZE - 1 )
 #define UART_INC_RX_BUFFER_IDX( x )       x = ( x + 1 ) & UART_RMASK
 #define UART_INC_TX_BUFFER_IDX( x )       x = ( x + 1 ) & UART_TMASK
+
+// *****************************************************************************
+// nRF definitions
+
+#define NRF_PORT_IN                       PIND 
+#define NRF_PORT_OUT                      PORTD
+#define NRF_PORT_DIR                      DDRD
+#define NRF_PIN_CE                        PD3
+#define NRF_PIN_IRQ                       PD2
 
 // *****************************************************************************
 // Other macros

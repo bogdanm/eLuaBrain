@@ -4,7 +4,6 @@
 #include "nrf.h"
 #include "nrf_ll.h"
 #include "nrf_conf.h"
-#include "utils.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -20,13 +19,15 @@ static u8 nrf_p0_addr[] = NRF_CLIENT_ADDR_POOL;
 static u8 nrf_crt_mode = 0xFF;
 static u32 nrf_lfsr = 1;
 
-#ifdef NRF_CFG_PROFILE_SERVER
+#ifdef NRF_DEBUG
 #define nrfprint              printf
 #else
 void nrfprint( const char *fmt, ... )
 {
 }
 #endif
+
+#define NRFMIN( x, y )        ( ( x ) < ( y ) ? ( x ) : ( y ) )
 
 // ****************************************************************************
 // Helpers
@@ -229,7 +230,7 @@ unsigned nrf_send_packet( const u8 *addr, const u8 *pdata, unsigned len )
   nrf_set_tx_addr( addr );
   nrf_set_rx_addr( 0, addr );
   memset( txdata, 0, NRF_PAYLOAD_SIZE );
-  memcpy( txdata, pdata, UMIN( len, NRF_PAYLOAD_SIZE ) );
+  memcpy( txdata, pdata, NRFMIN( len, NRF_PAYLOAD_SIZE ) );
   nrf_write_tx_payload( txdata, NRF_PAYLOAD_SIZE );
   nrf_ll_ce_high();
   nrf_ll_delay_us( 10 );
@@ -259,7 +260,7 @@ unsigned nrf_get_packet( u8 *pdata, unsigned maxlen, int *pipeno )
   nrf_stat_reg_t stat;
   static u8 rxdata[ NRF_PAYLOAD_SIZE ];
 
-  maxlen = UMIN( maxlen, NRF_PAYLOAD_SIZE );
+  maxlen = NRFMIN( maxlen, NRF_PAYLOAD_SIZE );
   stat = nrf_get_status();
   if( !stat.fields.rx_dr )
     return 0;

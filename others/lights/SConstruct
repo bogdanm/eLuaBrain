@@ -3,8 +3,8 @@ output = "lights"
 mcu = "atmega8"
 comport = '/dev/ttyUSB0'
 #comport = 'com5'
-local_include = "inc"
-source_files = "main.c uart.c"
+local_include = "-Iinc -I../../inc/nrf"
+source_files = "main.c uart.c avr_nrf.c ../../src/nrf/nrf.c"
 local_libs = ""
 avrdude = "avrdude"
 
@@ -37,7 +37,7 @@ else:
 #sys_include = os.path.join( basedir, "avr/include" )
 #cccom = "%s -I%s -I- -I%s -mmcu=%s -Os -mcall-prologues -c $SOURCE -o $TARGET" % ( compiler, local_include, sys_include, mcu )
 #cccom = "%s -I%s -iquote %s -mmcu=%s -O4 -Os -c $SOURCE -o $TARGET" % ( compiler, local_include, sys_include, mcu )
-cccom = "%s -I%s -Wall -mmcu=%s -Os -ffunction-sections -fdata-sections -mcall-prologues -Wall -c $SOURCE -o $TARGET" % ( compiler, local_include, mcu )
+cccom = "%s %s -Wall -mmcu=%s -Os -ffunction-sections -fdata-sections -mcall-prologues -Wall -c $SOURCE -o $TARGET" % ( compiler, local_include, mcu )
 
 # Linker-related data
 linkcom = "%s -mmcu=%s -Wl,--gc-sections -o $TARGET $SOURCES %s" % ( linker, mcu, local_libs )
