@@ -4,13 +4,29 @@
 #include "nrf.h"
 #include "nrf_ll.h"
 #include "nrf_conf.h"
+#include "utils.h"
 #include <stdio.h>
+#include <string.h>
 
 // ****************************************************************************
 // Local variables and definitions
 
-static const u8 nrf_srv_p0_addr[] = NRF_CFG_SRV_PIPE0_ADDR;
+#ifdef NRF_CFG_PROFILE_SERVER
+static u8 nrf_p0_addr[] = NRF_CFG_SRV_PIPE0_ADDR;
 static const u8 nrf_srv_p1_addr[] = NRF_CFG_SRV_PIPE1_ADDR;
+#else // #ifdef NRF_CFG_PROFILE_SERVER
+static u8 nrf_p0_addr[] = NRF_CLIENT_ADDR_POOL;
+#endif // #ifdef NRF_CFG_PROFILE_SERVER
+static u8 nrf_crt_mode = 0xFF;
+static u32 nrf_lfsr = 1;
+
+#ifdef NRF_CFG_PROFILE_SERVER
+#define nrfprint              printf
+#else
+void nrfprint( const char *fmt, ... )
+{
+}
+#endif
 
 // ****************************************************************************
 // Helpers
@@ -37,6 +53,13 @@ static void nrfh_generic_write( u8 cmd, const u8  *dataptr, u16 len )
     nrf_ll_send_packet( dataptr, len );
   nrf_ll_flush( len + 1 );    
   nrf_ll_csn_high();
+}
+
+// LFSR based pseudo RNG from http://en.wikipedia.org/wiki/Linear_feedback_shift_register
+static u32 nrfh_rand()
+{
+  nrf_lfsr = ( nrf_lfsr >> 1 ) ^ ( -( nrf_lfsr & 1u ) & 0xD0000001u ); 
+  return nrf_lfsr;
 }
 
 // ****************************************************************************
@@ -174,6 +197,96 @@ void nrf_set_payload_size( int pipe, u8 size )
   nrf_write_register_byte( NRF_REG_RX_PW( pipe ), size );
 }
 
+void nrf_set_mode( int mode )
+{
+  nrf_config_reg_t conf = nrf_get_config();
+
+  if( mode == nrf_crt_mode )
+    return;
+  conf.fields.prim_rx = mode;
+  nrf_set_config( conf );
+  nrf_ll_set_ce( mode == NRF_MODE_RX ? 1 : 0 );
+  nrf_set_rx_addr( 0, nrf_p0_addr );
+  nrf_crt_mode = ( u8 )mode;
+}
+
+void nrf_clear_interrupt( u8 mask )
+{
+  nrf_write_register_byte( NRF_REG_STATUS, mask );
+}
+
+int nrf_has_data()
+{
+  return ( nrf_read_register_byte( NRF_REG_STATUS ) & NRF_INT_RX_DR_MASK ) != 0;
+}
+
+unsigned nrf_send_packet( const u8 *addr, const u8 *pdata, unsigned len )
+{
+  static u8 txdata[ NRF_PAYLOAD_SIZE ];
+  nrf_stat_reg_t stat;
+
+  nrf_set_mode( NRF_MODE_TX );
+  nrf_set_tx_addr( addr );
+  nrf_set_rx_addr( 0, addr );
+  memset( txdata, 0, NRF_PAYLOAD_SIZE );
+  memcpy( txdata, pdata, UMIN( len, NRF_PAYLOAD_SIZE ) );
+  nrf_write_tx_payload( txdata, NRF_PAYLOAD_SIZE );
+  nrf_ll_ce_high();
+  nrf_ll_delay_us( 10 );
+  nrf_ll_ce_low();
+  // [TODO] change this when interrupts will be used
+  while( 1 )
+  {
+    stat = nrf_get_status();
+    if( stat.fields.max_rt )
+    {
+      nrf_clear_interrupt( NRF_INT_MAX_RT_MASK );
+      nrf_flush_tx();
+      len = 0;
+      break;
+    }
+    if( stat.fields.tx_ds )
+    {
+      nrf_clear_interrupt( NRF_INT_TX_DS_MASK );
+      break;
+    }
+  }
+  return len;
+}
+
+unsigned nrf_get_packet( u8 *pdata, unsigned maxlen, int *pipeno )
+{
+  nrf_stat_reg_t stat;
+  static u8 rxdata[ NRF_PAYLOAD_SIZE ];
+
+  maxlen = UMIN( maxlen, NRF_PAYLOAD_SIZE );
+  stat = nrf_get_status();
+  if( !stat.fields.rx_dr )
+    return 0;
+  nrf_ll_ce_low();
+  if( pipeno )
+    *pipeno = stat.fields.rx_p_no;
+  memset( rxdata, 0, NRF_PAYLOAD_SIZE );
+  nrf_get_rx_payload( rxdata, NRF_PAYLOAD_SIZE );
+  memcpy( pdata, rxdata, maxlen );
+  nrf_clear_interrupt( NRF_INT_RX_DR_MASK );
+  nrf_ll_ce_high();
+  return maxlen;
+}
+
+// Sets a random address for the client
+void nrf_set_client_address()
+{
+  u8 i, limit = nrf_p0_addr[ 0 ];
+
+  limit += nrf_p0_addr[ 1 ];
+  for( i = 0; i < limit; i ++ )
+    nrfh_rand();
+  for( i = 2; i < 5; i ++ )
+    nrf_p0_addr[ i ] = nrfh_rand() & 0xFF;
+  nrf_set_rx_addr( 0, nrf_p0_addr );
+}
+
 // ****************************************************************************
 // Other public functions
 
@@ -186,25 +299,25 @@ void nrf_init()
   // Do low-level setup first
   nrf_ll_init();
 
-  printf( "STAT: %d\n", nrf_read_register_byte( NRF_REG_STATUS ) );
-  printf( "CONFIG: %d\n", nrf_read_register_byte( NRF_REG_CONFIG ) );
-  printf( "ADDRESSES: \n");
+  nrfprint( "STAT: %d\n", nrf_read_register_byte( NRF_REG_STATUS ) );
+  nrfprint( "CONFIG: %d\n", nrf_read_register_byte( NRF_REG_CONFIG ) );
+  nrfprint( "ADDRESSES: \n");
   for( i = 0; i < 2; i ++ )
   {
-    printf( "  %d -> ", i );
+    nrfprint( "  %d -> ", i );
     nrf_get_rx_addr( i, t );
     for( j = 0; j < 5; j ++ )
-      printf( "%02X%s", t[ j ], j == 4 ? "\n" : ":" );
+      nrfprint( "%02X%s", t[ j ], j == 4 ? "\n" : ":" );
   }
 
-#if 1
   // Setup the actual nRF configuration now
   // Enable 'auto acknowledgement' function on all pipes
   nrf_write_register_byte( NRF_REG_EN_AA, 0x3F );
   // 5 bytes for the address field
   nrf_write_register_byte( NRF_REG_SETUP_AW, NRF_SETUP_AW_SIZE_5 );
   // Retry 1 time, start with the default timeout (0)
-  nrf_write_register_byte( NRF_REG_SETUP_RETR, 0x01 );
+  // [TODO] uncomment this later
+  //nrf_write_register_byte( NRF_REG_SETUP_RETR, 0x01 );
   // Set RF channel
   nrf_write_register_byte( NRF_REG_RF_CH, NRF_CFG_RF_CHANNEL );
   // RF setup (LNA is set to 1)
@@ -214,33 +327,39 @@ void nrf_init()
   // Enable the first two pipes
   nrf_write_register_byte( NRF_REG_EN_RXADDR, 0x03 );
   // Set addresses
-  nrf_set_rx_addr( 0, nrf_srv_p0_addr );
+  nrf_set_rx_addr( 0, nrf_p0_addr );
   nrf_set_rx_addr( 1, nrf_srv_p1_addr );
   // Set payload size
   nrf_set_payload_size( 0, NRF_PAYLOAD_SIZE );
   nrf_set_payload_size( 1, NRF_PAYLOAD_SIZE ); 
-#else
+#else // #ifdef NRF_CFG_PROFILE_SERVER
   // Enable the first pipe
   nrf_write_register_byte( NRF_REG_EN_RXADDR, 0x01 );
-  // Set addresses [TODO]
+  // Set random address in nrf_p0_addr
+  nrf_set_client_address();
   // Set payload size
   nrf_set_payload_size( 0, NRF_PAYLOAD_SIZE );
-#endif
+#endif // #ifdef NRF_CFG_PROFILE_SERVER
   // Finally set the CONFIG register
-  // Power up, transmitter, 2 bytes CRC, interrupts disabled
+  // Power up, 2 bytes CRC, interrupts disabled
+  // [TODO] change interrupts to enabled eventually
   nrf_write_register_byte( NRF_REG_CONFIG, 0x0E );
-#endif  
+#ifdef NRF_CFG_PROFILE_SERVER
+  nrf_set_mode( NRF_MODE_RX );
+#else
+  nrf_set_mode( NRF_MODE_TX );
+#endif
 
   // Power up, transmitter, 2 bytes CRC, interrupts disabled
-  printf( "\nAFTER\n\nSTAT: %d\n", nrf_read_register_byte( NRF_REG_STATUS ) );
-  printf( "CONFIG: %d\n", nrf_read_register_byte( NRF_REG_CONFIG ) );
-  printf( "ADDRESSES: \n");
+  nrfprint( "\nAFTER\n\nSTAT: %d\n", nrf_read_register_byte( NRF_REG_STATUS ) );
+  nrfprint( "CONFIG: %d\n", nrf_read_register_byte( NRF_REG_CONFIG ) );
+  nrfprint( "ADDRESSES: \n");
   for( i = 0; i < 2; i ++ )
   {
-    printf( "  %d -> ", i );
+    nrfprint( "  %d -> ", i );
     nrf_get_rx_addr( i, t );
     for( j = 0; j < 5; j ++ )
-      printf( "%02X%s", t[ j ], j == 4 ? "\n" : ":" );
+      nrfprint( "%02X%s", t[ j ], j == 4 ? "\n" : ":" );
   }
 }
 

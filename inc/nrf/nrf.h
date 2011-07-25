@@ -52,6 +52,9 @@
 // STAT reg constants
 #define NRF_STAT_RX_P_NONE    6
 #define NRF_STAT_RX_P_EMPTY   7
+#define NRF_INT_MAX_RT_MASK   0x10
+#define NRF_INT_TX_DS_MASK    0x20
+#define NRF_INT_RX_DR_MASK    0x40
 
 // SETUP_AW reg constants
 #define NRF_SETUP_AW_SIZE_3   1
@@ -68,6 +71,12 @@
 
 // Other constants
 #define NRF_PAYLOAD_SIZE      32
+#define NRF_MODE_RX           1
+#define NRF_MODE_TX           0
+// Server pipe 0 address (LSB to MSB) -> only for server 
+#define NRF_CFG_SRV_PIPE0_ADDR  { 0xA1, 0x32, 0x58, 0xF3, 0xC9 }
+// Server pipe 1 address (LSB to MSB) -> only for server
+#define NRF_CFG_SRV_PIPE1_ADDR  { 0xD4, 0x77, 0xC5, 0xEA, 0xB0 }
 
 // CONFIG register
 typedef union
@@ -165,6 +174,11 @@ void nrf_set_rx_addr( int pipe, const u8* paddr );
 void nrf_get_rx_addr( int pipe, u8 *addrbuf );
 void nrf_set_tx_addr( const u8 *paddr );
 void nrf_set_payload_size( int pipe, u8 size );
+void nrf_set_mode( int mode );
+void nrf_clear_interrupt( u8 mask );
+int nrf_has_data();
+unsigned nrf_send_packet( const u8 *addr, const u8 *pdata, unsigned len );
+unsigned nrf_get_packet( u8 *pdata, unsigned maxlen, int *pipeno );
 
 // Other public functions
 void nrf_init();
