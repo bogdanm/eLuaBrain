@@ -4,7 +4,6 @@
 #include "nrf.h"
 #include "nrf_ll.h"
 #include "nrf_conf.h"
-#include "utils.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -20,13 +19,15 @@ static u8 nrf_p0_addr[] = NRF_CLIENT_ADDR_POOL;
 static u8 nrf_crt_mode = 0xFF;
 static u32 nrf_lfsr = 1;
 
-#ifdef NRF_CFG_PROFILE_SERVER
+#ifdef NRF_DEBUG
 #define nrfprint              printf
 #else
 void nrfprint( const char *fmt, ... )
 {
 }
 #endif
+
+#define NRFMIN( x, y )        ( ( x ) < ( y ) ? ( x ) : ( y ) )
 
 // ****************************************************************************
 // Helpers
@@ -121,12 +122,9 @@ void nrf_flush_tx()
   nrfh_generic_write( NRF_CMD_FLUSH_TX, NULL, 0 );
 }
 
-nrf_stat_reg_t nrf_get_status()
+u8 nrf_get_status()
 {
-  nrf_stat_reg_t r;
-
-  r.val = nrf_read_register_byte( NRF_REG_STATUS );
-  return r;
+  return nrf_read_register_byte( NRF_REG_STATUS );
 }
 
 void nrf_activate()
@@ -147,62 +145,14 @@ void nrf_write_ack_payload( const u8 *dataptr, u16 len )
 // ****************************************************************************
 // Higher level nRF commands
 
-nrf_config_reg_t nrf_get_config()
-{
-  nrf_config_reg_t data;
-
-  data.val = nrf_read_register_byte( NRF_REG_CONFIG );
-  return data;
-}
-
-void nrf_set_config( nrf_config_reg_t conf )
-{
-  nrf_write_register_byte( NRF_REG_CONFIG, conf.val );
-}
-
-nrf_setup_retr_t nrf_get_setup_retr()
-{
-  nrf_setup_retr_t data;
-
-  data.val = nrf_read_register_byte( NRF_REG_SETUP_RETR );
-  return data;
-}
-
 void nrf_set_setup_retr( unsigned delay, unsigned count )
 {
-  nrf_setup_retr_t data;
-
-  data.val = 0;
-  data.fields.ard = delay;
-  data.fields.arc = count;
-  nrf_write_register_byte( NRF_REG_SETUP_RETR, data.val );
-}
-
-nrf_rf_setup_t nrf_get_rf_setup()
-{
-  nrf_rf_setup_t data;
-
-  data.val = nrf_read_register_byte( NRF_REG_RF_SETUP );
-  return data;
+  nrf_write_register_byte( NRF_REG_SETUP_RETR, ( delay << 4 ) | count );
 }
 
 void nrf_set_rf_setup( int data_rate, int pwr, int lna )
 {
-  nrf_rf_setup_t data;
-
-  data.val = 0;
-  data.fields.rf_dr = data_rate;
-  data.fields.rf_pwr = pwr;
-  data.fields.lna_hcurr = lna;
-  nrf_write_register_byte( NRF_REG_RF_SETUP, data.val );
-}
-
-nrf_fifo_status_t nrf_get_fifo_status()
-{
-  nrf_fifo_status_t data;
-
-  data.val = nrf_read_register_byte( NRF_REG_FIFO_STATUS );
-  return data;
+  nrf_write_register_byte( NRF_REG_RF_SETUP, ( data_rate << 3 ) | ( pwr << 1 ) | lna );
 }
 
 void nrf_set_rx_addr( int pipe, const u8* paddr )
@@ -227,12 +177,9 @@ void nrf_set_payload_size( int pipe, u8 size )
 
 void nrf_set_mode( int mode )
 {
-  nrf_config_reg_t conf = nrf_get_config();
-
   if( mode == nrf_crt_mode )
     return;
-  conf.fields.prim_rx = mode;
-  nrf_set_config( conf );
+  nrf_write_register_byte( NRF_REG_CONFIG, ( nrf_read_register_byte( NRF_REG_CONFIG ) & 0xFE ) | mode );
   nrf_ll_set_ce( mode == NRF_MODE_RX ? 1 : 0 );
   nrf_set_rx_addr( 0, nrf_p0_addr );
   nrf_crt_mode = ( u8 )mode;
@@ -250,12 +197,11 @@ int nrf_has_data()
 
 unsigned nrf_send_packet( const u8 *addr, const u8 *pdata, unsigned len )
 {
-  nrf_stat_reg_t stat;
+  u8 stat;
 
-  nrf_set_mode( NRF_MODE_TX );
   nrf_set_tx_addr( addr );
   nrf_set_rx_addr( 0, addr );
-  nrf_write_tx_payload( pdata, UMIN( len, NRF_PAYLOAD_SIZE ) );
+  nrf_write_tx_payload( pdata, NRFMIN( len, NRF_PAYLOAD_SIZE ) );
   nrf_ll_ce_high();
   nrf_ll_delay_us( 10 );
   nrf_ll_ce_low();
@@ -263,14 +209,14 @@ unsigned nrf_send_packet( const u8 *addr, const u8 *pdata, unsigned len )
   while( 1 )
   {
     stat = nrf_get_status();
-    if( stat.fields.max_rt )
+    if( stat & NRF_INT_MAX_RT_MASK )
     {
       nrf_clear_interrupt( NRF_INT_MAX_RT_MASK );
       nrf_flush_tx();
       len = 0;
       break;
     }
-    if( stat.fields.tx_ds )
+    if( stat & NRF_INT_TX_DS_MASK )
     {
       nrf_clear_interrupt( NRF_INT_TX_DS_MASK );
       break;
@@ -281,18 +227,17 @@ unsigned nrf_send_packet( const u8 *addr, const u8 *pdata, unsigned len )
 
 unsigned nrf_get_packet( u8 *pdata, unsigned maxlen, int *pipeno )
 {
-  nrf_stat_reg_t stat;
+  u8 stat;
 
-  maxlen = UMIN( maxlen, NRF_PAYLOAD_SIZE );
   stat = nrf_get_status();
-  if( !stat.fields.rx_dr )
+  if( ( stat & NRF_INT_RX_DR_MASK ) == 0 )
     return 0;
   // [TODO] this should probably be repeated while the RX FIFO still 
   // has data
   nrf_ll_ce_low();
   if( pipeno )
-    *pipeno = stat.fields.rx_p_no;
-  nrf_get_rx_payload( pdata, UMIN( maxlen, nrf_get_payload_size() ) );
+    *pipeno = ( stat >> 1 ) & 0x07;
+  nrf_get_rx_payload( pdata, NRFMIN( maxlen, nrf_get_payload_size() ) );
   nrf_clear_interrupt( NRF_INT_RX_DR_MASK );
   nrf_ll_ce_high();
   return maxlen;
@@ -335,6 +280,8 @@ void nrf_init()
   }
 
   // Setup the actual nRF configuration now
+  // Put the chip in low power mode in order to access all its registers
+  nrf_write_register_byte( NRF_REG_CONFIG, 0x08 );
   // Enable 'auto acknowledgement' function on all pipes
   nrf_write_register_byte( NRF_REG_EN_AA, 0x3F );
   // 5 bytes for the address field
@@ -345,7 +292,7 @@ void nrf_init()
   // Set RF channel
   nrf_write_register_byte( NRF_REG_RF_CH, NRF_CFG_RF_CHANNEL );
   // RF setup (LNA is set to 1)
-  nrf_set_rf_setup( NRF_CFG_DATA_RATE, NRF_CFG_TX_POWER, 1 );
+  nrf_set_rf_setup( NRF_CFG_DATA_RATE, NRF_CFG_TX_POWER, NRF_RF_SETUP_LNA_ON );
   // 'Activate' to enable some commands
   nrf_activate(); 
   // Enable dynamic payload length

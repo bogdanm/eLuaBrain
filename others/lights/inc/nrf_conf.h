@@ -6,7 +6,7 @@
 #include "nrf.h"
 
 // Profile (server or client)
-#define NRF_CFG_PROFILE_SERVER
+#define NRF_CFG_PROFILE_CLIENT
 // RF channel
 #define NRF_CFG_RF_CHANNEL    2
 // TX power (0 is the highest, see NRF_RF_SETUP_PWR_xxx in nrf.h for more values)
