@@ -100,7 +100,7 @@ static int luaterm_getcols( lua_State* L )
 static int luaterm_print( lua_State* L )
 {
   const char* buf;
-  size_t len, i;
+  size_t len;
   int total = lua_gettop( L ), s = 1;
   int x = -1, y = -1;
 
@@ -116,8 +116,7 @@ static int luaterm_print( lua_State* L )
   {
     luaL_checktype( L, s, LUA_TSTRING );
     buf = lua_tolstring( L, s, &len );
-    for( i = 0; i < len; i ++ )
-      term_putch( buf[ i ] );
+    term_putstr( buf, len );
   }
   return 0;
 }
@@ -197,7 +196,7 @@ static int luaterm_reset( lua_State *L )
   return 0;
 }
 
-// Lua: id = box( x, y, width, height, title, attrs )
+// Lua: id, x, y = box( x, y, width, height, title, [attrs] )
 static int luaterm_box( lua_State *L )
 {
   int x = luaL_checkinteger( L, 1 );
@@ -205,12 +204,14 @@ static int luaterm_box( lua_State *L )
   int width = luaL_checkinteger( L, 3 );
   int height = luaL_checkinteger( L, 4 );
   const char *title = luaL_checkstring( L, 5 );
-  int attrs = luaL_checkinteger( L, 6 );
-  void *p;
+  int attrs = luaL_optinteger( L, 6, TERM_BOX_FLAG_BORDER | TERM_BOX_FLAG_RESTORE | TERM_BOX_FLAG_CENTER );
+  TERM_BOX *p;
 
   p = term_box( x, y, width, height, title, attrs );
   lua_pushlightuserdata( L, p );
-  return 1;
+  lua_pushinteger( L, p->x );
+  lua_pushinteger( L, p->y );
+  return 3;
 }
 
 // Lua: close_box( id )
@@ -439,6 +440,17 @@ static int luaterm_menu( lua_State *L )
   return 1;
 }
 
+// Lua: center( y, text )
+static int luaterm_center( lua_State *L )
+{
+  int y = luaL_checkinteger( L, 1 );
+  const char *pstr = luaL_checkstring( L, 2 );
+
+  term_gotoxy( ( term_get_cols() - strlen( pstr ) ) / 2, y );
+  term_cstr( pstr );
+  return 0;
+}
+
 // Key codes by name
 #undef _D
 #define _D( x ) #x
@@ -495,6 +507,7 @@ const LUA_REG_TYPE term_map[] =
   { LSTRKEY( "getstr" ), LFUNCVAL( luaterm_getstr ) },
   { LSTRKEY( "set_last_line" ), LFUNCVAL( luaterm_set_last_line ) },
   { LSTRKEY( "menu" ), LFUNCVAL( luaterm_menu ) },
+  { LSTRKEY( "center" ), LFUNCVAL( luaterm_center ) },
 #if LUA_OPTIMIZE_MEMORY > 0
   { LSTRKEY( "__metatable" ), LROVAL( term_map ) },
   { LSTRKEY( "NOWAIT" ), LNUMVAL( TERM_INPUT_DONT_WAIT ) },
@@ -503,6 +516,7 @@ const LUA_REG_TYPE term_map[] =
   { LSTRKEY( "COL_DEFAULT" ), LNUMVAL( TERM_COL_DEFAULT ) },  
   { LSTRKEY( "BOX_RESTORE" ), LNUMVAL( TERM_BOX_FLAG_RESTORE ) },
   { LSTRKEY( "BOX_BORDER" ), LNUMVAL( TERM_BOX_FLAG_BORDER ) },
+  { LSTRKEY( "BOX_CENTER" ), LNUMVAL( TERM_BOX_FLAG_CENTER ) },
   { LSTRKEY( "MENU_NO_ENTER" ), LNUMVAL( TERM_MENU_ATTR_NO_ENTER ) },
   { LSTRKEY( "MENU_NO_ESC" ), LNUMVAL( TERM_MENU_ATTR_NO_ESC ) },
   COLLINE( COL_BLACK ),

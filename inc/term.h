@@ -45,6 +45,14 @@ enum
   TERM_COL_WHITE
 };
 
+// This defines a box (window)
+typedef struct
+{
+  u16 x, y, width, height;
+  u16 flags;
+  u8 *savedata;
+} TERM_BOX;
+
 // Foregound colors
 #define TERM_PREFIX           "\x1b["
 #define TERM_FGCOL_OFFSET     30
@@ -88,6 +96,7 @@ enum
 // Box flags
 #define TERM_BOX_FLAG_BORDER        0x8000
 #define TERM_BOX_FLAG_RESTORE       0x4000
+#define TERM_BOX_FLAG_CENTER        0x2000
 
 // Paging
 #define TERM_PAGING_ON              1

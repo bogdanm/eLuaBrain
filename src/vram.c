@@ -32,14 +32,6 @@ static u8 vram_last_line;
 #define VRAM_MKCOL( fg, bg )         ( ( ( bg ) << 4 ) + fg )
 #define VRAM_ANSI_ESC           0x1B
 
-// This defines a box (window)
-typedef struct
-{
-  u16 x, y, width, height;
-  u16 flags;
-  u8 *savedata;
-} TERM_BOX;
-
 // *****************************************************************************
 // ANSI sequence interpreter
 // ANSI 'state machine'
@@ -477,6 +469,11 @@ void* vram_box( unsigned x, unsigned y, unsigned width, unsigned height, const c
   if( ( pbox = ( TERM_BOX* )malloc( sizeof( TERM_BOX ) ) ) == NULL )
     goto error;
   memset( pbox, 0, sizeof( pbox ) );
+  if( flags & TERM_BOX_FLAG_CENTER ) // recompute x and y to center the box properly
+  {
+    x = ( VRAM_COLS - width ) / 2;
+    y = ( VRAM_LINES - height ) / 2;
+  }
   if( flags & TERM_BOX_FLAG_RESTORE )
     if( ( pbox->savedata = ( u8* )malloc( width * height * 2 ) ) == NULL )
       goto error;
