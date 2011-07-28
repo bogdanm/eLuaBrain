@@ -35,6 +35,18 @@
 #define NRF_PIN_IRQ                       PD2
 
 // *****************************************************************************
+// LEDs definitions
+#define LED_PORT_OUT                      PORTC
+#define LED_PORT_IN                       PINC
+#define LED_PORT_DIR                      DDRC
+#define LED_G_PIN                         PC0
+#define LED_R_PIN                         PC1
+#define LED_B_PIN                         PC2
+#define LED_MASK                          ( _BV( LED_R_PIN ) | _BV( LED_G_PIN ) | _BV( LED_B_PIN ) )
+#define LED_BASE_FREQ_HZ                  100
+#define LED_PWM_STEPS                     32
+
+// *****************************************************************************
 // Other macros
 
 #define nop()                             asm( "nop\n\t":: )
