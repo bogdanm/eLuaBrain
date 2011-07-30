@@ -13,6 +13,7 @@ static u8 pwm;
 static s8 vr, vg, vb;
 static volatile s8 cr, cg, cb, sync;
 static u8 temp;
+static const u8 lights_addr[] = NRF_HW_ADDR;
 
 #define TIMER_PRESCALER                   1
 #define start_timer()                     TCCR1B  = ( TCCR1B & ( u8 )~0x07 ) | TIMER_PRESCALER 
@@ -75,28 +76,27 @@ static FILE mystdout = FDEV_SETUP_STREAM( con_putchar, NULL, _FDEV_SETUP_WRITE )
 
 int main()
 {  
-  char c[] = "Incercare de test cu mata";
-  unsigned res;
-  u8 addr[] = NRF_CFG_SRV_PIPE0_ADDR;
-  u32 cnt;
+  u8 data[ 4 ], len;
 
   leds_init();
   uart_init();
   sei();
-  while( 1 )
-  {
-    cr = rand() % ( LED_PWM_STEPS + 1 );
-    cg = rand() % ( LED_PWM_STEPS + 1 );
-    cb = rand() % ( LED_PWM_STEPS + 1 );
-    sync = 1;
-    for( cnt = 0; cnt < 200000UL; cnt ++ ) 
-      _delay_us( 1.0 );
-  }
-  
   stdout = &mystdout;
   nrf_init();
-  res = nrf_send_packet( addr, ( u8* )c, strlen( c ) );
-  printf( "nrf_send_packet() done! Res is %d\n", res );
-  while( 1 );
+  nrf_set_rx_addr( 0, lights_addr );
+  nrf_set_mode( NRF_MODE_RX );
+  while( 1 )
+  {
+    len = nrf_get_packet( data, 4, NULL );
+    if( len != 4 )
+      continue;
+    if( data[ 0 ] != 1 )
+      continue;
+    printf( "Got data!\n" );
+    cr = data[ 1 ];
+    cg = data[ 2 ];
+    cb = data[ 3 ];
+    sync = 1;
+  }
 }
 

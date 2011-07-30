@@ -10,12 +10,9 @@
 // ****************************************************************************
 // Local variables and definitions
 
-#ifdef NRF_CFG_PROFILE_SERVER
-static u8 nrf_p0_addr[] = NRF_CFG_SRV_PIPE0_ADDR;
-static const u8 nrf_srv_p1_addr[] = NRF_CFG_SRV_PIPE1_ADDR;
-#else // #ifdef NRF_CFG_PROFILE_SERVER
-static u8 nrf_p0_addr[] = NRF_CLIENT_ADDR_POOL;
-#endif // #ifdef NRF_CFG_PROFILE_SERVER
+#define NRF_SEND_RETRIES      8
+
+static u8 nrf_p0_addr[ 5 ] = { 0xE7, 0xE7, 0xE7, 0xE7, 0xE7 };
 static u8 nrf_crt_mode = 0xFF;
 static u32 nrf_lfsr = 1;
 
@@ -157,6 +154,17 @@ void nrf_set_rf_setup( int data_rate, int pwr, int lna )
 
 void nrf_set_rx_addr( int pipe, const u8* paddr )
 {
+  unsigned i;
+
+  if( pipe == 0 )
+  {
+    // This is (re)set later in nrf_set_mode
+    memcpy( nrf_p0_addr, paddr, 5 );
+    // And it is also used as a random seed
+    nrf_lfsr = ( ( u32 )paddr[ 0 ] << 24 ) | ( ( u32 )paddr[ 1 ] << 16 ) | ( ( u32 )paddr[ 2 ] << 8 ) | paddr[ 3 ];
+    for( i = 0; i < paddr[ 4 ] % 4 + 1; i ++ )
+      nrfh_rand();
+  }
   nrf_write_register( NRF_REG_RX_ADDR( pipe ), paddr, 5 ); 
 }
 
@@ -198,29 +206,44 @@ int nrf_has_data()
 unsigned nrf_send_packet( const u8 *addr, const u8 *pdata, unsigned len )
 {
   u8 stat;
+  u8 retries = 0;
 
+  if( len == 0 )
+    return 0;
   nrf_set_tx_addr( addr );
   nrf_set_rx_addr( 0, addr );
-  nrf_write_tx_payload( pdata, NRFMIN( len, NRF_PAYLOAD_SIZE ) );
-  nrf_ll_ce_high();
-  nrf_ll_delay_us( 10 );
-  nrf_ll_ce_low();
-  // [TODO] change this when interrupts will be used
+  nrf_write_tx_payload( pdata, len = NRFMIN( len, NRF_PAYLOAD_SIZE ) );
   while( 1 )
   {
-    stat = nrf_get_status();
-    if( stat & NRF_INT_MAX_RT_MASK )
+    nrf_ll_ce_high();
+    nrf_ll_delay_us( 10 );
+    nrf_ll_ce_low();
+    // [TODO] change this when interrupts will be used
+    while( 1 )
     {
-      nrf_clear_interrupt( NRF_INT_MAX_RT_MASK );
-      nrf_flush_tx();
-      len = 0;
-      break;
+      stat = nrf_get_status();
+      if( stat & NRF_INT_TX_DS_MASK )
+      {
+        nrf_clear_interrupt( NRF_INT_TX_DS_MASK );
+        break;
+      }
+      if( stat & NRF_INT_MAX_RT_MASK )
+      {
+        nrf_clear_interrupt( NRF_INT_MAX_RT_MASK );
+        if( ++ retries == NRF_SEND_RETRIES ) // maximm retries, give up
+        {
+          nrf_flush_tx();
+          len = 0;
+        }
+        else // change the timeout and the number of retries to random values
+          nrf_write_register_byte( NRF_REG_SETUP_RETR, ( ( nrfh_rand() % 16 ) << 4 ) | ( nrfh_rand() % 7 + 3 ) );
+        break;
+      }
     }
+    if( len == 0 )
+      break;
     if( stat & NRF_INT_TX_DS_MASK )
-    {
-      nrf_clear_interrupt( NRF_INT_TX_DS_MASK );
       break;
-    }
   }
   return len;
 }
@@ -237,23 +260,10 @@ unsigned nrf_get_packet( u8 *pdata, unsigned maxlen, int *pipeno )
   nrf_ll_ce_low();
   if( pipeno )
     *pipeno = ( stat >> 1 ) & 0x07;
-  nrf_get_rx_payload( pdata, NRFMIN( maxlen, nrf_get_payload_size() ) );
+  nrf_get_rx_payload( pdata, maxlen = NRFMIN( maxlen, nrf_get_payload_size() ) );
   nrf_clear_interrupt( NRF_INT_RX_DR_MASK );
   nrf_ll_ce_high();
   return maxlen;
-}
-
-// Sets a random address for the client
-void nrf_set_client_address()
-{
-  u8 i, limit = nrf_p0_addr[ 0 ];
-
-  limit += nrf_p0_addr[ 1 ];
-  for( i = 0; i < limit; i ++ )
-    nrfh_rand();
-  for( i = 2; i < 5; i ++ )
-    nrf_p0_addr[ i ] = nrfh_rand() & 0xFF;
-  nrf_set_rx_addr( 0, nrf_p0_addr );
 }
 
 // ****************************************************************************
@@ -298,37 +308,20 @@ void nrf_init()
   // Enable dynamic payload length
   // [TODO] this must be modified to 0x06 to enable payload with ack
   nrf_write_register_byte( NRF_REG_FEATURE, 0x04 );
-  // Setup pipe(s)
-#ifdef NRF_CFG_PROFILE_SERVER
-  // Enable the first two pipes
-  nrf_write_register_byte( NRF_REG_EN_RXADDR, 0x03 );
-  // Set addresses
-  nrf_set_rx_addr( 0, nrf_p0_addr );
-  nrf_set_rx_addr( 1, nrf_srv_p1_addr );
-  // Set payload size (not sure if this is actually needed)
-  nrf_set_payload_size( 0, NRF_PAYLOAD_SIZE );
-  nrf_set_payload_size( 1, NRF_PAYLOAD_SIZE ); 
-  // Enable dynamic payload
-  nrf_write_register_byte( NRF_REG_DYNPD, 0x03 );
-#else // #ifdef NRF_CFG_PROFILE_SERVER
   // Enable the first pipe
   nrf_write_register_byte( NRF_REG_EN_RXADDR, 0x01 );
-  // Set random address in nrf_p0_addr
-  nrf_set_client_address();
-  // Set payload size
+  // Set pipe to default address
+  nrf_set_rx_addr( 0, nrf_p0_addr );
+  // Set payload size (not sure if this is needed in dynamic payload mode)
   nrf_set_payload_size( 0, NRF_PAYLOAD_SIZE );
   // Enable dynamic payload
   nrf_write_register_byte( NRF_REG_DYNPD, 0x01 );
-#endif // #ifdef NRF_CFG_PROFILE_SERVER
   // Finally set the CONFIG register
   // Power up, 2 bytes CRC, interrupts disabled
   // [TODO] change interrupts to enabled eventually
   nrf_write_register_byte( NRF_REG_CONFIG, 0x0E );
-#ifdef NRF_CFG_PROFILE_SERVER
-  nrf_set_mode( NRF_MODE_RX );
-#else
+  // Always start in TX mode
   nrf_set_mode( NRF_MODE_TX );
-#endif
 
   // Power up, transmitter, 2 bytes CRC, interrupts disabled
   nrfprint( "\nAFTER\n\nSTAT: %d\n", nrf_read_register_byte( NRF_REG_STATUS ) );

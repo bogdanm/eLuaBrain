@@ -45,17 +45,20 @@ LUALIB_API int ( luaopen_cpu )( lua_State* L );
 #define AUXLIB_ADC      "adc"
 LUALIB_API int ( luaopen_adc )( lua_State *L );
 
-#define AUXLIB_RPC   "rpc"
+#define AUXLIB_RPC      "rpc"
 LUALIB_API int ( luaopen_rpc )( lua_State *L );
 
 #define AUXLIB_BITARRAY "bitarray"
 LUALIB_API int ( luaopen_bitarray )( lua_State *L );
 
-#define AUXLIB_ELUA "elua"
+#define AUXLIB_ELUA     "elua"
 LUALIB_API int ( luaopen_elua )( lua_State *L );
 
-#define AUXLIB_I2C  "i2c"
+#define AUXLIB_I2C      "i2c"
 LUALIB_API int ( luaopen_i2c )( lua_State *L );
+
+#define AUXLIB_NRF      "nrf"
+LUALIB_API int ( luaopen_nrf )( lua_State *L );
 
 // Helper macros
 #define MOD_CHECK_ID( mod, id )\

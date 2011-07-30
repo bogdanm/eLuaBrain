@@ -78,8 +78,10 @@
 
 // Other constants
 #define NRF_PAYLOAD_SIZE      32
+#define NRF_MAX_PAYLOAD_SIZE  32
 #define NRF_MODE_RX           1
 #define NRF_MODE_TX           0
+#define NRF_MAX_PIPE_NO       5
 // Server pipe 0 address (LSB to MSB) -> only for server 
 #define NRF_CFG_SRV_PIPE0_ADDR  { 0xA1, 0x32, 0x58, 0xF3, 0xC9 }
 // Server pipe 1 address (LSB to MSB) -> only for server

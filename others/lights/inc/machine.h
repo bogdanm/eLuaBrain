@@ -33,6 +33,7 @@
 #define NRF_PORT_DIR                      DDRD
 #define NRF_PIN_CE                        PD3
 #define NRF_PIN_IRQ                       PD2
+#define NRF_HW_ADDR                       { 0x74, 0xA3, 0xC9, 0xEF, 0x68 }
 
 // *****************************************************************************
 // LEDs definitions

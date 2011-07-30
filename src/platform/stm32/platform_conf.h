@@ -104,6 +104,7 @@
   _ROM( AUXLIB_ELUA, luaopen_elua, elua_map )\
   _ROM( LUA_MATHLIBNAME, luaopen_math, math_map )\
   _ROM( AUXLIB_NET, luaopen_net, net_map)\
+  _ROM( AUXLIB_NRF, luaopen_nrf, nrf_map)\
   PLATLINE
 
 // *****************************************************************************
