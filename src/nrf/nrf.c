@@ -261,7 +261,8 @@ unsigned nrf_get_packet( u8 *pdata, unsigned maxlen, int *pipeno )
   if( pipeno )
     *pipeno = ( stat >> 1 ) & 0x07;
   nrf_get_rx_payload( pdata, maxlen = NRFMIN( maxlen, nrf_get_payload_size() ) );
-  nrf_clear_interrupt( NRF_INT_RX_DR_MASK );
+  if( ( ( nrf_get_status() >> 1 ) & 0x07 ) == NRF_RX_FIFO_EMPTY )
+    nrf_clear_interrupt( NRF_INT_RX_DR_MASK );
   nrf_ll_ce_high();
   return maxlen;
 }

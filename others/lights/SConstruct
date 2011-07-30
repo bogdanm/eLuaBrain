@@ -8,7 +8,7 @@ if platform.system() == "Windows":
 else:
   comport = '/dev/ttyUSB0'
 local_include = "-Iinc -I../../inc/nrf"
-source_files = "main.c uart.c avr_nrf.c ../../src/nrf/nrf.c"
+source_files = "main.c uart.c avr_nrf.c ../../src/nrf/nrf.c ledvm.c"
 local_libs = ""
 avrdude = "avrdude"
 

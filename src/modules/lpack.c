@@ -156,7 +156,7 @@ static int l_unpack(lua_State *L) 		/** unpack(s,f,[init]) */
    UNPACKNUMBER(OP_DOUBLE, double)
    UNPACKNUMBER(OP_FLOAT, float)
 #endif   
-   UNPACKNUMBER(OP_CHAR, char)
+   UNPACKNUMBER(OP_CHAR, signed char)
    UNPACKNUMBER(OP_BYTE, unsigned char)
    UNPACKNUMBER(OP_SHORT, short)
    UNPACKNUMBER(OP_USHORT, unsigned short)
@@ -240,7 +240,7 @@ static int l_pack(lua_State *L) 		/** pack(f,...) */
    PACKNUMBER(OP_DOUBLE, double)
    PACKNUMBER(OP_FLOAT, float)
 #endif
-   PACKNUMBER(OP_CHAR, char)
+   PACKNUMBER(OP_CHAR, signed char)
    PACKNUMBER(OP_BYTE, unsigned char)
    PACKNUMBER(OP_SHORT, short)
    PACKNUMBER(OP_USHORT, unsigned short)

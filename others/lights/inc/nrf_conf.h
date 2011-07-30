@@ -16,7 +16,7 @@
 // Client address pool (only for clients)
 #define NRF_CLIENT_ADDR_POOL    { 0xC0, 0xBF, 0, 0, 0 }
 // Debugging on
-#define NRF_DEBUG
+//#define NRF_DEBUG
 
 #endif // #ifndef __NRF_CONF_H__
 
