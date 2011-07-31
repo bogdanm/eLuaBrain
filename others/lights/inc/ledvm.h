@@ -9,13 +9,14 @@
 #define LEDVM_MAX_VAL         32
 #define LEDVM_MAX_CALLS       8
 #define LEDVM_EMPTY_MARK      0xAA55AA
-#define LEDVM_NUM_SAME        0xFE
 #define LEDVM_NUM_RAND        0xFF
 #define LEDVM_MASKNEW_BIT     0x08
 #define LEDVM_MASKR_BIT       0x04
 #define LEDVM_MASKG_BIT       0x02
 #define LEDVM_MASKB_BIT       0x01
 #define LEDVM_CNT_LIM         0
+#define LEDVM_DELTA_MASK      0x40
+#define LEDVM_NUM_MASK        0x3F
 
 // Errors
 enum

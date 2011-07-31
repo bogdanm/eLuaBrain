@@ -22,7 +22,7 @@ typedef struct {
   u8 m[ 3 ];                  // color channel masks
   s8 min[ 3 ];                // minimum values
   s8 max[ 3 ];                // maximum values
-  u8 on[ 3 ];                 // channel on/off flags
+  s8 on[ 3 ];                 // channel on/off flags
   u16 cnt_crt[ LEDVM_REP_COUNTERS ]; // current counter values
   u16 cnt_saddr[ LEDVM_REP_COUNTERS ] ; // counter start addresses
   u8 cnt_active;              // active counter bitmap
@@ -30,6 +30,7 @@ typedef struct {
   u32 rgb_delay;              // default delay for RGB set ops
   u16 cstack[ LEDVM_MAX_CALLS ];  // call stack
   u8 numcalls;                // call stack depth
+  u32 crtdelay;               // current delay
 } LEDVM_DATA;
 
 typedef int ( *p_handler )( const u8* );
@@ -38,8 +39,10 @@ static LEDVM_DATA vm_d;
 // ****************************************************************************
 // Local functions and helpers
 
-static s8 vmh_clip_rgb( int ch, int v )
+static s8 vmh_clip_rgb( u8 ch, s8 v )
 {
+  if( !vm_d.on[ ch ] )
+    return 0;
   if( v < vm_d.min[ ch ] )
     v = vm_d.min[ ch ];
   if( v > vm_d.max[ ch ] )
@@ -47,19 +50,25 @@ static s8 vmh_clip_rgb( int ch, int v )
   return ( s8 )v;
 }
 
-static void vmh_set_rgbdata( int r, int g, int b, int dodelay )
+static void vmh_delay( u32 period )
 {
-  vm_d.v[ CH_RED ] = vmh_clip_rgb( CH_RED, vm_d.on[ CH_RED ] ? r : 0 );
-  vm_d.v[ CH_GREEN ] = vmh_clip_rgb( CH_GREEN, vm_d.on[ CH_GREEN ] ? g : 0 );
-  vm_d.v[ CH_BLUE ] = vmh_clip_rgb( CH_BLUE, vm_d.on[ CH_BLUE ] ? b : 0 );
+  vm_d.crtdelay = period;
+}
+
+static void vmh_set_rgbdata( const s8 *newv, int dodelay )
+{
+  u8 i;
+
+  for( i = 0; i < 3; i ++ )
+    vm_d.v[ i ] = vmh_clip_rgb( i, newv[ i ] );
   ledvm_ll_setrgb( vm_d.v[ CH_RED ], vm_d.v[ CH_GREEN ], vm_d.v[ CH_BLUE ] );
   if( dodelay )
-    ledvm_ll_delayms( vm_d.rgb_delay );
+    vmh_delay( vm_d.rgb_delay );
 }
 
 static void vmh_set_crtrgb( int dodelay )
 {
-  vmh_set_rgbdata( vm_d.v[ CH_RED ], vm_d.v[ CH_GREEN ], vm_d.v[ CH_BLUE ], dodelay );
+  vmh_set_rgbdata( vm_d.v, dodelay );
 }
 
 static u32 vmh_data_to_u32( const u8 *pdata )
@@ -72,19 +81,26 @@ static int vmh_check_empty_inst( const u8 *pdata )
   return vmh_data_to_u32( pdata ) == LEDVM_EMPTY_MARK;
 }
 
-static s8 vmh_getv( u8 ch, int v, int specvalues )
+static s8 vmh_maskv( u8 ch, s8 v )
 {
-  u8 mask = vm_d.m[ ch ];
-  s8 crt = vm_d.v[ ch ];
+  return vm_d.m[ ch ] ? v : vm_d.v[ ch ];
+}
 
-  if( mask == 0 )
-    return crt;
+static s8 vmh_getv( u8 ch, s16 v, const s8 *pbase, int specvalues )
+{
+  s8 crt = pbase[ ch ];
+  s8 mul = 0;
+
   if( specvalues && v == LEDVM_NUM_RAND )
     return ledvm_ll_rand() % 33;
-  else if( specvalues && v == LEDVM_NUM_SAME )
-    return crt;
   else
-    return v;
+  {
+    if( specvalues && ( v & LEDVM_DELTA_MASK ) )
+      mul = 1;
+    v = v & LEDVM_NUM_MASK;
+    v = ( v << 10 ) >> 10;
+    return v + 1 + crt * mul;
+  }
 }
 
 static void vmh_check_mask( u8 data )
@@ -111,12 +127,13 @@ static int vm_h_nop( const u8 *pdata )
 
 static int vm_h_setrgb( const u8 *pdata ) 
 {
-  vmh_check_mask( pdata[ 0 ] );
-  u8 r = vmh_getv( CH_RED, pdata[ 1 ], 1 );
-  u8 g = vmh_getv( CH_GREEN, pdata[ 2 ], 1 );
-  u8 b = vmh_getv( CH_BLUE, pdata[ 3 ], 1 );
+  s8 newv[ 3 ];
+  u8 i;
 
-  vmh_set_rgbdata( r, g, b, 1 );
+  vmh_check_mask( pdata[ 0 ] );
+  for( i = 0; i < 3; i ++ )
+    newv[ i ] = vmh_getv( i, pdata[ i + 1 ], vm_d.v, 1 );
+  vmh_set_rgbdata( newv, 1 );
   VM_INC_PC;
   return LEDVM_ERR_OK;
 }
@@ -124,23 +141,29 @@ static int vm_h_setrgb( const u8 *pdata )
 static int vm_h_delay( const u8 *pdata )
 {
   vmh_check_mask( pdata[ 0 ] );
-  ledvm_ll_delayms( vmh_data_to_u32( pdata ) );
+  vmh_delay( vmh_data_to_u32( pdata ) );
   VM_INC_PC;
   return LEDVM_ERR_OK;
 }
 
 static int vm_h_seta( const u8 *pdata )
 {
+  u8 i;
+
   vmh_check_mask( pdata[ 0 ] );
-  memcpy( vm_d.a, pdata + 1, 3 );
+  for( i = 0; i < 3 ; i ++ )
+    vm_d.a[ i ] = vmh_getv( i, pdata[ i + 1 ], vm_d.a, 1 );
   VM_INC_PC;
   return LEDVM_ERR_OK;
 }
 
 static int vm_h_setb( const u8 *pdata )
 {
+  u8 i;
+
   vmh_check_mask( pdata[ 0 ] );
-  memcpy( vm_d.b, pdata + 1, 3 );
+  for( i = 0; i < 3 ; i ++ )
+    vm_d.b[ i ] = vmh_getv( i, pdata[ i + 1 ], vm_d.b, 1 );
   VM_INC_PC;
   return LEDVM_ERR_OK;
 }
@@ -199,17 +222,15 @@ static int vm_h_rgbdelay( const u8 *pdata )
 
 static int vm_h_nextrgb( const u8 *pdata )
 {
-  int newv[ 3 ], i;
+  s8 newv[ 3 ];
+  u8 i;
 
   if( !vmh_check_empty_inst( pdata ) )
     return LEDVM_ERR_INVALID_INSTRUCTION;
   vmh_check_mask( pdata[ 0 ] );
   for( i = 0; i < 3; i ++ )
-    newv[ i ] = ( int )vm_d.a[ i ] * vm_d.v[ i ] + vm_d.b[ i ];
-  vmh_set_rgbdata( vmh_getv( CH_RED, newv[ CH_RED ], 0 ),
-                   vmh_getv( CH_GREEN, newv[ CH_GREEN ], 0 ),
-                   vmh_getv( CH_BLUE, newv[ CH_BLUE ], 0 ),
-                   1 );
+    newv[ i ] = vmh_maskv( i, ( int )vm_d.a[ i ] * vm_d.v[ i ] + vm_d.b[ i ] );
+  vmh_set_rgbdata( newv, 1 );
   VM_INC_PC;
   return LEDVM_ERR_OK;
 }
@@ -237,15 +258,13 @@ static int vm_h_ret( const u8 *pdata )
 
 static int vm_h_addrgb( const u8 *pdata )
 {
-  int newv[ 3 ], i;
+  s8 newv[ 3 ];
+  u8 i;
 
   vmh_check_mask( pdata[ 0 ] );
   for( i = 0; i < 3; i ++ )
-    newv[ i ] = ( int )vm_d.v[ i ] + pdata[ i + 1 ];
-  vmh_set_rgbdata( vmh_getv( CH_RED, newv[ CH_RED ], 0 ),
-                   vmh_getv( CH_GREEN, newv[ CH_GREEN ], 0 ),
-                   vmh_getv( CH_BLUE, newv[ CH_BLUE ], 0 ),
-                   1 );
+    newv[ i ] = vmh_maskv( i, ( int )vm_d.v[ i ] + pdata[ i + 1 ] );
+  vmh_set_rgbdata( newv, 1 ); 
   VM_INC_PC;
   return LEDVM_ERR_OK;
 }
@@ -259,8 +278,11 @@ static int vm_h_jmp( const u8 *pdata )
 
 static int vm_h_setmin( const u8 *pdata )
 {
+  u8 i; 
+
   vmh_check_mask( pdata[ 0 ] );
-  memcpy( vm_d.min, pdata + 1, 3 );
+  for( i = 0; i < 3; i ++ )
+    vm_d.min[ i ] = vmh_getv( i, pdata[ i + 1 ], vm_d.min, 1 );
   vmh_set_crtrgb( 0 );
   VM_INC_PC;
   return LEDVM_ERR_OK;
@@ -268,8 +290,11 @@ static int vm_h_setmin( const u8 *pdata )
 
 static int vm_h_on( const u8 *pdata )
 {
+  u8 i;
+
   vmh_check_mask( pdata[ 0 ] );
-  memcpy( vm_d.on, pdata + 1, 3 );
+  for( i = 0; i < 3; i ++ )
+    vm_d.on[ i ] = vmh_getv( i, pdata[ i + 1 ], vm_d.on, 0 );
   vmh_set_crtrgb( 0 );
   VM_INC_PC;
   return LEDVM_ERR_OK;
@@ -277,8 +302,11 @@ static int vm_h_on( const u8 *pdata )
 
 static int vm_h_setmax( const u8 *pdata )
 {
+  u8 i;
+
   vmh_check_mask( pdata[ 0 ] );
-  memcpy( vm_d.max, pdata + 1, 3 );
+  for( i = 0; i < 3; i ++ )
+    vm_d.max[ i ] = vmh_getv( i, pdata[ i + 1 ], vm_d.max, 1 );
   vmh_set_crtrgb( 0 );
   VM_INC_PC;
   return LEDVM_ERR_OK;
@@ -308,9 +336,17 @@ u16 ledvm_get_pc()
 int ledvm_run()
 {
   u8 inst[ 4 ];
-  int res = ledvm_ll_getinst( vm_d.pc, inst );
-  u8 code = inst[ 0 ] >> 4;
-  
+  int res;
+  u8 code;
+
+  if( vm_d.crtdelay )
+  {
+    vm_d.crtdelay --;
+    ledvm_ll_delayms( 1.0 );
+    return LEDVM_ERR_OK;
+  }
+  res = ledvm_ll_getinst( vm_d.pc, inst );
+  code = inst[ 0 ] >> 4;
   if( res == 0 )
     return LEDVM_ERR_INVALID_PC;
   if( code  < sizeof( vm_handlers ) / sizeof( p_handler ) )

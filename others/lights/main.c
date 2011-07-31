@@ -63,6 +63,7 @@ ISR( TIMER1_COMPA_vect )
 // ****************************************************************************
 // Helpers and miscellaneous functions
 
+/*
 static int con_putchar( char c, FILE *stream )
 {
   ( void )stream;
@@ -73,7 +74,7 @@ static int con_putchar( char c, FILE *stream )
 }
 
 static FILE mystdout = FDEV_SETUP_STREAM( con_putchar, NULL, _FDEV_SETUP_WRITE );
-
+*/
 
 void ledvm_ll_setrgb( s8 r, s8 g, s8 b )
 {
@@ -115,7 +116,7 @@ int main()
   uart_init();
   sei();
   ledvm_init();
-  stdout = &mystdout;
+  //stdout = &mystdout;
   nrf_init();
   nrf_set_rx_addr( 0, lights_addr );
   nrf_set_mode( NRF_MODE_RX );
@@ -126,20 +127,23 @@ int main()
       // Get program
       if( nrf_get_packet( data, 4, NULL ) != 4 )
         continue;
-      for( i = 0; i < 4; i ++ ) printf( "%02X", data[ i ] );
-      printf( "\n" );
-      if( data[ 0 ] == 0xFF && data[ 1 ] == 0xFF && data[ 2 ] == 0xFF && data[ 3 ] == 0xFF )
-        break;
-      memcpy( program + idx, data, 4 );
-      idx += 4;
+      if( data[ 0 ] == 0xFF ) // direct mode/end of program
+      {
+        if( data[ 1 ] == 0xFF && data[ 2 ] == 0xFF && data[ 3 ] == 0xFF )
+          break;
+        ledvm_ll_setrgb( data[ 1 ], data[ 2 ], data[ 3 ] );
+      }
+      else
+      {
+        memcpy( program + idx, data, 4 );
+        idx += 4;
+      }
     }
-    printf( "Program uploaded, got %d instructions\n", idx >> 2 );
     // Execute program
     while( 1 )
     {
       if( ( idx = ledvm_run() ) != LEDVM_ERR_OK )
       {
-        printf( "ledvm_run() returned error %d at %d!\n", idx, ledvm_get_pc() );
         ledvm_ll_setrgb( 0, 0, 0 );
         while( 1 );
       }
