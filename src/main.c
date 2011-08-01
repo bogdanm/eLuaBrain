@@ -114,13 +114,6 @@ int main( void )
 
   // Initialize the nRF radio
   nrf_init();
-  /* // Uncomment to test nRF link
-  u8 data[ 33 ];
-  memset( data, 0, 33 );
-  int pipeno;
-  while( nrf_get_packet( data, 32, &pipeno ) == 0 );
-  printf( "Got data on pipe %d: %s\n", pipeno, data );
-  while( 1 ); */
 
   // Search for autorun files in the defined order and execute the 1st if found
   for( i = 0; i < sizeof( boot_order ) / sizeof( *boot_order ); i++ )

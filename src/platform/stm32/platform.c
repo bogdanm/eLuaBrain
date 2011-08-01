@@ -120,7 +120,10 @@ int platform_init()
 #endif  
 
   eth_init();
-  
+
+  // Wait a while for the Propeller to start running
+  platform_timer_delay( 0, 1300000 );
+
   // All done
   return PLATFORM_OK;
 }
@@ -1457,7 +1460,6 @@ static void vram_transfer_init()
   // Now it's a good time to get the Propeller out of reset
   platform_pio_op( PROP_RESET_PORT, 1 << PROP_RESET_PIN, PLATFORM_IO_PIN_SET );  
   platform_pio_op( PROP_RESET_PORT, 1 << PROP_RESET_PIN, PLATFORM_IO_PIN_DIR_OUTPUT );
-  platform_timer_delay( 0, 1000000 );
 }
 
 // ****************************************************************************
@@ -1468,15 +1470,25 @@ static void vram_transfer_init()
 #define ETH_INT_RESNUM        PLATFORM_IO_ENCODE( ENC28J60_INT_PORT, ENC28J60_INT_PIN, PLATFORM_IO_ENC_PIN )
 #define MAX_SEND_RETRY        5
 
+volatile static u8 eth_forced = 0;
+
 // Ethernet interrupt handler
 void eth_int_handler()
 {
-  if( eth_initialized )
+  if( !eth_initialized )
+    return;
+  if( eth_forced )
   {
-    SetRXInterrupt( 0 );
     elua_uip_mainloop();
-    SetRXInterrupt( 1 );
+    eth_forced = 0;
+    return;
   }
+  SetGlobalInterrupt( 0 );
+  if( isRxIntActive() )
+    elua_uip_mainloop();
+  else if( isLinkIntActive() )
+    elua_net_link_changed();
+  SetGlobalInterrupt( 1 );
 }
 
 static void eth_init()
@@ -1497,25 +1509,23 @@ static void eth_init()
   platform_cpu_set_interrupt( INT_GPIO_NEGEDGE, ETH_INT_RESNUM, PLATFORM_CPU_ENABLE );
   // Note: the handler will be called automatically from platform_int.c
   SetRXInterrupt( 1 );
+  SetLinkInterrupt( 1 );
 
   // Let uIP run now
   for( i = 0; i < 6; i ++ )
     sTempAddr.addr[ i ] = macaddr[ i ];
-  elua_uip_init( &sTempAddr );
-  eth_initialized = 1;    
+  elua_net_init( &sTempAddr );  
+  eth_initialized = 1;  
 }
 
 int platform_eth_get_link_status()
 {
   return isLinkUp() ? PLATFORM_ETH_LINK_UP : PLATFORM_ETH_LINK_DOWN;
-  // [TODO]:
-  //   interrupt and call elua_uip_xxx when link is up/down
-  //   elua_uip should close all the current sockets
 }
 
 void platform_eth_send_packet( const void* src, u32 size )
 {
-  int retrcount = 0;
+  //int retrcount = 0;
   //printf( "send %d bytes\n", ( int )size );
   //for( retrcount = 0; retrcount < MAX_SEND_RETRY; retrcount ++ )
   //  if( MACWrite( ( u8* )src, ( u16 )size ) == TRUE )
@@ -1533,6 +1543,7 @@ u32 platform_eth_get_packet_nb( void* buf, u32 maxlen )
 
 void platform_eth_force_interrupt()
 {
+  eth_forced = 1;
   EXTI_GenerateSWInterrupt( exti_line[ ENC28J60_INT_PIN ]  ); 
 }
 

@@ -141,6 +141,8 @@ void initMAC( const u8* bytMacAddress )
   WriteCtrReg(ECON1,  ECON1_RXEN);     //Enable the chip for reception of packets
 
   SetBitField(EIE, EIE_INTIE);
+  WritePhyReg(PHIE, PHIE_PGEIE|PHIE_PLNKIE);
+  ReadPhyReg(PHIR);
 }
 
 #if 0
@@ -613,10 +615,33 @@ void SetLinkInterrupt( int enabled )
     ClrBitField( EIE, EIE_LINKIE );
 }
 
+void SetGlobalInterrupt( int enabled )
+{
+  if( enabled )
+    SetBitField( EIE, EIE_INTIE );
+  else
+    ClrBitField( EIE, EIE_INTIE );
+}
+
 // Checks link status
 int isLinkUp()
 {
   return ( ReadPhyReg( PHSTAT2 ) & PHSTAT2_LSTAT ) != 0;
+}
+
+// Check if the RX interrupt is active
+int isRxIntActive()
+{
+  return ( ReadETHReg( EIR ) & EIR_PKTIF ) != 0;
+}
+
+// Check if the link interrupt is active
+int isLinkIntActive()
+{
+  int active = ( ReadETHReg( EIR ) & EIR_LINKIF ) != 0;
+  if( active )
+    ReadPhyReg( PHIR ); // clear interrupt
+  return active;
 }
 
 #endif // #ifdef BUILD_ENC28J60

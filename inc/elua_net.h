@@ -16,7 +16,8 @@ enum
   ELUA_NET_ERR_TIMEDOUT,
   ELUA_NET_ERR_CLOSED,
   ELUA_NET_ERR_ABORTED,
-  ELUA_NET_ERR_OVERFLOW
+  ELUA_NET_ERR_OVERFLOW,
+  ELUA_NET_ERR_LINKDOWN
 };
 
 // eLua IP address type
@@ -52,13 +53,21 @@ enum
 // Infinite timeout for timed operations
 #define ELUA_NET_INF_TIMEOUT          ( -1 )
 
+// Stack state
+#define ELUA_NET_STATE_UP             1
+#define ELUA_NET_STATE_DOWN           0
+
 // Receive data callback type
 typedef void( *p_elua_net_recv_cb )( int, const u8*, unsigned, elua_net_ip, u16 );
+// Stack state changed callback type
+typedef void ( *p_elua_net_state_cb )( int state );
 
 // eLua TCP/IP functions
-
 // Generic functions
-
+void elua_net_init( void* pdata );
+void elua_net_link_changed();
+p_elua_net_state_cb elua_net_set_state_cb( p_elua_net_state_cb plink );
+p_elua_net_state_cb elua_net_get_state_cb();
 int elua_net_socket( int type );
 int elua_net_set_buffer( int s, unsigned bufsize );
 int elua_net_set_split( int s, int schar );

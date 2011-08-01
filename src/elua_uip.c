@@ -24,6 +24,9 @@ extern void* uip_sappdata;
 // Global "configured" flag
 static volatile u8 elua_uip_configured;
 
+// "Link changed" call back
+static p_elua_net_state_cb elua_uip_state_cb;
+
 // *****************************************************************************
 // Platform independenet eLua UIP "main loop" implementation
 
@@ -48,6 +51,9 @@ static void device_driver_send()
 void elua_uip_mainloop()
 {
   u32 temp, packet_len;
+
+  if( platform_eth_get_link_status() == PLATFORM_ETH_LINK_DOWN )
+    return;
 
   // Increment uIP timers
   temp = platform_eth_get_elapsed_time();
@@ -144,12 +150,14 @@ void dhcpc_configured(const struct dhcpc_state *s)
 {
   if( s->ipaddr[ 0 ] != 0 )
   {
-    printf( "GOT DHCP IP!!!\n" );
+    //printf( "GOT DHCP IP!!!\n" );
     uip_sethostaddr( s->ipaddr );
     uip_setnetmask( s->netmask ); 
     uip_setdraddr( s->default_router );     
     resolv_conf( ( u16_t* )s->dnsaddr );
     elua_uip_configured = 1;
+    if( elua_uip_state_cb )
+      elua_uip_state_cb( ELUA_NET_STATE_UP );
   }
   else
     elua_uip_conf_static();
@@ -443,20 +451,18 @@ static void elua_uip_conf_static()
   uip_ipaddr( ipaddr, ELUA_CONF_DNS0, ELUA_CONF_DNS1, ELUA_CONF_DNS2, ELUA_CONF_DNS3 );
   resolv_conf( ipaddr );  
   elua_uip_configured = 1;
+  if( elua_uip_state_cb )
+    elua_uip_state_cb( ELUA_NET_STATE_UP );
 }
 
-// Init application
-void elua_uip_init( const struct uip_eth_addr *paddr )
+// This part of initializtion always takes place when a link is detected
+static void elua_uip_linkinit()
 {
-  // Set hardware address
-  uip_setethaddr( (*paddr) );
-  
-  // Initialize the uIP TCP/IP stack.
-  uip_init();
-  uip_arp_init();  
+  if( platform_eth_get_link_status() == PLATFORM_ETH_LINK_DOWN )
+    return;
   
 #ifdef BUILD_DHCPC
-  dhcpc_init( paddr->addr, sizeof( *paddr ) );
+  dhcpc_init( uip_ethaddr.addr, sizeof( uip_ethaddr ) );
   dhcpc_request();
 #else
   elua_uip_conf_static();
@@ -467,6 +473,54 @@ void elua_uip_init( const struct uip_eth_addr *paddr )
 #ifdef BUILD_CON_TCP
   uip_listen( HTONS( ELUA_NET_TELNET_PORT ) );
 #endif  
+}
+
+// Init application
+void elua_net_init( void *pdata )
+{
+  const struct uip_eth_addr *paddr = ( const struct uip_eth_addr* )pdata;
+
+  // Set hardware address
+  uip_setethaddr( (*paddr) );
+
+  uip_init();
+  uip_arp_init();
+  elua_uip_configured = 0;
+  
+  // Low level initialization
+  elua_uip_linkinit();
+}
+
+// Helper for forced closing sockets
+static void eluah_net_forced_close( struct elua_uip_state *pstate )
+{
+  if( pstate->buf )
+    free( pstate->buf );
+  memset( pstate, 0, sizeof( *pstate ) );
+}
+
+void elua_net_link_changed()
+{
+  int state = platform_eth_get_link_status();
+  unsigned i;
+
+  if( state == PLATFORM_ETH_LINK_DOWN )
+  {
+    uip_init();
+    uip_arp_init();
+    elua_uip_configured = 0;
+    // Clean all TCP sockets
+    for( i = 0; i < UIP_CONNS; i ++ )
+      eluah_net_forced_close( ( struct elua_uip_state* )&( uip_conns[ i ].appstate ) );
+    // And all UDP sockets
+    for( i = 0; i < UIP_UDP_CONNS; i ++ )
+      eluah_net_forced_close( ( struct elua_uip_state* )&( uip_udp_conns[ i ].appstate ) );
+    // Call state changed callback if available
+    if( elua_uip_state_cb )
+      elua_uip_state_cb( ELUA_NET_STATE_DOWN );
+  }
+  else
+    elua_uip_linkinit();
 }
 
 // *****************************************************************************
@@ -565,6 +619,19 @@ static void elua_prep_socket_state( volatile struct elua_uip_state *pstate, void
   pstate->state = state;
 }
 
+p_elua_net_state_cb elua_net_set_state_cb( p_elua_net_state_cb plink )
+{
+  p_elua_net_state_cb prev = elua_uip_state_cb;
+
+  elua_uip_state_cb = plink;
+  return prev;
+}
+
+p_elua_net_state_cb elua_net_get_state_cb()
+{
+  return elua_uip_state_cb;
+}
+
 int elua_net_socket( int type )
 {
   int i;
@@ -572,6 +639,8 @@ int elua_net_socket( int type )
   struct uip_udp_conn* pudp;
   volatile struct elua_uip_state *pstate = NULL;
 
+  if( !elua_uip_configured )
+    return ELUA_NET_INVALID_SOCKET;
   platform_eth_set_interrupt( PLATFORM_ETH_INT_DISABLE );
   if( type == ELUA_NET_SOCK_DGRAM )
   {
@@ -637,6 +706,20 @@ static int eluah_get_socket_state( int *ps, volatile struct elua_uip_state **pps
   return res;
 }
 
+// Helper: check if the stack is still up, return 1 if it is,
+// return 0 and set 'state' properly if it is not
+static int eluah_check_stack_state( volatile struct elua_uip_state *pstate )
+{
+  if( elua_uip_configured )
+    return 1;
+  else
+  {
+    pstate->res = ELUA_NET_ERR_LINKDOWN;
+    pstate->state = ELUA_UIP_STATE_IDLE;
+    return 0;
+  }
+}
+
 // Send data - internal helper (also works for 'sendto')
 static elua_net_size elua_net_send_internal( int s, const void* buf, elua_net_size len, elua_net_ip remoteip, u16 remoteport, int is_sendto )
 {
@@ -662,7 +745,9 @@ static elua_net_size elua_net_send_internal( int s, const void* buf, elua_net_si
     tosend = UMIN( is_sendto ? UIP_APPDATA_SIZE : uip_conns[ s ].mss, len );
     elua_prep_socket_state( pstate, ( void* )buf, tosend, ELUA_NET_ERR_OK, ELUA_UIP_STATE_SEND );
     platform_eth_force_interrupt();
-    while( pstate->state != ELUA_UIP_STATE_IDLE && pstate->state != ELUA_UIP_STATE_RETRY );
+    while( pstate->state != ELUA_UIP_STATE_IDLE && pstate->state != ELUA_UIP_STATE_RETRY && elua_uip_configured );
+    if( !eluah_check_stack_state( pstate ) )
+      break;
     if( pstate->state == ELUA_UIP_STATE_RETRY ) // resend the exact same packet again
       continue;
     sentbytes = tosend - pstate->len;
@@ -708,6 +793,8 @@ static elua_net_size elua_net_recv_internal( int s, void* buf, elua_net_size max
       while( 1 )
       {
         if( ( readbytes = pstate->buf_crt ) > 0 )
+          break;    
+        if( !eluah_check_stack_state( pstate ) )
           break;
         if( to_us == 0 || ( to_us > 0 && platform_timer_get_diff_us( timer_id, tmrstart, platform_timer_op( timer_id, PLATFORM_TIMER_OP_READ, 0 ) ) >= to_us ) )
           break;
@@ -757,10 +844,13 @@ static elua_net_size elua_net_recv_internal( int s, void* buf, elua_net_size max
       }
       else
         readsize = 0;
-      platform_eth_set_interrupt( PLATFORM_ETH_INT_DISABLE );
-      pstate->buf_crt -= readsize;
-      pstate->res = readbytes > 0 ? ELUA_NET_ERR_OK : ELUA_NET_ERR_TIMEDOUT;
-      platform_eth_set_interrupt( PLATFORM_ETH_INT_ENABLE );
+      if( elua_uip_configured )
+      {
+        platform_eth_set_interrupt( PLATFORM_ETH_INT_DISABLE );
+        pstate->buf_crt -= readsize;
+        pstate->res = readbytes > 0 ? ELUA_NET_ERR_OK : ELUA_NET_ERR_TIMEDOUT;
+        platform_eth_set_interrupt( PLATFORM_ETH_INT_ENABLE );
+      }
     }
     else // direct read
     {
@@ -769,6 +859,8 @@ static elua_net_size elua_net_recv_internal( int s, void* buf, elua_net_size max
       while( 1 )
       {
         if( pstate->state == ELUA_UIP_STATE_IDLE )
+          break;
+        if( !eluah_check_stack_state( pstate ) )
           break;
         if( to_us == 0 || ( to_us > 0 && platform_timer_get_diff_us( timer_id, tmrstart, platform_timer_op( timer_id, PLATFORM_TIMER_OP_READ, 0 ) ) >= to_us ) )
         {
@@ -821,7 +913,7 @@ int elua_net_get_telnet_socket()
   
 #ifdef BUILD_CON_TCP  
   if( elua_uip_telnet_socket != -1 )
-    if( uip_conn_active( elua_uip_telnet_socket ) )
+    if( elua_uip_configured && uip_conn_active( elua_uip_telnet_socket ) )
       res = elua_uip_telnet_socket;
 #endif      
   return res;
@@ -847,7 +939,9 @@ int elua_net_close( int s )
   }
   elua_prep_socket_state( pstate, NULL, 0, ELUA_NET_ERR_OK, ELUA_UIP_STATE_CLOSE );
   platform_eth_force_interrupt();
-  while( pstate->state != ELUA_UIP_STATE_IDLE );
+  while( pstate->state != ELUA_UIP_STATE_IDLE && elua_uip_configured );
+  if( !eluah_check_stack_state( pstate ) )
+    return 0;
   if( pstate->buf )
   {
     free( pstate->buf );
@@ -952,6 +1046,8 @@ int elua_net_accept( u16 port, unsigned timer_id, s32 to_us, elua_net_ip* pfrom 
   {
     if( elua_uip_accept_request == 0 )
       break;
+    if( !elua_uip_configured )
+      break;
     if( to_us == 0 || ( to_us > 0 && platform_timer_get_diff_us( timer_id, tmrstart, platform_timer_op( timer_id, PLATFORM_TIMER_OP_READ, 0 ) ) >= to_us ) )
     {
       elua_uip_accept_request = 0;
@@ -984,6 +1080,8 @@ int elua_net_connect( int s, elua_net_ip addr, u16 port, unsigned timer_id, s32 
     tmrstart = platform_timer_op( timer_id, PLATFORM_TIMER_OP_START, 0 );
   while( pstate->state != ELUA_UIP_STATE_IDLE )
   {
+    if( !eluah_check_stack_state( pstate ) )
+      break;
     if( to_us == 0 || ( to_us > 0 && platform_timer_get_diff_us( timer_id, tmrstart, platform_timer_op( timer_id, PLATFORM_TIMER_OP_READ, 0 ) ) >= to_us ) )
     {
       elua_net_close( s );
@@ -1009,8 +1107,9 @@ elua_net_ip elua_net_lookup( const char* hostname )
     elua_resolv_req_done = 0;
     resolv_query( ( char* )hostname );
     platform_eth_force_interrupt();
-    while( elua_resolv_req_done == 0 );
-    res = elua_resolv_ip;
+    while( elua_resolv_req_done == 0 && elua_uip_configured );
+    if( elua_uip_configured )
+      res = elua_resolv_ip;
   }
 #endif
   return res;  
@@ -1085,6 +1184,8 @@ static int eluah_expect_read_char( int s, int socktype, volatile struct elua_uip
     {
       if( ( leftbytes = pstate->buf_crt ) > 0 )
         break;
+      if( !eluah_check_stack_state( pstate ) )
+        return -1;
       if( to_us == 0 || ( to_us > 0 && platform_timer_get_diff_us( timer_id, tmrstart, platform_timer_op( timer_id, PLATFORM_TIMER_OP_READ, 0 ) ) >= to_us ) )
         break;
       if( socktype == ELUA_NET_SOCK_STREAM && !uip_conn_active( s ) )

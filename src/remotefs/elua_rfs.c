@@ -155,9 +155,10 @@ static u32 rfs_recv( u8 *p, u32 size, s32 timeout )
 // UDP transport implementation
 
 #ifdef RFS_TRANSPORT_UDP
-static int rfs_socket;
+static int rfs_socket = ELUA_NET_INVALID_SOCKET;
 static volatile elua_net_ip rfs_server_ip;
 static volatile u16 rfs_data_size;
+static p_elua_net_state_cb rfs_prev_state_cb;
 
 #define RFS_MAX_DISCOVERIES   3
 #define RFS_DISCOVERY_TO      40000
@@ -165,6 +166,8 @@ static volatile u16 rfs_data_size;
 // Receive callback (directly from the TCP stack)
 static void rfs_recv_cb( int sockno, const u8 *pdata, unsigned size, elua_net_ip ip, u16 port )
 {
+  if( rfs_socket == ELUA_NET_INVALID_SOCKET )
+    return;
   ( void )sockno;
   if( rfs_server_ip.ipaddr == 0 && size == ELUARPC_START_OFFSET && eluarpc_is_discover_response_packet( pdata ) ) // this is a response for the discovery request
   {
@@ -187,6 +190,8 @@ static int rfs_lookup_server()
   int retries = 0;
   u8 discover_packet[ ELUARPC_START_OFFSET ];
 
+  if( rfs_socket == ELUA_NET_INVALID_SOCKET )
+    return 0;
   if( rfs_server_ip.ipaddr != 0 )
     return 1;
   ip.ipaddr = 0xFFFFFFFF;
@@ -210,6 +215,8 @@ static int rfs_lookup_server()
 
 static u32 rfs_send( const u8 *p, u32 size )
 {
+  if( rfs_socket == ELUA_NET_INVALID_SOCKET )
+    return 0;
   if( !rfs_lookup_server() )
     return 0;
   return elua_net_sendto( rfs_socket, p, size, rfs_server_ip, RFS_UDP_PORT );
@@ -222,6 +229,8 @@ static u32 rfs_recv( u8 *p, u32 size, s32 timeout )
 
   ( void )p;
   ( void )size;
+  if( rfs_socket == ELUA_NET_INVALID_SOCKET )
+    return 0;
   if( rfs_server_ip.ipaddr == 0 ) // this shouldn't happen at all
     return 0;
   if( timeout > 0 )
@@ -238,6 +247,19 @@ static u32 rfs_recv( u8 *p, u32 size, s32 timeout )
   if( readbytes == 0 ) // server error, must search again
     rfs_server_ip.ipaddr = 0;
   return readbytes;
+}
+
+static void rfs_state_cb( int state )
+{
+  if( state == ELUA_NET_STATE_DOWN )
+    rfs_socket = ELUA_NET_INVALID_SOCKET;
+  else
+  {
+    if( ( rfs_socket = elua_net_socket( ELUA_NET_SOCK_DGRAM ) ) != ELUA_NET_INVALID_SOCKET )
+      elua_net_set_recv_callback( rfs_socket, rfs_recv_cb );
+  }
+  if( rfs_prev_state_cb )
+    rfs_prev_state_cb( state );
 }
 #endif
 
@@ -292,16 +314,9 @@ const DM_DEVICE *remotefs_init()
     return NULL;
   } 
 #elif defined( RFS_TRANSPORT_UDP ) // goodie!
-  elua_net_ip ip;
-  while( 1 )
-  {
-    ip = elua_net_get_config( ELUA_NET_CFG_IP );
-    if( ip.ipaddr != 0 )
-      break;
-  }
-  if( ( rfs_socket = elua_net_socket( ELUA_NET_SOCK_DGRAM ) ) == ELUA_NET_INVALID_SOCKET )
-    return NULL;
-  elua_net_set_recv_callback( rfs_socket, rfs_recv_cb );
+  if( ( rfs_socket = elua_net_socket( ELUA_NET_SOCK_DGRAM ) ) != ELUA_NET_INVALID_SOCKET )
+    elua_net_set_recv_callback( rfs_socket, rfs_recv_cb );
+  rfs_prev_state_cb = elua_net_set_state_cb( rfs_state_cb );
 #endif
   rfsc_setup( rfs_buffer, rfs_send, rfs_recv, RFS_TIMEOUT );
   return &rfs_device;

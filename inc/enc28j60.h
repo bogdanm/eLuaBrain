@@ -15,8 +15,14 @@ u16 MACRead(u08*, u16 maxsize);
 void SetRXInterrupt( int enabled );
 // Enable/disable link status interrupt
 void SetLinkInterrupt( int enabled );
+// Enable/disable global interrupt
+void SetGlobalInterrupt( int enabled );
 // Checks link status
 int isLinkUp();
+// Check if the RX interrupt is active
+int isRxIntActive();
+// Check if the link interrupt is active
+int isLinkIntActive();
 
 // useful structures
 typedef union {
