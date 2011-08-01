@@ -121,9 +121,6 @@ int platform_init()
 
   eth_init();
 
-  // Wait a while for the Propeller to start running
-  platform_timer_delay( 0, 1300000 );
-
   // All done
   return PLATFORM_OK;
 }

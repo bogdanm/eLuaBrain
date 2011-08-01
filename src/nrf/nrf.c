@@ -15,6 +15,7 @@
 static u8 nrf_p0_addr[ 5 ] = { 0xE7, 0xE7, 0xE7, 0xE7, 0xE7 };
 static u8 nrf_crt_mode = 0xFF;
 static u32 nrf_lfsr = 1;
+static u8 nrf_initialized = 0;
 
 #ifdef NRF_DEBUG
 #define nrfprint              printf
@@ -275,6 +276,9 @@ void nrf_init()
 {
   u8 t[5];
   unsigned i, j;
+
+  if( nrf_initialized )
+    return 0;
   
   // Do low-level setup first
   nrf_ll_init();
@@ -336,6 +340,8 @@ void nrf_init()
       nrfprint( "%02X%s", t[ j ], j == 4 ? "\n" : ":" );
   }
   nrfprint( "FEATURE: %d\n", nrf_read_register_byte( NRF_REG_FEATURE ) );
+
+  nrf_initialized = 1;
 }
 
 // nRF IRQ handler

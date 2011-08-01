@@ -24,6 +24,7 @@ static int nrfm_set_mode( lua_State *L )
 {
   int mode = luaL_checkinteger( L, 1 );
 
+  nrf_init();
   nrf_set_mode( mode );
   return 0;
 }
@@ -38,6 +39,7 @@ static int nrfm_write( lua_State *L )
   size_t len;
   const char *data;
   
+  nrf_init();
   if( !nrfmh_parse_address( addr, destaddr ) )
     return luaL_error( L, "invalid address" );
   luaL_checkstring( L, 2 );
@@ -58,6 +60,7 @@ static int nrfm_read( lua_State *L )
   unsigned len = 0;
   timer_data_type tmr_start, tmr_crt;
 
+  nrf_init();
   if( timeout == 0 )
     len = nrf_get_packet( data, NRF_MAX_PAYLOAD_SIZE, NULL );
   else if( timeout == PLATFORM_UART_INFINITE_TIMEOUT )
@@ -89,6 +92,7 @@ static int nrfm_set_address( lua_State *L )
   const char *addr = luaL_checkstring( L, 1 );
   u8 pipeaddr[ 5 ];
 
+  nrf_init();
   if( !nrfmh_parse_address( addr, pipeaddr ) )
     return luaL_error( L, "invalid address" );
   nrf_set_rx_addr( 0, pipeaddr );
