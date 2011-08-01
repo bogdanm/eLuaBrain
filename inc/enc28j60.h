@@ -13,6 +13,10 @@ u16 MACWrite(u08*, u16);
 u16 MACRead(u08*, u16 maxsize);
 // Enable/disable RX interrupt
 void SetRXInterrupt( int enabled );
+// Enable/disable link status interrupt
+void SetLinkInterrupt( int enabled );
+// Checks link status
+int isLinkUp();
 
 // useful structures
 typedef union {

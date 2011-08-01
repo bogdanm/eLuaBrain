@@ -1497,12 +1497,20 @@ static void eth_init()
   platform_cpu_set_interrupt( INT_GPIO_NEGEDGE, ETH_INT_RESNUM, PLATFORM_CPU_ENABLE );
   // Note: the handler will be called automatically from platform_int.c
   SetRXInterrupt( 1 );
- 
+
   // Let uIP run now
   for( i = 0; i < 6; i ++ )
     sTempAddr.addr[ i ] = macaddr[ i ];
   elua_uip_init( &sTempAddr );
   eth_initialized = 1;    
+}
+
+int platform_eth_get_link_status()
+{
+  return isLinkUp() ? PLATFORM_ETH_LINK_UP : PLATFORM_ETH_LINK_DOWN;
+  // [TODO]:
+  //   interrupt and call elua_uip_xxx when link is up/down
+  //   elua_uip should close all the current sockets
 }
 
 void platform_eth_send_packet( const void* src, u32 size )

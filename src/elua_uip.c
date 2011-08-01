@@ -431,6 +431,9 @@ void elua_uip_appcall()
 static void elua_uip_conf_static()
 {
   uip_ipaddr_t ipaddr;
+
+  if( platform_eth_get_link_status() == PLATFORM_ETH_LINK_DOWN )
+    return;
   uip_ipaddr( ipaddr, ELUA_CONF_IPADDR0, ELUA_CONF_IPADDR1, ELUA_CONF_IPADDR2, ELUA_CONF_IPADDR3 );
   uip_sethostaddr( ipaddr );
   uip_ipaddr( ipaddr, ELUA_CONF_NETMASK0, ELUA_CONF_NETMASK1, ELUA_CONF_NETMASK2, ELUA_CONF_NETMASK3 );
@@ -477,6 +480,9 @@ void elua_uip_udp_appcall()
   volatile struct elua_uip_state *s;
   elua_net_size temp;
   int sockno;
+
+  if( platform_eth_get_link_status() == PLATFORM_ETH_LINK_DOWN )
+    return;
   
   s = ( struct elua_uip_state* )&( uip_udp_conn->appstate );
   sockno = uip_udp_conn - uip_udp_conns;

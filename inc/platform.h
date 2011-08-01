@@ -289,12 +289,15 @@ int platform_i2c_recv_byte( unsigned id, int ack );
 
 #define PLATFORM_ETH_INT_ENABLE     1
 #define PLATFORM_ETH_INT_DISABLE    0
+#define PLATFORM_ETH_LINK_DOWN      0
+#define PLATFORM_ETH_LINK_UP        1
 
 void platform_eth_send_packet( const void* src, u32 size );
 u32 platform_eth_get_packet_nb( void* buf, u32 maxlen );
 void platform_eth_force_interrupt();
 u32 platform_eth_get_elapsed_time();
 void platform_eth_set_interrupt( int state );
+int platform_eth_get_link_status();
 
 // *****************************************************************************
 // Allocator support
