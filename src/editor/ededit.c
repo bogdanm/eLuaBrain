@@ -182,7 +182,10 @@ static int ededit_delline()
       return 1;
   }
   else
+  {
+    edhw_clearline( UMIN( EDITOR_LINES - 1, ed_crt_buffer->file_lines - 1 ) );
     edalloc_buffer_remove_line( ed_crt_buffer, lineid );
+  }
   if( ed_crt_buffer->file_lines == lineid )
   {
     if( ed_startline > 0 )

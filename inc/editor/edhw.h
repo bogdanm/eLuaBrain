@@ -28,6 +28,7 @@ typedef int ( *p_ed_validate )( const char *crt, int c );
 int edhw_init();
 int edhw_getkey( void );
 void edhw_clrscr();
+void edhw_clearline( int line );
 void edhw_writechar( char c );
 void edhw_writetext( const char* text );
 //void edhw_setcolors( int fgcol, int bgcol );

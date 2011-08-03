@@ -57,6 +57,15 @@ void edhw_setcursor( int type )
 {
 }
 
+void edhw_clearline( int line )
+{
+  int x = term_get_cx(), y = term_get_cy();
+
+  term_gotoxy( 0, line );
+  term_clreol();
+  term_gotoxy( x, y );
+}
+
 void edhw_clrscr()
 {
   term_clrscr();
