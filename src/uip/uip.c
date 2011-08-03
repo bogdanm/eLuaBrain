@@ -450,8 +450,8 @@ uip_find_unused_port()
      another one. */
   for(c = 0; c < UIP_CONNS; ++c) {
     conn = &uip_conns[c];
-    if(conn->tcpstateflags != UIP_CLOSED && conn->tcpstateflags != UIP_RESERVED &&
-       conn->lport == htons(lastport)) {
+    if(conn->tcpstateflags != UIP_CLOSED && conn->tcpstateflags != UIP_RESERVED && 
+       conn->tcpstateflags != UIP_WAITACCEPT && conn->lport == htons(lastport)) {
       goto again;
     }
   }
@@ -801,7 +801,7 @@ uip_process(u8_t flag)
       if(uip_connr->timer == UIP_TIME_WAIT_TIMEOUT) {
 	uip_connr->tcpstateflags = UIP_CLOSED;
       }
-    } else if(uip_connr->tcpstateflags != UIP_CLOSED && uip_connr->tcpstateflags != UIP_RESERVED) {
+    } else if(uip_connr->tcpstateflags != UIP_CLOSED && uip_connr->tcpstateflags != UIP_RESERVED && uip_connr->tcpstateflags != UIP_WAITACCEPT) {
       /* If the connection has outstanding data, we increase the
 	 connection's timer and see if it has reached the RTO value
 	 in which case we retransmit. */
@@ -1266,7 +1266,7 @@ uip_process(u8_t flag)
   /* First check any active connections. */
   for(uip_connr = &uip_conns[0]; uip_connr <= &uip_conns[UIP_CONNS - 1];
       ++uip_connr) {
-    if(uip_connr->tcpstateflags != UIP_CLOSED && uip_connr->tcpstateflags != UIP_RESERVED &&
+    if(uip_connr->tcpstateflags != UIP_CLOSED && uip_connr->tcpstateflags != UIP_RESERVED && uip_connr->tcpstateflags != UIP_WAITACCEPT && 
        BUF->destport == uip_connr->lport &&
        BUF->srcport == uip_connr->rport &&
        uip_ipaddr_cmp(BUF->srcipaddr, uip_connr->ripaddr)) {
@@ -1356,16 +1356,16 @@ uip_process(u8_t flag)
      nice algorithm for the TIME_WAIT search. */
   uip_connr = 0;
   for(c = 0; c < UIP_CONNS; ++c) {
-    if(uip_conns[c].tcpstateflags == UIP_CLOSED) {
+    if(uip_conns[c].tcpstateflags == UIP_WAITACCEPT) {
       uip_connr = &uip_conns[c];
       break;
     }
-    if(uip_conns[c].tcpstateflags == UIP_TIME_WAIT) {
+/*    if(uip_conns[c].tcpstateflags == UIP_TIME_WAIT) {
       if(uip_connr == 0 ||
 	 uip_conns[c].timer > uip_connr->timer) {
 	uip_connr = &uip_conns[c];
       }
-    }
+    }*/
   }
 
   if(uip_connr == 0) {

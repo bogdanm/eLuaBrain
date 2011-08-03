@@ -16,21 +16,17 @@
 
 #define lua_puship( L, ip )   lua_pushnumber( L, ( lua_Number )ip )
 
-// Lua: sock, remoteip, err = accept( port, [ timer_id, timeout ] )
+// Lua: sock, remoteip, err = accept( port, bufsize, [ timer_id, timeout ] )
 static int net_accept( lua_State *L )
 {
   u16 port = ( u16 )luaL_checkinteger( L, 1 );
-  unsigned timer_id = 0;
-  s32 timeout = ELUA_NET_INF_TIMEOUT;
+  unsigned bufsize = ( unsigned )luaL_optinteger( L, 1, 0 );
+  unsigned timer_id = ( unsigned )luaL_optinteger( L, 2, 0 );
+  s32 timeout = ( s32 )luaL_optinteger( L, 3, ELUA_NET_INF_TIMEOUT );
   elua_net_ip remip;
   int sock;
 
-  if( lua_gettop( L ) >= 2 ) // check for timeout arguments
-  {
-    timer_id = ( unsigned )luaL_checkinteger( L, 2 );
-    timeout = ( s32 )luaL_checkinteger( L, 3 );
-  }  
-  lua_pushinteger( L, sock = elua_net_accept( port, timer_id, timeout, &remip ) );
+  lua_pushinteger( L, sock = elua_net_accept( port, bufsize, timer_id, timeout, &remip ) );
   lua_puship( L, remip.ipaddr );
   lua_pushinteger( L, elua_net_get_last_err( sock ) );
   return 3;

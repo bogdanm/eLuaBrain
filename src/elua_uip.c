@@ -264,7 +264,6 @@ static elua_net_size elua_uip_telnet_prep_send( const char* src, elua_net_size s
 
 // Special handling for "accept"
 volatile static u8 elua_uip_accept_request;
-volatile static int elua_uip_accept_sock;
 volatile static elua_net_ip elua_uip_accept_remote;
 
 // Global helper for read: transfer data either directly in memory or in Lua buffer
@@ -341,7 +340,6 @@ void elua_uip_appcall()
 #endif
     if( elua_uip_accept_request )
     {
-      elua_uip_accept_sock = sockno;
       uip_ipaddr_copy( ( u16* )&elua_uip_accept_remote.ipaddr, uip_conn->ripaddr );
       elua_uip_accept_request = 0;
     }
@@ -658,7 +656,7 @@ int elua_net_socket( int type )
     for( i = 0; i < UIP_CONNS; i ++ )
     { 
       pconn = uip_conns + i;
-      if( pconn->tcpstateflags == UIP_CLOSED || pconn->tcpstateflags == UIP_RESERVED )
+      if( pconn->tcpstateflags == UIP_CLOSED || pconn->tcpstateflags  )
       { 
         // Found a free connection, reserve it for later use
         uip_conn_reserve( i );
@@ -786,105 +784,97 @@ static elua_net_size elua_net_recv_internal( int s, void* buf, elua_net_size max
   if( to_us > 0 )
     tmrstart = platform_timer_op( timer_id, PLATFORM_TIMER_OP_START, 0 );
   res = 0; // 'res' will keep the match status in split mode
-  while( maxsize )
+  if( pstate->buf ) // this is a buffered read, look for data
   {
-    if( pstate->buf ) // this is a buffered read, look for data
+    while( 1 )
     {
-      while( 1 )
+      if( ( readbytes = pstate->buf_crt ) > 0 )
+        break;    
+      if( !eluah_check_stack_state( pstate ) )
+        break;
+      if( to_us == 0 || ( to_us > 0 && platform_timer_get_diff_us( timer_id, tmrstart, platform_timer_op( timer_id, PLATFORM_TIMER_OP_READ, 0 ) ) >= to_us ) )
+        break;
+      if( socktype == ELUA_NET_SOCK_STREAM && !uip_conn_active( s ) )
+        break;
+    }
+    if( readbytes > maxsize )
+      readbytes = maxsize;
+    if( readbytes > 0 )
+    {
+      // Got some data, copy it in our buffer
+      // If the read operation uses split chars we read byte by byte until we find the split char or the end of buffer
+      if( pstate->split != ELUA_NET_NO_SPLIT )
       {
-        if( ( readbytes = pstate->buf_crt ) > 0 )
-          break;    
-        if( !eluah_check_stack_state( pstate ) )
-          break;
-        if( to_us == 0 || ( to_us > 0 && platform_timer_get_diff_us( timer_id, tmrstart, platform_timer_op( timer_id, PLATFORM_TIMER_OP_READ, 0 ) ) >= to_us ) )
-          break;
-        if( socktype == ELUA_NET_SOCK_STREAM && !uip_conn_active( s ) )
-          break;
-      }
-      if( readbytes > maxsize )
-        readbytes = maxsize;
-      if( readbytes > 0 )
-      {
-        // Got some data, copy it in our buffer
-        // If the read operation uses split chars we read byte by byte until we find the split char or the end of buffer
-        if( pstate->split != ELUA_NET_NO_SPLIT )
-        {
-          readsize = 0;
-          while( readsize < readbytes && res == 0 )
-          {
-            b = pstate->buf[ pstate->buf_ridx ];
-            if( with_buffer )
-              luaL_addchar( ( luaL_Buffer* )buf, ( char )b );
-            else              
-              *( ( u8* )buf + readsize ) = b;
-            if( ++ pstate->buf_ridx == pstate->buf_total )
-              pstate->buf_ridx = 0;
-            readsize ++;
-            if( b == pstate->split )
-              res = 1;
-          }
-        }
-        else // split not needed, just copy the data in the output buffer
-        {
-          // First transfer: ridx -> end of buffer
-          readsize = UMIN( readbytes, pstate->buf_total - pstate->buf_ridx );
-          eluah_uip_generic_read( buf, pstate->buf + pstate->buf_ridx, readsize, with_buffer );
-          pstate->buf_ridx += readsize;
-          if( pstate->buf_ridx == pstate->buf_total )
-          {
-            pstate->buf_ridx = 0;
-            if( readsize < readbytes ) // second transfer: from the start of buffer
-            {
-              eluah_uip_generic_read( with_buffer ? buf : ( u8* )buf + readsize, pstate->buf, readbytes - readsize, with_buffer );
-              pstate->buf_ridx += readbytes - readsize;
-            }
-          }
-          readsize = readbytes;
-        }
-      }
-      else
         readsize = 0;
-      if( elua_uip_configured )
+        while( readsize < readbytes && res == 0 )
+        {
+          b = pstate->buf[ pstate->buf_ridx ];
+          if( with_buffer )
+            luaL_addchar( ( luaL_Buffer* )buf, ( char )b );
+          else              
+            *( ( u8* )buf + readsize ) = b;
+          if( ++ pstate->buf_ridx == pstate->buf_total )
+            pstate->buf_ridx = 0;
+          readsize ++;
+          if( b == pstate->split )
+            res = 1;
+        }
+      }
+      else // split not needed, just copy the data in the output buffer
+      {
+        // First transfer: ridx -> end of buffer
+        readsize = UMIN( readbytes, pstate->buf_total - pstate->buf_ridx );
+        eluah_uip_generic_read( buf, pstate->buf + pstate->buf_ridx, readsize, with_buffer );
+        pstate->buf_ridx += readsize;
+        if( pstate->buf_ridx == pstate->buf_total )
+        {
+          pstate->buf_ridx = 0;
+          if( readsize < readbytes ) // second transfer: from the start of buffer
+          {
+            eluah_uip_generic_read( with_buffer ? buf : ( u8* )buf + readsize, pstate->buf, readbytes - readsize, with_buffer );
+            pstate->buf_ridx += readbytes - readsize;
+          }
+        }
+        readsize = readbytes;
+      }
+    }
+    else
+      readsize = 0;
+    if( elua_uip_configured )
+    {
+      platform_eth_set_interrupt( PLATFORM_ETH_INT_DISABLE );
+      pstate->buf_crt -= readsize;
+      pstate->res = readbytes > 0 ? ELUA_NET_ERR_OK : ELUA_NET_ERR_TIMEDOUT;
+      platform_eth_set_interrupt( PLATFORM_ETH_INT_ENABLE );
+    }
+  }
+  else // direct read
+  {
+    readsize = UMIN( is_recvfrom ? UIP_APPDATA_SIZE : uip_conns[ s ].mss, maxsize );
+    elua_prep_socket_state( pstate, buf, readsize, with_buffer, ELUA_UIP_STATE_RECV );
+    while( 1 )
+    {
+      if( pstate->state == ELUA_UIP_STATE_IDLE )
+        break;
+      if( !eluah_check_stack_state( pstate ) )
+        break;
+      if( to_us == 0 || ( to_us > 0 && platform_timer_get_diff_us( timer_id, tmrstart, platform_timer_op( timer_id, PLATFORM_TIMER_OP_READ, 0 ) ) >= to_us ) )
       {
         platform_eth_set_interrupt( PLATFORM_ETH_INT_DISABLE );
-        pstate->buf_crt -= readsize;
-        pstate->res = readbytes > 0 ? ELUA_NET_ERR_OK : ELUA_NET_ERR_TIMEDOUT;
-        platform_eth_set_interrupt( PLATFORM_ETH_INT_ENABLE );
-      }
-    }
-    else // direct read
-    {
-      readsize = UMIN( is_recvfrom ? UIP_APPDATA_SIZE : uip_conns[ s ].mss, maxsize );
-      elua_prep_socket_state( pstate, buf, readsize, with_buffer, ELUA_UIP_STATE_RECV );
-      while( 1 )
-      {
-        if( pstate->state == ELUA_UIP_STATE_IDLE )
-          break;
-        if( !eluah_check_stack_state( pstate ) )
-          break;
-        if( to_us == 0 || ( to_us > 0 && platform_timer_get_diff_us( timer_id, tmrstart, platform_timer_op( timer_id, PLATFORM_TIMER_OP_READ, 0 ) ) >= to_us ) )
-        {
-          platform_eth_set_interrupt( PLATFORM_ETH_INT_DISABLE );
-          if( pstate->state != ELUA_UIP_STATE_IDLE )
-          { 
-            pstate->res = ELUA_NET_ERR_TIMEDOUT;
-            pstate->state = ELUA_UIP_STATE_IDLE;
-          }
-          platform_eth_set_interrupt( PLATFORM_ETH_INT_ENABLE );
-          break;
+        if( pstate->state != ELUA_UIP_STATE_IDLE )
+        { 
+          pstate->res = ELUA_NET_ERR_TIMEDOUT;
+          pstate->state = ELUA_UIP_STATE_IDLE;
         }
-        if( socktype == ELUA_NET_SOCK_STREAM && !uip_conn_active( s ) )
-          break;
+        platform_eth_set_interrupt( PLATFORM_ETH_INT_ENABLE );
+        break;
       }
-      readbytes = readsize - pstate->len;
+      if( socktype == ELUA_NET_SOCK_STREAM && !uip_conn_active( s ) )
+        break;
     }
-    totread += readbytes;
-    if( res || readbytes == 0 || readbytes < readsize || pstate->res != ELUA_NET_ERR_OK )
-      break;
-    maxsize -= readbytes;
-    if( !with_buffer )
-      buf = ( u8* )buf + readbytes;
+    readbytes = readsize - pstate->len;
   }
+  totread += readbytes;
   if( is_recvfrom )
   {
     *p_remote_port = HTONS( uip_udp_conns[ s ].rport );
@@ -1024,9 +1014,10 @@ int elua_net_set_buffer( int s, unsigned bufsize )
 }
 
 // Accept a connection on the given port, return its socket id (and the IP of the remote host by side effect)
-int elua_net_accept( u16 port, unsigned timer_id, s32 to_us, elua_net_ip* pfrom )
+int elua_net_accept( u16 port, unsigned bufsize, unsigned timer_id, s32 to_us, elua_net_ip* pfrom )
 {
-  u32 tmrstart = 0;
+  timer_data_type tmrstart = 0;
+  int s = -1;
   
   if( !elua_uip_configured )
     return -1;
@@ -1034,11 +1025,16 @@ int elua_net_accept( u16 port, unsigned timer_id, s32 to_us, elua_net_ip* pfrom 
   if( port == ELUA_NET_TELNET_PORT )
     return -1;
 #endif  
+  if( ( s = elua_net_socket( ELUA_NET_SOCK_STREAM ) ) == -1 )
+    return -1;
+  if( bufsize )
+    if( elua_net_set_buffer( s, bufsize ) == 0 )
+      return -1;
+  uip_conn_mark_accept( s );
   platform_eth_set_interrupt( PLATFORM_ETH_INT_DISABLE );
   uip_unlisten( htons( port ) );
   uip_listen( htons( port ) );
   platform_eth_set_interrupt( PLATFORM_ETH_INT_ENABLE );
-  elua_uip_accept_sock = -1;
   elua_uip_accept_request = 1;
   if( to_us > 0 )
     tmrstart = platform_timer_op( timer_id, PLATFORM_TIMER_OP_START, 0 );
@@ -1046,16 +1042,15 @@ int elua_net_accept( u16 port, unsigned timer_id, s32 to_us, elua_net_ip* pfrom 
   {
     if( elua_uip_accept_request == 0 )
       break;
-    if( !elua_uip_configured )
-      break;
-    if( to_us == 0 || ( to_us > 0 && platform_timer_get_diff_us( timer_id, tmrstart, platform_timer_op( timer_id, PLATFORM_TIMER_OP_READ, 0 ) ) >= to_us ) )
+    if( !elua_uip_configured || to_us == 0 || ( to_us > 0 && platform_timer_get_diff_us( timer_id, tmrstart, platform_timer_op( timer_id, PLATFORM_TIMER_OP_READ, 0 ) ) >= to_us ) )
     {
-      elua_uip_accept_request = 0;
-      break;
+      elua_net_close( s );
+      s = -1;
     }
   }  
+  elua_uip_accept_request = 0;
   *pfrom = elua_uip_accept_remote;
-  return elua_uip_accept_sock;
+  return s;
 }
 
 // Connect to a specified machine
