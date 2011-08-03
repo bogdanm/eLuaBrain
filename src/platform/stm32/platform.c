@@ -1522,12 +1522,12 @@ int platform_eth_get_link_status()
 
 void platform_eth_send_packet( const void* src, u32 size )
 {
-  //int retrcount = 0;
+  int retrcount = 0;
   //printf( "send %d bytes\n", ( int )size );
-  //for( retrcount = 0; retrcount < MAX_SEND_RETRY; retrcount ++ )
-  //  if( MACWrite( ( u8* )src, ( u16 )size ) == TRUE )
-  //    return;
-  MACWrite( ( u8* )src, ( u16 )size );
+  for( retrcount = 0; retrcount < MAX_SEND_RETRY; retrcount ++ )
+    if( MACWrite( ( u8* )src, ( u16 )size ) == TRUE )
+      return;
+  //MACWrite( ( u8* )src, ( u16 )size );
 }
 
 u32 platform_eth_get_packet_nb( void* buf, u32 maxlen )

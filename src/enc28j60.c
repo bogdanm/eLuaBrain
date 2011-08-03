@@ -235,7 +235,7 @@ u16 MACWrite(u08 * ptrBuffer, u16 ui_Len)
     }
     ClrBitField(EIR, EIR_TXERIF | EIR_TXIF);
     ClrBitField(ESTAT,ESTAT_TXABRT);
-    //printf( "NOT SENT\n" );
+    //printf( "                   NOT SENT for len=%d\n", ui_Len );
     return FALSE;                                          // packet transmit failed. Inform calling function
   }                                                        // calling function may inquire why packet failed by calling [TO DO] function
   else

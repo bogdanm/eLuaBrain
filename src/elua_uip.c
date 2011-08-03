@@ -408,8 +408,9 @@ void elua_uip_appcall()
     // We write directly in UIP's buffer 
     if( uip_acked() )
     {
-      s->len = 0;
-      s->state = ELUA_UIP_STATE_IDLE;
+      temp = UMIN( s->len, uip_mss() );
+      s->len -= temp;
+      s->ptr += temp;
     }
     if( s->len > 0 ) // need to (re)transmit?
     {
@@ -421,8 +422,10 @@ void elua_uip_appcall()
       }
       else
 #endif      
-        uip_send( s->ptr, s->len );
+        uip_send( s->ptr, UMIN( s->len, uip_mss() ) );
     }
+    else
+      s->state = ELUA_UIP_STATE_IDLE;
     //return;
   }
   
@@ -722,7 +725,7 @@ static int eluah_check_stack_state( volatile struct elua_uip_state *pstate )
 static elua_net_size elua_net_send_internal( int s, const void* buf, elua_net_size len, elua_net_ip remoteip, u16 remoteport, int is_sendto )
 {
   volatile struct elua_uip_state *pstate;
-  elua_net_size tosend, sentbytes, totsent = 0;
+  elua_net_size sentbytes;
   int res;
  
   if( len == 0 )
@@ -738,24 +741,19 @@ static elua_net_size elua_net_send_internal( int s, const void* buf, elua_net_si
     uip_udp_conns[ s ].rport = HTONS( remoteport ); 
   }
   // Send data in 'sendlimit' chunks
-  while( len )
+  while( 1 )
   {
-    tosend = UMIN( is_sendto ? UIP_APPDATA_SIZE : uip_conns[ s ].mss, len );
-    elua_prep_socket_state( pstate, ( void* )buf, tosend, ELUA_NET_ERR_OK, ELUA_UIP_STATE_SEND );
+    elua_prep_socket_state( pstate, ( void* )buf, len, ELUA_NET_ERR_OK, ELUA_UIP_STATE_SEND );
     platform_eth_force_interrupt();
     while( pstate->state != ELUA_UIP_STATE_IDLE && pstate->state != ELUA_UIP_STATE_RETRY && elua_uip_configured );
     if( !eluah_check_stack_state( pstate ) )
       break;
     if( pstate->state == ELUA_UIP_STATE_RETRY ) // resend the exact same packet again
       continue;
-    sentbytes = tosend - pstate->len;
-    totsent += sentbytes;
-    if( sentbytes < tosend || pstate->res != ELUA_NET_ERR_OK )
-      break;
-    len -= sentbytes;
-    buf = ( u8* )buf + sentbytes;
+    sentbytes = len - pstate->len;
+    break;
   }
-  return totsent;
+  return sentbytes;
 }
 
 elua_net_size elua_net_send( int s, const void* buf, elua_net_size len )
