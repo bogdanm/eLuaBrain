@@ -112,11 +112,11 @@ void term_set_cursor( int type )
 
 void term_reset()
 {
-  term_clrscr();
-  term_gotoxy( 0, 0 );
   term_set_color( TERM_COL_DEFAULT, TERM_COL_DEFAULT );
   term_set_cursor( TERM_CURSOR_BLOCK );
   term_set_last_line( term_get_lines() - 1 );
+  term_clrscr();
+  term_gotoxy( 0, 0 );
 }
 
 void* term_box( unsigned x, unsigned y, unsigned width, unsigned height, const char *title, u16 flags )

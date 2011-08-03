@@ -170,9 +170,9 @@ static int linenoisePrompt(int id, char *buf, size_t buflen, const char *prompt)
      * initially is just an empty string. */
     linenoise_internal_addhistory( id, "", LINENOISE_PUSH_EMPTY );
     
-    term_putstr( prompt_cols[ id ], strlen( SHELL_PROMPT_COLOR ) );
+    term_putstr( prompt_cols[ id ], strlen( prompt_cols[ id ] ) );
     term_putstr( prompt, plen );
-    term_putstr( line_cols[ id ], strlen( SHELL_COMMAND_COLOR ) );
+    term_putstr( line_cols[ id ], strlen( line_cols[ id ] ) );
     while(1) {
         int c;
 

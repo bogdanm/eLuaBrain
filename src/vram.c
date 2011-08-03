@@ -26,6 +26,7 @@ static u8 vram_bg_col = VRAM_DEFAULT_BG_COL;
 static u8 vram_paging_enabled;
 static u8 vram_paging_lines;
 static u8 vram_last_line;
+static u8 vram_crt_attr;
 
 #define VRAM_CHARADDR( x, y )   ( ( y ) * VRAM_COLS + ( x ) + ( VRAM_FIRST_DATA >> 1 ) )
 #define VRAM_CHARADDR8( x, y )  ( ( char* )vram_data + ( ( ( y ) * VRAM_COLS + ( x ) ) << 1 ) + VRAM_FIRST_DATA )
@@ -237,16 +238,16 @@ static void vram_putchar_internal( int x, int y, char c )
 {
   u16 *pdata = ( u16* )vram_data + VRAM_CHARADDR( x, y );
  
-  *pdata = ( c << 8 ) | VRAM_MKCOL( vram_fg_col, vram_bg_col );      
+  *pdata = ( c << 8 ) | vram_crt_attr;
 }
 
 static void vram_clear_line( int y )
 {
   u32 *pdata = ( u32* )vram_data + ( VRAM_CHARADDR( 0, y ) >> 1 );
-  u32 fill = ( ' ' << 8 ) | VRAM_MKCOL( vram_fg_col, vram_bg_col );
+  u32 fill = ( ' ' << 8 ) | vram_crt_attr;
   unsigned i;
   
-  fill = ( fill < 16 ) | fill;
+  fill = ( fill << 16 ) | fill;
   for( i = 0; i < VRAM_COLS >> 1; i ++ )
     *pdata ++ = fill;   
 }
@@ -264,6 +265,7 @@ void vram_init()
   vram_p_type = pv + VRAM_OFF_TYPE;
   *vram_p_type = VRAM_CURSOR_BLOCK_BLINK;
   vram_last_line = VRAM_LINES - 1;
+  vram_set_color( VRAM_DEFAULT_FG_COL, VRAM_DEFAULT_BG_COL );
   vram_clrscr();  
 } 
 
@@ -334,14 +336,14 @@ void vram_putchar( char c )
   }
   else
   {
-    if( *vram_p_cx == VRAM_COLS )
+    if( *vram_p_cx >= VRAM_COLS )
     {
       // Last column on the line: write a new line (recursively) and change cursor position
       vram_putchar( '\n' );
       *vram_p_cx = 0;
     }
     vram_putchar_internal( *vram_p_cx, *vram_p_cy, c );  
-    *vram_p_cx += 1;        
+    *vram_p_cx += 1;
   }
 }            
 
@@ -360,7 +362,8 @@ void vram_set_color( int fg, int bg )
   if( bg == VRAM_COL_DEFAULT )
     vram_bg_col = VRAM_DEFAULT_BG_COL;
   else if( bg != VRAM_COL_DONT_CHANGE )
-    vram_bg_col = bg;        
+    vram_bg_col = bg;
+  vram_crt_attr = VRAM_MKCOL( vram_fg_col, vram_bg_col );
 }
 
 void vram_clrscr()
@@ -369,12 +372,12 @@ void vram_clrscr()
   u32 *pdata = vram_data + ( VRAM_FIRST_DATA >> 2 );
   u32 fill;
   
-  fill = ( ' ' << 8 ) | VRAM_MKCOL( vram_fg_col, vram_bg_col );
+  fill = ( ' ' << 8 ) | vram_crt_attr;
   fill = ( fill << 16 ) | fill;
   for( i = 0; i < VRAM_SIZE_VMEM_ONLY >> 2; i ++ )
     *pdata ++ = fill;
   *vram_p_cx = 0;
-  *vram_p_cy = 0;  
+  *vram_p_cy = 0; 
 }
 
 void vram_gotoxy( u8 x, u8 y )
@@ -409,7 +412,7 @@ u8 vram_get_cy()
 void vram_clreol()
 {
   u16 *pdata = ( u16* )vram_data + VRAM_CHARADDR( *vram_p_cx, *vram_p_cy );
-  u16 fill = ( ' ' << 8 ) | VRAM_MKCOL( vram_fg_col, vram_bg_col );
+  u16 fill = ( ' ' << 8 ) | vram_crt_attr;
   unsigned i;
    
   for( i = *vram_p_cx; i < VRAM_COLS; i ++ )
