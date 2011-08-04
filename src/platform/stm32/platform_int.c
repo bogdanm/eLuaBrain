@@ -72,7 +72,7 @@ static void all_exti_irqhandler( int line )
 {
   u16 v, port, pin;
   
-  v = exti_line_to_gpio( line );	
+  v = exti_line_to_gpio( line );
   port = PLATFORM_IO_GET_PORT( v );
   pin = PLATFORM_IO_GET_PIN( v );
 
@@ -164,7 +164,8 @@ static int gpioh_set_int_status( elua_int_id id, elua_int_resnum resnum, int sta
     EXTI_StructInit(&exti_init_struct);
     exti_init_struct.EXTI_Line = exti_line[ exint_gpio_to_src( resnum ) ];
     exti_init_struct.EXTI_Mode = EXTI_Mode_Interrupt;
-    if( ( ( ( EXTI->RTSR & mask ) != 0 ) && ( id == INT_GPIO_NEGEDGE ) ) || ( ( ( EXTI->FTSR & mask ) != 0 ) && ( id == INT_GPIO_POSEDGE ) ) )
+    if( ( ( ( EXTI->RTSR & mask ) != 0 ) && ( id == INT_GPIO_NEGEDGE ) ) ||
+        ( ( ( EXTI->FTSR & mask ) != 0 ) && ( id == INT_GPIO_POSEDGE ) ) )
       exti_init_struct.EXTI_Trigger = EXTI_Trigger_Rising_Falling;
     else
       exti_init_struct.EXTI_Trigger = id == INT_GPIO_POSEDGE ? EXTI_Trigger_Rising : EXTI_Trigger_Falling;

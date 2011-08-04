@@ -80,14 +80,14 @@ toolchain_list['devkitarm'] = toolchain_list['arm-eabi-gcc']
 # (the one that will be used if none is specified)
 platform_list = {  
   'at91sam7x' : { 'cpus' : [ 'AT91SAM7X256', 'AT91SAM7X512' ], 'toolchains' : [ 'arm-gcc', 'codesourcery', 'devkitarm', 'arm-eabi-gcc' ] },
-  'lm3s' : { 'cpus' : [ 'LM3S1968', 'LM3S8962', 'LM3S6965', 'LM3S6918', 'LM3S9B92' ], 'toolchains' : [ 'arm-gcc', 'codesourcery', 'devkitarm', 'arm-eabi-gcc' ] },
+  'lm3s' : { 'cpus' : [ 'LM3S1968', 'LM3S8962', 'LM3S6965', 'LM3S6918', 'LM3S9B92', 'LM3S9D92' ], 'toolchains' : [ 'arm-gcc', 'codesourcery', 'devkitarm', 'arm-eabi-gcc' ] },
   'str9' : { 'cpus' : [ 'STR912FAW44' ], 'toolchains' : [ 'arm-gcc', 'codesourcery', 'devkitarm', 'arm-eabi-gcc' ] },
   'i386' : { 'cpus' : [ 'I386' ], 'toolchains' : [ 'i686-gcc' ] },
   'sim' : { 'cpus' : [ 'LINUX' ], 'toolchains' : [ 'i686-gcc' ] },
   'lpc288x' : { 'cpus' : [ 'LPC2888' ], 'toolchains' : [ 'arm-gcc', 'codesourcery', 'devkitarm', 'arm-eabi-gcc' ] },
   'str7' : { 'cpus' : [ 'STR711FR2' ], 'toolchains' : [ 'arm-gcc', 'codesourcery', 'devkitarm', 'arm-eabi-gcc' ] },
   'stm32' : { 'cpus' : [ 'STM32F103ZE', 'STM32F103RE' ], 'toolchains' : [ 'arm-gcc', 'codesourcery', 'devkitarm', 'arm-eabi-gcc' ] },
-  'avr32' : { 'cpus' : [ 'AT32UC3A0512', 'AT32UC3A0128', 'AT32UC3B0256' ], 'toolchains' : [ 'avr32-gcc', 'avr32-unknown-none-gcc' ] },
+  'avr32' : { 'cpus' : [ 'AT32UC3A0512', 'AT32UC3A0256', 'AT32UC3A0128', 'AT32UC3B0256' ], 'toolchains' : [ 'avr32-gcc', 'avr32-unknown-none-gcc' ] },
   'lpc24xx' : { 'cpus' : [ 'LPC2468' ], 'toolchains' : [ 'arm-gcc', 'codesourcery', 'devkitarm', 'arm-eabi-gcc' ] },
   'lpc17xx' : { 'cpus' : [ 'LPC1768' ], 'toolchains' : [ 'arm-gcc', 'codesourcery', 'devkitarm', 'arm-eabi-gcc' ] }
 }
@@ -98,6 +98,7 @@ board_list = { 'SAM7-EX256' : [ 'AT91SAM7X256', 'AT91SAM7X512' ],
                'EK-LM3S8962' : [ 'LM3S8962' ],
                'EK-LM3S6965' : [ 'LM3S6965' ],
                'EK-LM3S9B92' : [ 'LM3S9B92' ],
+               'SOLDERCORE' : [ 'LM3S9D92' ],
                'STR9-COMSTICK' : [ 'STR912FAW44' ],
                'STR-E912' : [ 'STR912FAW44' ],
                'PC' : [ 'I386' ],
@@ -111,7 +112,7 @@ board_list = { 'SAM7-EX256' : [ 'AT91SAM7X256', 'AT91SAM7X512' ],
                'EAGLE-100' : [ 'LM3S6918' ],
                'ELUA-PUC' : ['LPC2468' ],
                'MBED' : ['LPC1768'],
-               'MIZAR32' : [ 'AT32UC3A0128' ],
+               'MIZAR32' : [ 'AT32UC3A0128', 'AT32UC3A0256', 'AT32UC3A0512', ],
                'NETDUINO' : [ 'AT91SAM7X512' ],
             }
 
@@ -279,7 +280,7 @@ if not GetOption( 'help' ):
     if syspl.system() == 'Windows':
       suffix = '.exe'
     else:
-      suffix = '.elf'
+      suffix = ''
     # First check for luac.cross in the current directory
     if not os.path.isfile( "luac.cross" + suffix ):
       print "The eLua cross compiler was not found."
@@ -388,8 +389,10 @@ if not GetOption( 'help' ):
   if not GetOption( 'clean' ):
     print "Building ROM File System..."
     flist = []
-    for sample in glob.glob("romfs/*"):
-      flist += [ string.replace( sample, "romfs/", "" ) ]
+    os.chdir( "romfs" );
+    for sample in glob.glob("*"):
+      flist += [ sample ]
+    os.chdir( ".." )
     import mkfs
     mkfs.mkfs( "romfs", "romfiles", flist, comp['romfs'], compcmd )
     print

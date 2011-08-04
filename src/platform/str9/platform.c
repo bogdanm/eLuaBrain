@@ -470,18 +470,18 @@ void ADC_IRQHandler( void )
     
       // Fill in smoothing buffer until warmed up
       if ( s->logsmoothlen > 0 && s->smooth_ready == 0)
-	adc_smooth_data( s->id );
+        adc_smooth_data( s->id );
 #if defined( BUF_ENABLE_ADC )
       else if ( s->reqsamples > 1 )
       {
-	buf_write( BUF_ID_ADC, s->id, ( t_buf_data* )s->value_ptr );
-	s->value_fresh = 0;
+        buf_write( BUF_ID_ADC, s->id, ( t_buf_data* )s->value_ptr );
+        s->value_fresh = 0;
       }
 #endif
 
       // If we have the number of requested samples, stop sampling
       if ( adc_samples_available( s->id ) >= s->reqsamples && s->freerunning == 0 )
-	platform_adc_stop( s->id );
+        platform_adc_stop( s->id );
 
       d->seq_ctr++;
     }
@@ -524,12 +524,12 @@ static void platform_setup_adcs()
 
   ADC_ITConfig(ADC_IT_ECV, ENABLE);
 
-  platform_adc_setclock( 0, 0 );
+  platform_adc_set_clock( 0, 0 );
 }
 
 
 // NOTE: On this platform, there is only one ADC, clock settings apply to the whole device
-u32 platform_adc_setclock( unsigned id, u32 frequency )
+u32 platform_adc_set_clock( unsigned id, u32 frequency )
 {
   elua_adc_dev_state *d = adc_get_dev_state( 0 );
   

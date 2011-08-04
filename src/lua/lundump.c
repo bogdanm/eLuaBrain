@@ -56,7 +56,7 @@ static void LoadBlock(LoadState* S, void* b, size_t size)
 static void LoadMem (LoadState* S, void* b, int n, size_t size)
 {
   LoadBlock(S,b,n*size);
-  if (S->swap)
+  if (S->swap && b)
   {
     char* p=(char*) b;
     char c;
@@ -156,18 +156,30 @@ static TString* LoadString(LoadState* S)
   return NULL;
  else
  {
-  char* s=luaZ_openspace(S->L,S->b,size);
-  LoadBlock(S,s,size);
-  return luaS_newlstr(S->L,s,size-1);		/* remove trailing '\0' */
+  char* s;
+  if (!luaZ_direct_mode(S->Z)) {
+   s = luaZ_openspace(S->L,S->b,size);
+   LoadBlock(S,s,size);
+   return luaS_newlstr(S->L,s,size-1); /* remove trailing zero */
+  } else {
+   s = (char*)luaZ_get_crt_address(S->Z);
+   LoadBlock(S,NULL,size);
+   return luaS_newrolstr(S->L,s,size-1);
+  }
  }
 }
 
 static void LoadCode(LoadState* S, Proto* f)
 {
  int n=LoadInt(S);
- f->code=luaM_newvector(S->L,n,Instruction);
  f->sizecode=n;
- LoadVector(S,f->code,n,sizeof(Instruction));
+ if (!luaZ_direct_mode(S->Z)) {
+  f->code=luaM_newvector(S->L,n,Instruction);
+  LoadVector(S,f->code,n,sizeof(Instruction));
+ } else {
+  f->code=(Instruction*)luaZ_get_crt_address(S->Z);
+  LoadVector(S,NULL,n,sizeof(Instruction));
+ }
 }
 
 static Proto* LoadFunction(LoadState* S, TString* p);
@@ -213,9 +225,14 @@ static void LoadDebug(LoadState* S, Proto* f)
 {
  int i,n;
  n=LoadInt(S);
- f->lineinfo=luaM_newvector(S->L,n,int);
  f->sizelineinfo=n;
- LoadVector(S,f->lineinfo,n,sizeof(int));
+ if (!luaZ_direct_mode(S->Z)) {
+   f->lineinfo=luaM_newvector(S->L,n,int);
+   LoadVector(S,f->lineinfo,n,sizeof(int));
+ } else {
+   f->lineinfo=(int*)luaZ_get_crt_address(S->Z);
+   LoadVector(S,NULL,n,sizeof(int));
+ }
  n=LoadInt(S);
  f->locvars=luaM_newvector(S->L,n,LocVar);
  f->sizelocvars=n;
@@ -238,6 +255,7 @@ static Proto* LoadFunction(LoadState* S, TString* p)
  Proto* f;
  if (++S->L->nCcalls > LUAI_MAXCCALLS) error(S,"code too deep");
  f=luaF_newproto(S->L);
+ if (luaZ_direct_mode(S->Z)) proto_readonly(f);
  setptvalue2s(S->L,S->L->top,f); incr_top(S->L);
  f->source=LoadString(S); if (f->source==NULL) f->source=p;
  f->linedefined=LoadInt(S);

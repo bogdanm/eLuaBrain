@@ -1,0 +1,488 @@
+diff -Naur lua-5.1.4-orig/src//lapi.c lua-5.1.4/src//lapi.c
+--- lua-5.1.4-orig/src//lapi.c	2008-07-04 21:41:18.000000000 +0300
++++ lua-5.1.4/src//lapi.c	2011-08-01 13:24:00.778020999 +0300
+@@ -450,6 +450,13 @@
+   lua_unlock(L);
+ }
+ 
++LUA_API void lua_pushrolstring (lua_State *L, const char *s, size_t len) {
++  lua_lock(L);
++  luaC_checkGC(L);
++  setsvalue2s(L, L->top, luaS_newrolstr(L, s, len));
++  api_incr_top(L);
++  lua_unlock(L);
++}
+ 
+ LUA_API void lua_pushstring (lua_State *L, const char *s) {
+   if (s == NULL)
+@@ -996,7 +1003,7 @@
+     L->top -= (n-1);
+   }
+   else if (n == 0) {  /* push empty string */
+-    setsvalue2s(L, L->top, luaS_newlstr(L, "", 0));
++    setsvalue2s(L, L->top, luaS_newrolstr(L, "", 0));
+     api_incr_top(L);
+   }
+   /* else n == 1; nothing to do */
+diff -Naur lua-5.1.4-orig/src//lauxlib.c lua-5.1.4/src//lauxlib.c
+--- lua-5.1.4-orig/src//lauxlib.c	2008-01-21 15:20:51.000000000 +0200
++++ lua-5.1.4/src//lauxlib.c	2011-07-29 17:09:44.378021002 +0300
+@@ -523,20 +523,33 @@
+   int extraline;
+   FILE *f;
+   char buff[LUAL_BUFFERSIZE];
++  const char *srcp;
++  size_t totsize;
+ } LoadF;
+ 
+ 
+ static const char *getF (lua_State *L, void *ud, size_t *size) {
+   LoadF *lf = (LoadF *)ud;
+   (void)L;
++  if (L == NULL && size == NULL) // special request: detect 'direct mode'
++    return lf->srcp;
+   if (lf->extraline) {
+     lf->extraline = 0;
+     *size = 1;
+     return "\n";
+   }
+-  if (feof(lf->f)) return NULL;
+-  *size = fread(lf->buff, 1, sizeof(lf->buff), lf->f);
+-  return (*size > 0) ? lf->buff : NULL;
++  if (lf->srcp == NULL) { // no direct access
++    if (feof(lf->f)) return NULL;
++    *size = fread(lf->buff, 1, sizeof(lf->buff), lf->f);
++    return (*size > 0) ? lf->buff : NULL;
++  } else { // direct access, return the whole file as a single buffer
++    if (lf->totsize) {
++      *size = lf->totsize;
++      lf->totsize = 0;
++      return lf->srcp;
++    } else
++      return NULL;
++  }
+ }
+ 
+ 
+@@ -553,8 +566,9 @@
+   LoadF lf;
+   int status, readstatus;
+   int c;
++  const char *srcp = NULL;
+   int fnameindex = lua_gettop(L) + 1;  /* index of filename on the stack */
+-  lf.extraline = 0;
++  lf.extraline = lf.totsize = 0;
+   if (filename == NULL) {
+     lua_pushliteral(L, "=stdin");
+     lf.f = stdin;
+@@ -563,6 +577,14 @@
+     lua_pushfstring(L, "@%s", filename);
+     lf.f = fopen(filename, "r");
+     if (lf.f == NULL) return errfile(L, "open", fnameindex);
++#ifdef TEST_ROM_FEATURES    
++    fseek(lf.f, 0, SEEK_END);
++    lf.totsize = ftell(lf.f);
++    fseek(lf.f, 0, SEEK_SET);
++    srcp = (const char*)malloc(lf.totsize);
++    fread((char*)srcp, 1, lf.totsize, lf.f);
++    fseek(lf.f, 0, SEEK_SET);
++#endif    
+   }
+   c = getc(lf.f);
+   if (c == '#') {  /* Unix exec. file? */
+@@ -578,9 +600,17 @@
+     lf.extraline = 0;
+   }
+   ungetc(c, lf.f);
++  if (srcp) {
++    lf.srcp = srcp + ftell(lf.f);
++    lf.totsize -= ftell(lf.f);
++  } else
++    lf.srcp = NULL;
+   status = lua_load(L, getF, &lf, lua_tostring(L, -1));
+   readstatus = ferror(lf.f);
+   if (filename) fclose(lf.f);  /* close file (even in case of errors) */
++#ifdef TEST_ROM_FEATURES    
++  if (srcp) free((char*)srcp);
++#endif  
+   if (readstatus) {
+     lua_settop(L, fnameindex);  /* ignore results from `lua_load' */
+     return errfile(L, "read", fnameindex);
+@@ -599,6 +629,8 @@
+ static const char *getS (lua_State *L, void *ud, size_t *size) {
+   LoadS *ls = (LoadS *)ud;
+   (void)L;
++  if (L == NULL && size == NULL) // direct mode check
++    return NULL;
+   if (ls->size == 0) return NULL;
+   *size = ls->size;
+   ls->size = 0;
+diff -Naur lua-5.1.4-orig/src//lbaselib.c lua-5.1.4/src//lbaselib.c
+--- lua-5.1.4-orig/src//lbaselib.c	2008-02-14 18:46:22.000000000 +0200
++++ lua-5.1.4/src//lbaselib.c	2011-07-29 17:09:44.378021002 +0300
+@@ -296,6 +296,8 @@
+ */
+ static const char *generic_reader (lua_State *L, void *ud, size_t *size) {
+   (void)ud;  /* to avoid warnings */
++  if (L == NULL && size == NULL) // direct mode check, doesn't happen
++    return NULL;
+   luaL_checkstack(L, 2, "too many nested functions");
+   lua_pushvalue(L, 1);  /* get function */
+   lua_call(L, 0, 1);  /* call it */
+diff -Naur lua-5.1.4-orig/src//ldo.c lua-5.1.4/src//ldo.c
+--- lua-5.1.4-orig/src//ldo.c	2008-01-19 00:31:22.000000000 +0200
++++ lua-5.1.4/src//ldo.c	2011-08-01 14:30:23.528021009 +0300
+@@ -407,7 +407,7 @@
+ 
+ static int resume_error (lua_State *L, const char *msg) {
+   L->top = L->ci->base;
+-  setsvalue2s(L, L->top, luaS_new(L, msg));
++  setsvalue2s(L, L->top, luaS_newro(L, msg));
+   incr_top(L);
+   lua_unlock(L);
+   return LUA_ERRRUN;
+diff -Naur lua-5.1.4-orig/src//lfunc.c lua-5.1.4/src//lfunc.c
+--- lua-5.1.4-orig/src//lfunc.c	2007-12-28 16:58:43.000000000 +0200
++++ lua-5.1.4/src//lfunc.c	2011-07-29 17:09:44.378021002 +0300
+@@ -139,12 +139,14 @@
+ 
+ 
+ void luaF_freeproto (lua_State *L, Proto *f) {
+-  luaM_freearray(L, f->code, f->sizecode, Instruction);
+   luaM_freearray(L, f->p, f->sizep, Proto *);
+   luaM_freearray(L, f->k, f->sizek, TValue);
+-  luaM_freearray(L, f->lineinfo, f->sizelineinfo, int);
+   luaM_freearray(L, f->locvars, f->sizelocvars, struct LocVar);
+   luaM_freearray(L, f->upvalues, f->sizeupvalues, TString *);
++  if (!proto_is_readonly(f)) {
++    luaM_freearray(L, f->code, f->sizecode, Instruction);
++    luaM_freearray(L, f->lineinfo, f->sizelineinfo, int);
++  }
+   luaM_free(L, f);
+ }
+ 
+diff -Naur lua-5.1.4-orig/src//lfunc.h lua-5.1.4/src//lfunc.h
+--- lua-5.1.4-orig/src//lfunc.h	2007-12-27 15:02:25.000000000 +0200
++++ lua-5.1.4/src//lfunc.h	2011-07-29 17:09:44.378021002 +0300
+@@ -17,6 +17,8 @@
+ #define sizeLclosure(n)	(cast(int, sizeof(LClosure)) + \
+                          cast(int, sizeof(TValue *)*((n)-1)))
+ 
++#define proto_readonly(p) ((p)->marked |= 128)
++#define proto_is_readonly(p) (((p)->marked & 128) != 0)
+ 
+ LUAI_FUNC Proto *luaF_newproto (lua_State *L);
+ LUAI_FUNC Closure *luaF_newCclosure (lua_State *L, int nelems, Table *e);
+diff -Naur lua-5.1.4-orig/src//lgc.c lua-5.1.4/src//lgc.c
+--- lua-5.1.4-orig/src//lgc.c	2007-12-27 15:02:25.000000000 +0200
++++ lua-5.1.4/src//lgc.c	2011-07-29 17:09:44.378021002 +0300
+@@ -308,12 +308,12 @@
+       Proto *p = gco2p(o);
+       g->gray = p->gclist;
+       traverseproto(g, p);
+-      return sizeof(Proto) + sizeof(Instruction) * p->sizecode +
+-                             sizeof(Proto *) * p->sizep +
++      return sizeof(Proto) + sizeof(Proto *) * p->sizep +
+                              sizeof(TValue) * p->sizek + 
+-                             sizeof(int) * p->sizelineinfo +
+                              sizeof(LocVar) * p->sizelocvars +
+-                             sizeof(TString *) * p->sizeupvalues;
++                             sizeof(TString *) * p->sizeupvalues +
++                             (proto_is_readonly(p) ? 0 : sizeof(Instruction) * p->sizecode +
++                                                         sizeof(int) * p->sizelineinfo);
+     }
+     default: lua_assert(0); return 0;
+   }
+diff -Naur lua-5.1.4-orig/src//lgc.h lua-5.1.4/src//lgc.h
+--- lua-5.1.4-orig/src//lgc.h	2007-12-27 15:02:25.000000000 +0200
++++ lua-5.1.4/src//lgc.h	2011-07-29 17:09:44.378021002 +0300
+@@ -48,6 +48,7 @@
+ ** bit 4 - for tables: has weak values
+ ** bit 5 - object is fixed (should not be collected)
+ ** bit 6 - object is "super" fixed (only the main thread)
++** bit 7 - object is partially stored in read-only memory
+ */
+ 
+ 
+@@ -59,6 +60,7 @@
+ #define VALUEWEAKBIT	4
+ #define FIXEDBIT	5
+ #define SFIXEDBIT	6
++#define READONLYBIT 7
+ #define WHITEBITS	bit2mask(WHITE0BIT, WHITE1BIT)
+ 
+ 
+diff -Naur lua-5.1.4-orig/src//llex.c lua-5.1.4/src//llex.c
+--- lua-5.1.4-orig/src//llex.c	2007-12-27 15:02:25.000000000 +0200
++++ lua-5.1.4/src//llex.c	2011-08-01 12:50:32.848021002 +0300
+@@ -64,7 +64,7 @@
+ void luaX_init (lua_State *L) {
+   int i;
+   for (i=0; i<NUM_RESERVED; i++) {
+-    TString *ts = luaS_new(L, luaX_tokens[i]);
++    TString *ts = luaS_newro(L, luaX_tokens[i]);
+     luaS_fix(ts);  /* reserved words are never collected */
+     lua_assert(strlen(luaX_tokens[i])+1 <= TOKEN_LEN);
+     ts->tsv.reserved = cast_byte(i+1);  /* reserved word */
+diff -Naur lua-5.1.4-orig/src//lobject.h lua-5.1.4/src//lobject.h
+--- lua-5.1.4-orig/src//lobject.h	2008-08-06 16:29:48.000000000 +0300
++++ lua-5.1.4/src//lobject.h	2011-07-29 17:09:44.378021002 +0300
+@@ -206,8 +206,7 @@
+   } tsv;
+ } TString;
+ 
+-
+-#define getstr(ts)	cast(const char *, (ts) + 1)
++#define getstr(ts)	(((ts)->tsv.marked & 128) ? cast(const char *, *(const char**)((ts) + 1)) : cast(const char *, (ts) + 1))
+ #define svalue(o)       getstr(rawtsvalue(o))
+ 
+ 
+diff -Naur lua-5.1.4-orig/src//lstring.c lua-5.1.4/src//lstring.c
+--- lua-5.1.4-orig/src//lstring.c	2007-12-27 15:02:25.000000000 +0200
++++ lua-5.1.4/src//lstring.c	2011-08-01 15:22:50.358021001 +0300
+@@ -48,19 +48,24 @@
+ 
+ 
+ static TString *newlstr (lua_State *L, const char *str, size_t l,
+-                                       unsigned int h) {
++                                       unsigned int h, int readonly) {
+   TString *ts;
+   stringtable *tb;
+   if (l+1 > (MAX_SIZET - sizeof(TString))/sizeof(char))
+     luaM_toobig(L);
+-  ts = cast(TString *, luaM_malloc(L, (l+1)*sizeof(char)+sizeof(TString)));
++  ts = cast(TString *, luaM_malloc(L, readonly ? sizeof(char**)+sizeof(TString) : (l+1)*sizeof(char)+sizeof(TString)));
+   ts->tsv.len = l;
+   ts->tsv.hash = h;
+   ts->tsv.marked = luaC_white(G(L));
+   ts->tsv.tt = LUA_TSTRING;
+   ts->tsv.reserved = 0;
+-  memcpy(ts+1, str, l*sizeof(char));
+-  ((char *)(ts+1))[l] = '\0';  /* ending 0 */
++  if (!readonly) {
++    memcpy(ts+1, str, l*sizeof(char));
++    ((char *)(ts+1))[l] = '\0';  /* ending 0 */
++  } else {
++    *(char **)(ts+1) = (char *)str;
++    luaS_readonly(ts);
++  }
+   tb = &G(L)->strt;
+   h = lmod(h, tb->size);
+   ts->tsv.next = tb->hash[h];  /* chain new entry */
+@@ -72,7 +77,7 @@
+ }
+ 
+ 
+-TString *luaS_newlstr (lua_State *L, const char *str, size_t l) {
++TString *luaS_newlstr_helper (lua_State *L, const char *str, size_t l, int readonly) {
+   GCObject *o;
+   unsigned int h = cast(unsigned int, l);  /* seed */
+   size_t step = (l>>5)+1;  /* if string is too long, don't hash all its chars */
+@@ -89,7 +94,17 @@
+       return ts;
+     }
+   }
+-  return newlstr(L, str, l, h);  /* not found */
++  return newlstr(L, str, l, h, readonly);  /* not found */
++}
++
++
++TString *luaS_newlstr (lua_State *L, const char *str, size_t l) {
++  return luaS_newlstr_helper(L, str, l, 0);
++}
++
++
++LUAI_FUNC TString *luaS_newrolstr (lua_State *L, const char *str, size_t l) {
++  return luaS_newlstr_helper(L, str, l, 1);
+ }
+ 
+ 
+diff -Naur lua-5.1.4-orig/src//lstring.h lua-5.1.4/src//lstring.h
+--- lua-5.1.4-orig/src//lstring.h	2007-12-27 15:02:25.000000000 +0200
++++ lua-5.1.4/src//lstring.h	2011-08-01 14:29:35.208021002 +0300
+@@ -13,19 +13,22 @@
+ #include "lstate.h"
+ 
+ 
+-#define sizestring(s)	(sizeof(union TString)+((s)->len+1)*sizeof(char))
++#define sizestring(s)	(sizeof(union TString)+(luaS_isreadonly(s) ? sizeof(char **) : ((s)->len+1)*sizeof(char)))
+ 
+ #define sizeudata(u)	(sizeof(union Udata)+(u)->len)
+ 
+ #define luaS_new(L, s)	(luaS_newlstr(L, s, strlen(s)))
+-#define luaS_newliteral(L, s)	(luaS_newlstr(L, "" s, \
++#define luaS_newro(L, s)  (luaS_newrolstr(L, s, strlen(s)))
++#define luaS_newliteral(L, s)	(luaS_newrolstr(L, "" s, \
+                                  (sizeof(s)/sizeof(char))-1))
+ 
+ #define luaS_fix(s)	l_setbit((s)->tsv.marked, FIXEDBIT)
++#define luaS_readonly(s) l_setbit((s)->tsv.marked, READONLYBIT)
++#define luaS_isreadonly(s) testbit((s)->marked, READONLYBIT)
+ 
+ LUAI_FUNC void luaS_resize (lua_State *L, int newsize);
+ LUAI_FUNC Udata *luaS_newudata (lua_State *L, size_t s, Table *e);
+ LUAI_FUNC TString *luaS_newlstr (lua_State *L, const char *str, size_t l);
+-
++LUAI_FUNC TString *luaS_newrolstr (lua_State *L, const char *str, size_t l);
+ 
+ #endif
+diff -Naur lua-5.1.4-orig/src//ltm.c lua-5.1.4/src//ltm.c
+--- lua-5.1.4-orig/src//ltm.c	2007-12-27 15:02:25.000000000 +0200
++++ lua-5.1.4/src//ltm.c	2011-08-01 12:48:13.858021003 +0300
+@@ -37,7 +37,7 @@
+   };
+   int i;
+   for (i=0; i<TM_N; i++) {
+-    G(L)->tmname[i] = luaS_new(L, luaT_eventname[i]);
++    G(L)->tmname[i] = luaS_newro(L, luaT_eventname[i]);
+     luaS_fix(G(L)->tmname[i]);  /* never collect these names */
+   }
+ }
+diff -Naur lua-5.1.4-orig/src//lua.h lua-5.1.4/src//lua.h
+--- lua-5.1.4-orig/src//lua.h	2008-08-06 16:30:12.000000000 +0300
++++ lua-5.1.4/src//lua.h	2011-08-01 13:25:32.468020997 +0300
+@@ -161,6 +161,7 @@
+ LUA_API void  (lua_pushnumber) (lua_State *L, lua_Number n);
+ LUA_API void  (lua_pushinteger) (lua_State *L, lua_Integer n);
+ LUA_API void  (lua_pushlstring) (lua_State *L, const char *s, size_t l);
++LUA_API void  (lua_pushrolstring) (lua_State *L, const char *s, size_t l);
+ LUA_API void  (lua_pushstring) (lua_State *L, const char *s);
+ LUA_API const char *(lua_pushvfstring) (lua_State *L, const char *fmt,
+                                                       va_list argp);
+@@ -271,7 +272,7 @@
+ #define lua_isnoneornil(L, n)	(lua_type(L, (n)) <= 0)
+ 
+ #define lua_pushliteral(L, s)	\
+-	lua_pushlstring(L, "" s, (sizeof(s)/sizeof(char))-1)
++	lua_pushrolstring(L, "" s, (sizeof(s)/sizeof(char))-1)
+ 
+ #define lua_setglobal(L,s)	lua_setfield(L, LUA_GLOBALSINDEX, (s))
+ #define lua_getglobal(L,s)	lua_getfield(L, LUA_GLOBALSINDEX, (s))
+diff -Naur lua-5.1.4-orig/src//lundump.c lua-5.1.4/src//lundump.c
+--- lua-5.1.4-orig/src//lundump.c	2008-04-04 22:51:41.000000000 +0300
++++ lua-5.1.4/src//lundump.c	2011-08-01 14:31:30.058021004 +0300
+@@ -81,18 +81,30 @@
+   return NULL;
+  else
+  {
+-  char* s=luaZ_openspace(S->L,S->b,size);
+-  LoadBlock(S,s,size);
+-  return luaS_newlstr(S->L,s,size-1);		/* remove trailing '\0' */
++  char* s;
++  if (!luaZ_direct_mode(S->Z)) {
++    s = luaZ_openspace(S->L,S->b,size);
++    LoadBlock(S,s,size);
++    return luaS_newlstr(S->L,s,size-1); /* remove trailing zero */
++  } else {
++    s = (char*)luaZ_get_crt_address(S->Z);
++    LoadBlock(S,NULL,size);
++    return luaS_newrolstr(S->L,s,size-1);
++  }
+  }
+ }
+ 
+ static void LoadCode(LoadState* S, Proto* f)
+ {
+  int n=LoadInt(S);
+- f->code=luaM_newvector(S->L,n,Instruction);
+  f->sizecode=n;
+- LoadVector(S,f->code,n,sizeof(Instruction));
++ if (!luaZ_direct_mode(S->Z)) {
++  f->code=luaM_newvector(S->L,n,Instruction);
++  LoadVector(S,f->code,n,sizeof(Instruction));
++ } else {
++  f->code=(Instruction*)luaZ_get_crt_address(S->Z);
++  LoadVector(S,NULL,n,sizeof(Instruction));
++ }
+ }
+ 
+ static Proto* LoadFunction(LoadState* S, TString* p);
+@@ -138,9 +150,14 @@
+ {
+  int i,n;
+  n=LoadInt(S);
+- f->lineinfo=luaM_newvector(S->L,n,int);
+  f->sizelineinfo=n;
+- LoadVector(S,f->lineinfo,n,sizeof(int));
++ if (!luaZ_direct_mode(S->Z)) {
++   f->lineinfo=luaM_newvector(S->L,n,int);
++   LoadVector(S,f->lineinfo,n,sizeof(int));
++ } else {
++   f->lineinfo=(int*)luaZ_get_crt_address(S->Z);
++   LoadVector(S,NULL,n,sizeof(int));
++ }
+  n=LoadInt(S);
+  f->locvars=luaM_newvector(S->L,n,LocVar);
+  f->sizelocvars=n;
+@@ -163,6 +180,7 @@
+  Proto* f;
+  if (++S->L->nCcalls > LUAI_MAXCCALLS) error(S,"code too deep");
+  f=luaF_newproto(S->L);
++ if (luaZ_direct_mode(S->Z)) proto_readonly(f);
+  setptvalue2s(S->L,S->L->top,f); incr_top(S->L);
+  f->source=LoadString(S); if (f->source==NULL) f->source=p;
+  f->linedefined=LoadInt(S);
+diff -Naur lua-5.1.4-orig/src//lzio.c lua-5.1.4/src//lzio.c
+--- lua-5.1.4-orig/src//lzio.c	2007-12-27 15:02:25.000000000 +0200
++++ lua-5.1.4/src//lzio.c	2011-07-29 17:09:44.378021002 +0300
+@@ -49,7 +49,7 @@
+   z->L = L;
+   z->reader = reader;
+   z->data = data;
+-  z->n = 0;
++  z->n = z->i = 0;
+   z->p = NULL;
+ }
+ 
+@@ -61,10 +61,13 @@
+     if (luaZ_lookahead(z) == EOZ)
+       return n;  /* return number of missing bytes */
+     m = (n <= z->n) ? n : z->n;  /* min. between n and z->n */
+-    memcpy(b, z->p, m);
++    if (b)
++      memcpy(b, z->p, m);
+     z->n -= m;
++    z->i += m;
+     z->p += m;
+-    b = (char *)b + m;
++    if (b)
++      b = (char *)b + m;
+     n -= m;
+   }
+   return 0;
+diff -Naur lua-5.1.4-orig/src//lzio.h lua-5.1.4/src//lzio.h
+--- lua-5.1.4-orig/src//lzio.h	2007-12-27 15:02:25.000000000 +0200
++++ lua-5.1.4/src//lzio.h	2011-07-29 17:09:44.378021002 +0300
+@@ -40,8 +40,10 @@
+ 	(luaM_reallocvector(L, (buff)->buffer, (buff)->buffsize, size, char), \
+ 	(buff)->buffsize = size)
+ 
+-#define luaZ_freebuffer(L, buff)	luaZ_resizebuffer(L, buff, 0)
+-
++#define luaZ_freebuffer(L, buff)  luaZ_resizebuffer(L, buff, 0)
++#define luaZ_get_base_address(zio) ((const char *)((zio)->reader(NULL, (zio)->data, NULL)))
++#define luaZ_direct_mode(zio) (luaZ_get_base_address(zio) != NULL)
++#define luaZ_get_crt_address(zio) (luaZ_get_base_address(zio) + (zio)->i)
+ 
+ LUAI_FUNC char *luaZ_openspace (lua_State *L, Mbuffer *buff, size_t n);
+ LUAI_FUNC void luaZ_init (lua_State *L, ZIO *z, lua_Reader reader,
+@@ -55,6 +57,7 @@
+ 
+ struct Zio {
+   size_t n;			/* bytes still unread */
++  size_t i;     /* buffer offset */
+   const char *p;		/* current position in buffer */
+   lua_Reader reader;
+   void* data;			/* additional data */
+diff -Naur lua-5.1.4-orig/src//Makefile lua-5.1.4/src//Makefile
+--- lua-5.1.4-orig/src//Makefile	2011-08-01 15:23:50.188020999 +0300
++++ lua-5.1.4/src//Makefile	2011-08-01 15:23:22.778020999 +0300
+@@ -8,7 +8,7 @@
+ PLAT= none
+ 
+ CC= gcc
+-CFLAGS= -O2 -Wall $(MYCFLAGS)
++CFLAGS= -O2 -Wall $(MYCFLAGS) -DTEST_ROM_FEATURES
+ AR= ar rcu
+ RANLIB= ranlib
+ RM= rm -f

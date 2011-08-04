@@ -15,7 +15,6 @@
 #include "platform_conf.h"
 #include "common.h"
 #include "buf.h"
-#include "spi.h"
 #ifdef BUILD_MMCFS
 #include "diskio.h"
 #endif
@@ -40,21 +39,28 @@
 #include "spi.h"
 #include "adc.h"
 #include "pwm.h"
+#include "i2c.h"
+
+#ifdef BUILD_UIP
 
 // UIP sys tick data
 // NOTE: when using virtual timers, SYSTICKHZ and VTMR_FREQ_HZ should have the
 // same value, as they're served by the same timer (the systick)
-#define SYSTICKHZ               4
-#define SYSTICKMS               (1000 / SYSTICKHZ)
-
-#ifdef BUILD_UIP
-static int eth_timer_fired;
+#if !defined( VTMR_NUM_TIMERS ) || VTMR_NUM_TIMERS == 0
+# error "On AVR32, UIP needs virtual timer support. Define VTMR_NUM_TIMERS > 0."
 #endif
+
+#define SYSTICKHZ VTMR_FREQ_HZ
+#define SYSTICKMS (1000 / SYSTICKHZ)
+
+static int eth_timer_fired;
+
+#endif // BUILD_UIP
 
 // ****************************************************************************
 // Platform initialization
 #ifdef BUILD_UIP
-u32  platform_ethernet_setup(void);
+u32 platform_ethernet_setup( void );
 #endif
 
 extern int pm_configure_clocks( pm_freq_param_t *param );
@@ -88,7 +94,7 @@ __attribute__((__interrupt__)) static void tmr_int_handler()
   // of incrementing the timers and taking the appropriate actions.
   platform_eth_force_interrupt();
 #endif
-}                                
+}
 #endif
 
 const u32 uart_base_addr[ ] = {
@@ -145,10 +151,12 @@ int platform_init()
   // Setup clocks
   if( PM_FREQ_STATUS_FAIL == pm_configure_clocks( &pm_freq_param ) )
     return PLATFORM_ERR;
+#ifdef FOSC32
   // Select the 32-kHz oscillator crystal
   pm_enable_osc32_crystal (&AVR32_PM );
   // Enable the 32-kHz clock
   pm_enable_clk32_no_wait( &AVR32_PM, AVR32_PM_OSCCTRL32_STARTUP_0_RCOSC );
+#endif
 
   // Initialize external memory if any.
 #ifdef AVR32_SDRAMC
@@ -249,104 +257,59 @@ int platform_init()
 // ****************************************************************************
 // PIO functions
 
-// Reg types for our helper function
-#define PIO_REG_PVR   0
-#define PIO_REG_OVR   1
-#define PIO_REG_GPER  2
-#define PIO_REG_ODER  3
-#define PIO_REG_PUER  4
-
-#define GPIO          AVR32_GPIO
-
-// Helper function: for a given port, return the address of a specific register (value, direction, pullup ...)
-static volatile unsigned long* platform_pio_get_port_reg_addr( unsigned port, int regtype )
-{
-  volatile avr32_gpio_port_t *gpio_port = &GPIO.port[ port ];
-
-  switch( regtype )
-  {
-    case PIO_REG_PVR:
-      return ( unsigned long * )&gpio_port->pvr;
-    case PIO_REG_OVR:
-      return &gpio_port->ovr;
-    case PIO_REG_GPER:
-      return &gpio_port->gper;
-    case PIO_REG_ODER:
-      return &gpio_port->oder;
-    case PIO_REG_PUER:
-      return &gpio_port->puer;
-  }
-  // Should never get here
-  return ( unsigned long* )&gpio_port->pvr;
-}
-
-// Helper function: get port value, get direction, get pullup, ...
-static pio_type platform_pio_get_port_reg( unsigned port, int reg )
-{
-  volatile unsigned long *pv = platform_pio_get_port_reg_addr( port, reg );
-
-  return *pv;
-}
-
-// Helper function: set port value, set direction, set pullup ...
-static void platform_pio_set_port_reg( unsigned port, pio_type val, int reg )
-{
-  volatile unsigned long *pv = platform_pio_get_port_reg_addr( port, reg );
-
-  *pv = val;
-}
-
 pio_type platform_pio_op( unsigned port, pio_type pinmask, int op )
 {
   pio_type retval = 1;
 
+  // Pointer to the register set for this GPIO port
+  volatile avr32_gpio_port_t *gpio_regs = &AVR32_GPIO.port[ port ];
+
   switch( op )
   {
     case PLATFORM_IO_PORT_SET_VALUE:
-      platform_pio_set_port_reg( port, pinmask, PIO_REG_OVR );
+      gpio_regs->ovr = pinmask;
       break;
 
     case PLATFORM_IO_PIN_SET:
-      platform_pio_set_port_reg( port, platform_pio_get_port_reg( port, PIO_REG_OVR ) | pinmask, PIO_REG_OVR );
+      gpio_regs->ovrs = pinmask;
       break;
 
     case PLATFORM_IO_PIN_CLEAR:
-      platform_pio_set_port_reg( port, platform_pio_get_port_reg( port, PIO_REG_OVR ) & ~pinmask, PIO_REG_OVR );
+      gpio_regs->ovrc = pinmask;
       break;
 
     case PLATFORM_IO_PORT_DIR_INPUT:
       pinmask = 0xFFFFFFFF;
     case PLATFORM_IO_PIN_DIR_INPUT:
-      platform_pio_set_port_reg( port, platform_pio_get_port_reg( port, PIO_REG_ODER ) & ~pinmask, PIO_REG_ODER );
-      platform_pio_set_port_reg( port, platform_pio_get_port_reg( port, PIO_REG_GPER ) | pinmask, PIO_REG_GPER );
+      gpio_regs->oderc = pinmask;  // Disable output drivers
+      gpio_regs->gpers = pinmask;  // Make GPIO control this pin
       break;
 
     case PLATFORM_IO_PORT_DIR_OUTPUT:
       pinmask = 0xFFFFFFFF;
     case PLATFORM_IO_PIN_DIR_OUTPUT:
-      platform_pio_set_port_reg( port, platform_pio_get_port_reg( port, PIO_REG_ODER ) | pinmask, PIO_REG_ODER );
-      platform_pio_set_port_reg( port, platform_pio_get_port_reg( port, PIO_REG_GPER ) | pinmask, PIO_REG_GPER );
+      gpio_regs->oders = pinmask;  // Enable output drivers
+      gpio_regs->gpers = pinmask;  // Make GPIO control this pin
       break;
 
     case PLATFORM_IO_PORT_GET_VALUE:
-      retval = platform_pio_get_port_reg( port, PIO_REG_PVR );
+      retval = gpio_regs->pvr;
       break;
 
     case PLATFORM_IO_PIN_GET:
-      retval = platform_pio_get_port_reg( port, PIO_REG_PVR ) & pinmask ? 1 : 0;
+      retval = gpio_regs->pvr & pinmask ? 1 : 0;
       break;
 
     case PLATFORM_IO_PIN_PULLUP:
-      platform_pio_set_port_reg( port, platform_pio_get_port_reg( port, PIO_REG_PUER ) | pinmask, PIO_REG_PUER );
+      gpio_regs->puers = pinmask;
       break;
 
     case PLATFORM_IO_PIN_NOPULL:
-      platform_pio_set_port_reg( port, platform_pio_get_port_reg( port, PIO_REG_PUER ) & ~pinmask, PIO_REG_PUER );
+      gpio_regs->puerc = pinmask;
       break;
 
     default:
       retval = 0;
-      break;
   }
   return retval;
 }
@@ -517,7 +480,7 @@ int platform_s_uart_set_flow_control( unsigned id, int type )
       gpio_enable_module_pin( ppindata->pin, ppindata->function );
     else // release pin to GPIO module
     {
-      gpio_port = &GPIO.port[ ppindata->pin >> 5 ];
+      gpio_port = &AVR32_GPIO.port[ ppindata->pin >> 5 ];
       gpio_port->gpers = 1 << ( ppindata->pin & 0x1F );
     }
   return PLATFORM_OK;
@@ -828,7 +791,7 @@ __attribute__((__interrupt__)) static void adc_int_handler()
 }
 
 
-u32 platform_adc_setclock( unsigned id, u32 frequency )
+u32 platform_adc_set_clock( unsigned id, u32 frequency )
 {
   return 0;
 }
@@ -864,15 +827,27 @@ int platform_adc_start_sequence( )
 # error "NUM_PWM > AVR32_PWM_CHANNEL_LENGTH"
 #endif
 
+#if NUM_PWM > 0
+
 static const gpio_map_t pwm_pins =
 {
-  { AVR32_PWM_0_PIN, AVR32_PWM_0_FUNCTION },
-  { AVR32_PWM_1_PIN, AVR32_PWM_1_FUNCTION },
-  { AVR32_PWM_2_PIN, AVR32_PWM_2_FUNCTION },
-  { AVR32_PWM_3_PIN, AVR32_PWM_3_FUNCTION },
-  { AVR32_PWM_4_1_PIN, AVR32_PWM_4_1_FUNCTION },	// PB27
-  { AVR32_PWM_5_1_PIN, AVR32_PWM_5_1_FUNCTION },	// PB28
-  { AVR32_PWM_6_PIN, AVR32_PWM_6_FUNCTION },
+#if ( BOARD == ATEVK1100 ) || ( BOARD == MIZAR32 )
+  { AVR32_PWM_0_PIN, AVR32_PWM_0_FUNCTION },      // PB19 - LED4
+  { AVR32_PWM_1_PIN, AVR32_PWM_1_FUNCTION },      // PB20 - LED5
+  { AVR32_PWM_2_PIN, AVR32_PWM_2_FUNCTION },	  // PB21 - LED6
+  { AVR32_PWM_3_PIN, AVR32_PWM_3_FUNCTION },      // PB22 - LED7
+  { AVR32_PWM_4_1_PIN, AVR32_PWM_4_1_FUNCTION },  // PB27 - LED0
+  { AVR32_PWM_5_1_PIN, AVR32_PWM_5_1_FUNCTION },  // PB28 - LED1
+  { AVR32_PWM_6_PIN, AVR32_PWM_6_FUNCTION },      // PB18 - LCD_C / GPIO50
+#elif BOARD == ATEVK1101
+  { AVR32_PWM_0_0_PIN, AVR32_PWM_0_0_FUNCTION },  // PA7  LED0
+  { AVR32_PWM_1_0_PIN, AVR32_PWM_1_0_FUNCTION },  // PA8  LED1
+  { AVR32_PWM_2_0_PIN, AVR32_PWM_2_0_FUNCTION },  // PA21 LED2
+  { AVR32_PWM_3_0_PIN, AVR32_PWM_3_0_FUNCTION },  // PA14 ? or _1 PA25
+  { AVR32_PWM_4_1_PIN, AVR32_PWM_4_1_FUNCTION },  // PA28 - audio out
+  { AVR32_PWM_5_1_PIN, AVR32_PWM_5_1_FUNCTION },  // PB5: UART1-RTS & Nexus i/f EVTIn / _0 PA18=Xin0
+  { AVR32_PWM_6_0_PIN, AVR32_PWM_6_0_FUNCTION },  // PA22 - LED3 and audio out
+#endif
 };
 
 
@@ -1006,86 +981,171 @@ u32 platform_pwm_op( unsigned id, int op, u32 data)
   return 0;
 }
 
+#endif // #if NUM_PWM > 0
+
+// ****************************************************************************
+// I2C support
+
+u32 platform_i2c_setup( unsigned id, u32 speed )
+{
+  return i2c_setup(speed);
+}
+
+void platform_i2c_send_start( unsigned id )
+{
+  i2c_start_cond();
+}
+
+void platform_i2c_send_stop( unsigned id )
+{
+  i2c_stop_cond();
+}
+
+int platform_i2c_send_address( unsigned id, u16 address, int direction )
+{
+  // Convert enum codes to R/w bit value.
+  // If TX == 0 and RX == 1, this test will be removed by the compiler
+  if ( ! ( PLATFORM_I2C_DIRECTION_TRANSMITTER == 0 &&
+           PLATFORM_I2C_DIRECTION_RECEIVER == 1 ) ) {
+    direction = ( direction == PLATFORM_I2C_DIRECTION_TRANSMITTER ) ? 0 : 1;
+  }
+
+  // Low-level returns nack (0=acked); we return ack (1=acked).
+  return ! i2c_write_byte( (address << 1) | direction );
+}
+
+int platform_i2c_send_byte( unsigned id, u8 data )
+{
+  // Low-level returns nack (0=acked); we return ack (1=acked).
+  return ! i2c_write_byte( data );
+}
+
+int platform_i2c_recv_byte( unsigned id, int ack )
+{
+  return i2c_read_byte( !ack );
+}
+
+
 // ****************************************************************************
 // Network support
 
 #ifdef BUILD_UIP
 static const gpio_map_t MACB_GPIO_MAP =
 {
-  {AVR32_MACB_MDC_0_PIN,    AVR32_MACB_MDC_0_FUNCTION   },
-  {AVR32_MACB_MDIO_0_PIN,   AVR32_MACB_MDIO_0_FUNCTION  },
-  {AVR32_MACB_RXD_0_PIN,    AVR32_MACB_RXD_0_FUNCTION   },
-  {AVR32_MACB_TXD_0_PIN,    AVR32_MACB_TXD_0_FUNCTION   },
-  {AVR32_MACB_RXD_1_PIN,    AVR32_MACB_RXD_1_FUNCTION   },
-  {AVR32_MACB_TXD_1_PIN,    AVR32_MACB_TXD_1_FUNCTION   },
-  {AVR32_MACB_TX_EN_0_PIN,  AVR32_MACB_TX_EN_0_FUNCTION },
-  {AVR32_MACB_RX_ER_0_PIN,  AVR32_MACB_RX_ER_0_FUNCTION },
-  {AVR32_MACB_RX_DV_0_PIN,  AVR32_MACB_RX_DV_0_FUNCTION },
-  {AVR32_MACB_TX_CLK_0_PIN, AVR32_MACB_TX_CLK_0_FUNCTION}
+  { AVR32_MACB_MDC_0_PIN,    AVR32_MACB_MDC_0_FUNCTION    },
+  { AVR32_MACB_MDIO_0_PIN,   AVR32_MACB_MDIO_0_FUNCTION   },
+  { AVR32_MACB_RXD_0_PIN,    AVR32_MACB_RXD_0_FUNCTION    },
+  { AVR32_MACB_TXD_0_PIN,    AVR32_MACB_TXD_0_FUNCTION    },
+  { AVR32_MACB_RXD_1_PIN,    AVR32_MACB_RXD_1_FUNCTION    },
+  { AVR32_MACB_TXD_1_PIN,    AVR32_MACB_TXD_1_FUNCTION    },
+  { AVR32_MACB_TX_EN_0_PIN,  AVR32_MACB_TX_EN_0_FUNCTION  },
+  { AVR32_MACB_RX_ER_0_PIN,  AVR32_MACB_RX_ER_0_FUNCTION  },
+  { AVR32_MACB_RX_DV_0_PIN,  AVR32_MACB_RX_DV_0_FUNCTION  },
+  { AVR32_MACB_TX_CLK_0_PIN, AVR32_MACB_TX_CLK_0_FUNCTION },
 };
 
-u32  platform_ethernet_setup()
+u32 platform_ethernet_setup()
 {
-	  static struct uip_eth_addr sTempAddr;
-	  // Assign GPIO to MACB
-	  gpio_enable_module(MACB_GPIO_MAP, sizeof(MACB_GPIO_MAP) / sizeof(MACB_GPIO_MAP[0]));
+  static struct uip_eth_addr sTempAddr = {
+    .addr[0] = ETHERNET_CONF_ETHADDR0,
+    .addr[1] = ETHERNET_CONF_ETHADDR1,
+    .addr[2] = ETHERNET_CONF_ETHADDR2,
+    .addr[3] = ETHERNET_CONF_ETHADDR3,
+    .addr[4] = ETHERNET_CONF_ETHADDR4,
+    .addr[5] = ETHERNET_CONF_ETHADDR5,
+  };
 
-	  // initialize MACB & Phy Layers
-	  if (xMACBInit(&AVR32_MACB) == FALSE ) {
-		  return PLATFORM_ERR;
-	  }
+  // Assign GPIO to MACB
+  gpio_enable_module( MACB_GPIO_MAP, sizeof(MACB_GPIO_MAP ) / sizeof( MACB_GPIO_MAP[0] ) );
 
-	  sTempAddr.addr[0] = ETHERNET_CONF_ETHADDR0;
-	  sTempAddr.addr[1] = ETHERNET_CONF_ETHADDR1;
-	  sTempAddr.addr[2] = ETHERNET_CONF_ETHADDR2;
-	  sTempAddr.addr[3] = ETHERNET_CONF_ETHADDR3;
-	  sTempAddr.addr[4] = ETHERNET_CONF_ETHADDR4;
-	  sTempAddr.addr[5] = ETHERNET_CONF_ETHADDR5;
+  // initialize MACB & Phy Layers
+  if ( xMACBInit( &AVR32_MACB ) == FALSE ) {
+    return PLATFORM_ERR;
+  }
 
-	  // Initialize the eLua uIP layer
-   elua_uip_init( &sTempAddr );
-   return PLATFORM_OK;
-}  
+  // Initialize the eLua uIP layer
+  elua_uip_init( &sTempAddr );
+  return PLATFORM_OK;
+}
 
 void platform_eth_send_packet( const void* src, u32 size )
 {
-   lMACBSend(&AVR32_MACB,src, size, TRUE);
+  lMACBSend( &AVR32_MACB,src, size, TRUE );
 }
 
 u32 platform_eth_get_packet_nb( void* buf, u32 maxlen )
 {
-	u32    len;
+  u32 len;
 
-    /* Obtain the size of the packet. */
-    len = ulMACBInputLength();
+  /* Obtain the size of the packet. */
+  len = ulMACBInputLength();
 
-    if (len > maxlen) {
-    	return 0;
-    }
+  if( len > maxlen ) {
+    return 0;
+  }
 
-    if( len ) {
-        /* Let the driver know we are going to read a new packet. */
-    	vMACBRead( NULL, 0, len );
-    	vMACBRead( buf, len, len );
-    }
+  if( len ) {
+    /* Let the driver know we are going to read a new packet. */
+    vMACBRead( NULL, 0, len );
+    vMACBRead( buf, len, len );
+  }
 
- return len;
+  return len;
 }
 
 void platform_eth_force_interrupt()
 {
-    elua_uip_mainloop();
+  elua_uip_mainloop();
 }
 
 u32 platform_eth_get_elapsed_time()
 {
-    if( eth_timer_fired )
-    {
-      eth_timer_fired = 0;
-      return SYSTICKMS;
-    }
-    else
-      return 0;
+  if( eth_timer_fired )
+  {
+    eth_timer_fired = 0;
+    return SYSTICKMS;
+  }
+  else
+    return 0;
 }
 
 #endif
+
+// ****************************************************************************
+// Platform specific modules go here
+
+#ifdef PS_LIB_TABLE_NAME
+
+#define MIN_OPT_LEVEL 2
+#include "lua.h"
+#include "lauxlib.h"
+#include "lrotable.h"
+#include "lrodefs.h"
+
+extern const LUA_REG_TYPE lcd_map[];
+
+const LUA_REG_TYPE platform_map[] =
+{
+#if LUA_OPTIMIZE_MEMORY > 0
+  { LSTRKEY( "lcd" ), LROVAL( lcd_map ) },
+#endif
+  { LNILKEY, LNILVAL }
+};
+
+LUALIB_API int luaopen_platform( lua_State *L )
+{
+#if LUA_OPTIMIZE_MEMORY > 0
+  return 0;
+#else // #if LUA_OPTIMIZE_MEMORY > 0
+  luaL_register( L, PS_LIB_TABLE_NAME, platform_map );
+
+  // Setup the new tables inside platform table
+  lua_newtable( L );
+  luaL_register( L, NULL, lcd_map );
+  lua_setfield( L, -2, "lcd" );
+
+  return 1;
+#endif // #if LUA_OPTIMIZE_MEMORY > 0
+}
+
+#endif // #ifdef PS_LIB_TABLE_NAME

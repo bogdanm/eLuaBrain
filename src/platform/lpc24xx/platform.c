@@ -73,8 +73,8 @@ static void platform_setup_extmem()
   volatile unsigned int i;
   volatile DWORD wtemp;
 
-  EMC_CTRL = 0x00000001;		/*Disable Address mirror*/
-  PCONP   |= 0x00000800;		/* Turn On EMC PCLK */
+  EMC_CTRL = 0x00000001;                /*Disable Address mirror*/
+  PCONP   |= 0x00000800;                /* Turn On EMC PCLK */
   PINSEL4  = 0x50000000;
   PINSEL5  = 0x05050555;
   PINSEL6  = 0x55555555;
@@ -590,7 +590,7 @@ static void adc_int_handler()
   if ( dreg_t & ( 1UL << 31 ) )
   { 
     d->sample_buf[ d->seq_ctr ] = ( u16 )( ( dreg_t >> 6 ) & 0x3FF );
-    AD0CR &= 0xF8FFFF00;	// stop ADC, disable channels
+    AD0CR &= 0xF8FFFF00;        // stop ADC, disable channels
     s->value_fresh = 1;
             
     if ( s->logsmoothlen > 0 && s->smooth_ready == 0)
@@ -663,7 +663,7 @@ static void platform_setup_adcs()
 
 
 // NOTE: On this platform, there is only one ADC, clock settings apply to the whole device
-u32 platform_adc_setclock( unsigned id, u32 frequency )
+u32 platform_adc_set_clock( unsigned id, u32 frequency )
 {
   elua_adc_dev_state *d = adc_get_dev_state( 0 );
 

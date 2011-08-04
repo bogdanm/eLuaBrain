@@ -1138,7 +1138,7 @@ static void adcs_init()
   
   for( id = 0; id < NUM_ADC; id ++ )
     adc_init_ch_state( id );
-	
+
   RCC_APB2PeriphClockCmd( RCC_APB2Periph_ADC1, ENABLE );
   RCC_ADCCLKConfig( RCC_PCLK2_Div8 );
   
@@ -1188,10 +1188,10 @@ static void adcs_init()
   DMA_Cmd( DMA1_Channel1, ENABLE );
   DMA_ITConfig( DMA1_Channel1, DMA1_IT_TC1 , ENABLE ); 
   
-  platform_adc_setclock( 0, 0 );
+  platform_adc_set_clock( 0, 0 );
 }
 
-u32 platform_adc_setclock( unsigned id, u32 frequency )
+u32 platform_adc_set_clock( unsigned id, u32 frequency )
 {
   TIM_TimeBaseInitTypeDef timer_base_struct;
   elua_adc_dev_state *d = adc_get_dev_state( 0 );
