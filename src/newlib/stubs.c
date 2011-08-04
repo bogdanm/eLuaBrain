@@ -182,6 +182,37 @@ _ssize_t _write_r( struct _reent *r, int file, const void *ptr, size_t len )
 }
 
 // ****************************************************************************
+// _unlink_r
+
+int _unlink_r( struct _reent *r, const char *fname )
+{
+  const DM_DEVICE* pdev;
+  char* actname;
+  int devid;
+ 
+  if( !fname || *fname == '\0' )
+  {
+    r->_errno = ENOENT; 
+    return -1;
+  }
+  // Look for device, return error if not found or if function not implemented
+  if( ( devid = find_dm_entry( fname, &actname ) ) == -1 )
+  {
+    r->_errno = ENODEV;
+    return -1; 
+  }
+  pdev = dm_get_device_at( devid );
+  if( pdev->p_unlink_r == NULL )
+  {
+    r->_errno = ENOSYS;
+    return -1;   
+  }
+ 
+  // And call the unlink function
+  return pdev->p_unlink_r( r, actname );  
+}
+
+// ****************************************************************************
 // Miscalenous functions
 
 int _isatty_r( struct _reent* r, int fd )
@@ -213,12 +244,6 @@ pid_t getpid()
 clock_t _times_r( struct _reent* r, struct tms *buf )
 {
   return 0;
-}
-
-int _unlink_r( struct _reent *r, const char *name )
-{
-  r->_errno = ENOSYS;
-  return -1;
 }
 
 int _link_r( struct _reent *r, const char *c1, const char *c2 )

@@ -53,6 +53,7 @@ typedef struct
   struct dm_dirent* ( *p_readdir_r )( struct _reent *r, void *dir );  
   int ( *p_closedir_r )( struct _reent *r, void* dir ); 
   const char* ( *p_getaddr_r )( struct _reent *r, int fd );
+  int ( *p_unlink_r )( struct _reent *r, const char *fname );
 } DM_DEVICE;
 
 // Errors

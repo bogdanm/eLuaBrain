@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include "platform.h"
 #include "elua_net.h"
 #include "devman.h"
@@ -69,6 +70,7 @@ static void shell_help( char* args )
   printf( "  ee <file>   - dump file to the EEPROM connected on I2C1\n" );
   printf( "  edit <file> - edits the given file\n" );
   printf( "  ver         - print eLua version\n" );
+  printf( "  rm <file> <-f> - removes the file, use '-f' to supress confirmation\n" );
 }
 
 // 'lua' handler
@@ -310,6 +312,39 @@ static void shell_edit( char *args )
   editor_mainloop();
 }
 
+// 'rm' handler
+static void shell_rm( char *args )
+{
+  char *p1 = NULL, *p2 = NULL;
+  int res = 0;
+  int ask = 1;
+
+  if( *args )
+  {
+    p1 = strchr( args, ' ' );
+    if( p1 )
+    {
+      *p1 = 0;
+      p2 = strchr( p1 + 1, ' ' );
+      if( p2  )
+      {
+        if( strcasecmp( p2, "-f" ) )
+        {
+          printf( "Invalid argument '%s'\n", p2 );
+          goto rmdone;
+        }
+        else
+          ask = 0;
+      }
+      // [TODO] make 'ask' count only if multiple files are removed
+      res = unlink( p1 ) == 0 ? 1 : 0; 
+    }
+  }
+rmdone:  
+  if( !res )
+    printf( "Remove failed.\n" );
+}
+
 // 'ee' handler
 static void shell_ee( char *args )
 {
@@ -449,6 +484,7 @@ static const SHELL_COMMAND shell_commands[] =
   { "cp", shell_cp },
   { "ee", shell_ee },
   { "edit", shell_edit },
+  { "rm", shell_rm },
   { NULL, NULL }
 };
 

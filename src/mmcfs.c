@@ -261,6 +261,28 @@ static int mmcfs_closedir_r( struct _reent *r, void *d )
   return 0;
 }
 
+// unlink
+static int mmcfs_unlink_r( struct _reent *r, const char* fname, int devnum )
+{
+  mmc_pathBuf[0] = devnum + '0';
+  mmc_pathBuf[1] = ':';
+  mmc_pathBuf[2] = 0;
+  if (strchr(fname, '/') == NULL)
+    strcat(mmc_pathBuf, "/");
+  strcat(mmc_pathBuf, fname);
+  return f_unlink(mmc_pathBuf) == FR_OK ? 0 : -1;
+}
+
+static int mmcfs_unlink_r_mmc( struct _reent *r, const char* fname )
+{ 
+  return mmcfs_unlink_r( r, fname, 0 );
+}
+
+static int mmcfs_unlink_r_nand( struct _reent *r, const char* fname )
+{
+  return mmcfs_unlink_r( r, fname, 1 );
+}
+
 // MMC device descriptor structure
 static const DM_DEVICE mmcfs_device =
 {
@@ -273,7 +295,8 @@ static const DM_DEVICE mmcfs_device =
   mmcfs_opendir_r_mmc,  // opendir
   mmcfs_readdir_r,      // readdir
   mmcfs_closedir_r,     // closedir
-  NULL                  // getaddr
+  NULL,                 // getaddr
+  mmcfs_unlink_r_mmc    // unlink
 };
 
 // MMC device descriptor structure (NAND)
@@ -287,7 +310,9 @@ static DM_DEVICE nand_device =
   mmcfs_lseek_r,        // lseek
   mmcfs_opendir_r_nand, // opendir
   mmcfs_readdir_r,      // readdir
-  mmcfs_closedir_r      // closedir
+  mmcfs_closedir_r,     // closedir
+  NULL,                 // getaddr
+  mmcfs_unlink_r_nand   // unlink
 };
 
 const DM_DEVICE* mmcfs_init( unsigned i )
@@ -310,3 +335,4 @@ const DM_DEVICE* mmcfs_init()
 }
 
 #endif // BUILD_MMCFS
+

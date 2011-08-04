@@ -291,7 +291,8 @@ static const DM_DEVICE rfs_device =
   rfs_opendir_r,        // opendir
   rfs_readdir_r,        // readdir
   rfs_closedir_r,       // closedir
-  NULL                  // getaddr
+  NULL,                 // getaddr
+  NULL                  // unlink - for security purposes
 };
 
 const DM_DEVICE *remotefs_init()

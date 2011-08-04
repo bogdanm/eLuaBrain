@@ -258,7 +258,8 @@ static const DM_DEVICE semifs_device =
   semifs_opendir_r,      // opendir
   semifs_readdir_r,      // readdir
   semifs_closedir_r,     // closedir
-  NULL                   // getaddr
+  NULL,                  // getaddr
+  NULL                   // unlink - not implemented yet
 };
 
 const DM_DEVICE* semifs_init()

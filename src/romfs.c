@@ -200,7 +200,7 @@ static int romfs_closedir_r( struct _reent *r, void *d )
 }
 
 // getaddr
-static const char* romfs_getaddr( struct _reent *r, int fd )
+static const char* romfs_getaddr_r( struct _reent *r, int fd )
 {
   FS* pfs = romfs_fd_table + fd;
 
@@ -219,7 +219,8 @@ static const DM_DEVICE romfs_device =
   romfs_opendir_r,      // opendir
   romfs_readdir_r,      // readdir
   romfs_closedir_r,     // closedir
-  romfs_getaddr         // getaddr
+  romfs_getaddr_r,      // getaddr
+  NULL                  // unlink
 };
 
 const DM_DEVICE* romfs_init()
