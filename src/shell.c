@@ -304,21 +304,8 @@ static void shell_cat( char *args )
 // 'edit' handler
 static void shell_edit( char *args )
 {
-  FILE *fp;
-
   if( *args != 0 )
-  {
     *strchr( args, ' ' ) = 0;
-    if( ( fp = fopen( args, "rb" ) ) == NULL )
-    {
-      if( ( fp = fopen( args, "wb" ) ) == NULL )
-      {
-        printf( "Unable to create file %s\n", args );
-        return;
-      }
-    }
-    fclose( fp );
-  }
   editor_init( args );
   editor_mainloop();
 }

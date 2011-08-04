@@ -97,14 +97,14 @@ EDITOR_BUFFER* edalloc_buffer_new( const char *fname )
 
   if( fname && *fname )
   {
-    if( ( fp = fopen( fname, "rb" ) ) == NULL )
-      goto newout;
-
-    // Get file size
-    if( fseek( fp, 0, SEEK_END ) == -1 )
-      goto newout;
-    fsize = ftell( fp );
-    fseek( fp, 0, SEEK_SET );
+    if( ( fp = fopen( fname, "rb" ) ) != NULL )
+    {
+      // Get file size
+      if( fseek( fp, 0, SEEK_END ) == -1 )
+        goto newout;
+      fsize = ftell( fp );
+      fseek( fp, 0, SEEK_SET );
+    }
   }
   else
     fname = NULL;
@@ -127,7 +127,7 @@ EDITOR_BUFFER* edalloc_buffer_new( const char *fname )
 
   // Read the file line by line
   i = 0;
-  if( fp )
+  if( fp && fsize > 0 )
   {
     while( 1 )
     {
