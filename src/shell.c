@@ -328,16 +328,17 @@ static void shell_rm( char *args )
       p2 = strchr( p1 + 1, ' ' );
       if( p2  )
       {
-        if( strcasecmp( p2, "-f" ) )
+        *p2 = 0;
+        if( strcasecmp( p1 + 1, "-f" ) )
         {
-          printf( "Invalid argument '%s'\n", p2 );
+          printf( "Invalid argument '%s'\n", p1 + 1 );
           goto rmdone;
         }
         else
           ask = 0;
       }
       // [TODO] make 'ask' count only if multiple files are removed
-      res = unlink( p1 ) == 0 ? 1 : 0; 
+      res = unlink( args ) == 0 ? 1 : 0;
     }
   }
 rmdone:  
