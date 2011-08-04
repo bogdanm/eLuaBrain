@@ -278,7 +278,7 @@ void nrf_init()
   unsigned i, j;
 
   if( nrf_initialized )
-    return 0;
+    return;
   
   // Do low-level setup first
   nrf_ll_init();

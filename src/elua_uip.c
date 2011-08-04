@@ -725,7 +725,7 @@ static int eluah_check_stack_state( volatile struct elua_uip_state *pstate )
 static elua_net_size elua_net_send_internal( int s, const void* buf, elua_net_size len, elua_net_ip remoteip, u16 remoteport, int is_sendto )
 {
   volatile struct elua_uip_state *pstate;
-  elua_net_size sentbytes;
+  elua_net_size sentbytes = 0;
   int res;
  
   if( len == 0 )

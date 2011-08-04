@@ -83,7 +83,7 @@ int main( void )
 {
   int i;
   FILE* fp;
-  DM_DEVICE *d;
+  const DM_DEVICE *d;
 
   // Initialize platform first
   if( platform_init() != PLATFORM_OK )

@@ -9,6 +9,7 @@
 #include "edutils.h"
 #include "edmove.h"
 #include "utils.h"
+#include "edhw.h"
 #include <ctype.h>
 #include <string.h>
 #include <stdlib.h>
