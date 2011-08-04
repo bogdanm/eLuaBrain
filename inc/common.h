@@ -10,6 +10,12 @@
 #define VTMR_GET_ID( x )        ( ( x ) - VTMR_FIRST_ID )
 #define TIMER_IS_VIRTUAL( x )   ( ( VTMR_NUM_TIMERS > 0 ) && ( ( x ) >= VTMR_FIRST_ID ) && ( ( x ) < VTMR_NUM_TIMERS + VTMR_FIRST_ID ) )
 
+// Path types
+#define PATH_TYPE_INVALID       0
+#define PATH_TYPE_FS            1
+#define PATH_TYPE_FILE          2
+#define PATH_TYPE_WC            3 // wildcards
+
 // Functions exported by the common platform layer
 void cmn_platform_init();
 void cmn_virtual_timer_cb();
@@ -22,6 +28,7 @@ void cmn_uart_setup_sermux();
 
 unsigned int intlog2( unsigned int v );
 int cmn_match_fname( const char *fname, const char *pattern );
+int cmn_get_path_type( const char *path, const char **pname );
 
 #endif // #ifndef __COMMON_H__
 

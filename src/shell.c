@@ -51,6 +51,9 @@ typedef struct
 // Shell data
 static char* shell_prog;
 
+// Callback function for FS iterator
+typedef int ( *p_shell_iterator_cb )( const char *fsname, struct dm_dirent *, void *f, int iterno );
+
 // ****************************************************************************
 // Shell functions
 
@@ -204,18 +207,78 @@ static void shell_ver( char* args )
   printf( "For more information visit www.eluaproject.net and wiki.eluaproject.net\n" );
 }
 
+// Generic FS iterator for 'ls', 'cp' and 'rm'
+static int shellh_pattern_iterator( const char *pattern, p_shell_iterator_cb cb, void *f )
+{
+  const char *pfname;
+  int ptype = cmn_get_path_type( pattern, &pfname );
+  DM_DIR *d;
+  struct dm_dirent *ent;
+  char *pdevname;
+  int i = 0;
+
+  if( ptype == PATH_TYPE_INVALID || ptype == PATH_TYPE_FS )
+    return 0;
+  if( ( pdevname = strndup( pattern, pfname - pattern - 1 ) ) == NULL )
+  {
+    printf( "Not enough memory.\n" );
+    return 0;
+  }
+  if( ( d = dm_opendir( pdevname ) ) != NULL )// iterate and call only matching files
+  {
+    cb( pdevname, NULL, f, -1 );
+    while( ( ent = dm_readdir( d ) ) != NULL )
+      if( cmn_match_fname( ent->fname, pfname ) )
+        if( cb( pdevname, ent, f, i ++ ) == 0 ) // exit iteration indication
+          break;
+    cb( pdevname, NULL, f, i ); // last iteration
+    dm_closedir( d );
+  }
+  printf( TERM_RESET_COL ); // just in case 
+  free( pdevname );
+  return 1;
+}
+
 // 'ls' and 'dir' handler
+// Iterator callback
+static int shell_ls_iterator_cb( const char *fsname, struct dm_dirent *ent, void *f, int i )
+{
+  u32 *total = ( u32* )f;
+ 
+  if( !ent )
+  {
+    if( i == -1 ) // pre-iteration
+    {
+      *total = 0;
+      printf( TERM_FGCOL_LIGHT_BLUE "\n%s" TERM_RESET_COL, fsname );
+    }
+    else // post-iteration
+    {
+      if( i > 0 )
+        printf( TERM_FGCOL_LIGHT_YELLOW "\n\nTotal on %s: %u bytes\n" TERM_RESET_COL, fsname, ( unsigned )*total );
+      else // post-iteration with no files matched
+        printf( TERM_FGCOL_LIGHT_MAGENTA "\n\nNo files found on %s\n" TERM_RESET_COL, fsname );
+    }
+    return 1;
+  }
+  printf( TERM_FGCOL_LIGHT_GREEN "\n  %s" TERM_RESET_COL, ent->fname );
+  for( i = strlen( ent->fname ); i <= DM_MAX_FNAME_LENGTH; i++ )
+    printf( " " );
+  printf( TERM_FGCOL_LIGHT_CYAN "%u bytes" TERM_RESET_COL , ( unsigned )ent->fsize );
+  *total = *total + ent->fsize;
+  return 1;
+}
+
 static void shell_ls( char* args )
 {
   const DM_DEVICE *pdev;
-  unsigned dev, i;
-  DM_DIR *d;
-  struct dm_dirent *ent;
+  unsigned dev;
   u32 total;
   char *pattern = NULL;
   char *fspattern = NULL;
+  char fullpattern[ DM_MAX_DEV_NAME + DM_MAX_FNAME_LENGTH + 2 ];
 
-  // Check for pattern
+  // Check for file pattern and filesystem pattern
   if( *args != 0 )
   {
     *strchr( args, ' ' ) = 0;
@@ -227,7 +290,7 @@ static void shell_ls( char* args )
       if( pattern )
       {
         pattern ++;
-        if( strlen( pattern ) == 0 )
+        if( *pattern == '\0' )
           pattern = NULL;
       }
     }
@@ -243,25 +306,8 @@ static void shell_ls( char* args )
     // Check against the pattern
     if( fspattern && strncmp( fspattern, pdev->name, strlen( pdev->name ) ) )
       continue;
-    d = dm_opendir( pdev->name );
-    if( d )
-    {
-      total = 0;
-      printf( "\n%s", pdev->name );
-      while( ( ent = dm_readdir( d ) ) != NULL )
-      {
-        if( cmn_match_fname( ent->fname, pattern ) )
-        {
-          printf( "\n%s", ent->fname );
-          for( i = strlen( ent->fname ); i <= DM_MAX_FNAME_LENGTH; i++ )
-            printf( " " );
-          printf( "%u bytes", ( unsigned )ent->fsize );
-          total = total + ent->fsize;
-        }
-      }
-      printf( "\n\nTotal on %s: %u bytes\n", pdev->name, ( unsigned )total );
-      dm_closedir( d );
-    }
+    snprintf( fullpattern, DM_MAX_DEV_NAME + DM_MAX_FNAME_LENGTH + 1, "%s/%s", pdev->name, pattern == NULL ? "*" : pattern );
+    shellh_pattern_iterator( fullpattern, shell_ls_iterator_cb, &total );
   }   
   term_enable_paging( TERM_PAGING_OFF );
   printf( "\n" );
@@ -300,7 +346,7 @@ static void shell_cat( char *args )
     term_enable_paging( TERM_PAGING_OFF );
   }
   else
-      printf( "Usage: cat (or type) <filename1> [<filename2> ...]\n" );
+    printf( "Usage: cat (or type) <filename1> [<filename2> ...]\n" );
 }    
 
 // 'edit' handler
@@ -313,11 +359,49 @@ static void shell_edit( char *args )
 }
 
 // 'rm' handler
+// Iterator callback
+static int shell_rm_iterator_cb( const char *fsname, struct dm_dirent *ent, void *f, int i )
+{
+  int *pask = ( int* )f;
+  char fullpattern[ DM_MAX_DEV_NAME + DM_MAX_FNAME_LENGTH + 2 ];
+  int resp;
+
+  if( ent == NULL )
+  {
+    if( i == 0 ) // post-iteration with no files matched
+      printf( "No files deleted.\n" );
+    return 1;
+  }
+  snprintf( fullpattern, DM_MAX_DEV_NAME + DM_MAX_FNAME_LENGTH + 1, "%s/%s", fsname, ent->fname );
+  if( *pask )
+  {
+    printf( TERM_FGCOL_LIGHT_BLUE "Delete %s [%sY%ses/%sN%so/e%sX%sit] ? " TERM_RESET_COL, fullpattern, TERM_FGCOL_LIGHT_YELLOW,
+      TERM_FGCOL_LIGHT_BLUE, TERM_FGCOL_LIGHT_YELLOW, TERM_FGCOL_LIGHT_BLUE, TERM_FGCOL_LIGHT_YELLOW, TERM_FGCOL_LIGHT_BLUE );
+    resp = term_getch( TERM_INPUT_WAIT );
+    printf( "%c\n", ( char )resp );
+    if( resp == 'x' || resp == 'X' )
+      return 0;
+    if( resp == 'y' || resp == 'Y' )
+      if( unlink( fullpattern ) != 0 )
+        printf( TERM_FGCOL_LIGHT_RED "Error deleting %s\n" TERM_RESET_COL, fullpattern );
+  }
+  else
+  {
+    printf( TERM_FGCOL_LIGHT_GREEN "Deleting %s ... ", fullpattern );
+    if( unlink( fullpattern ) == 0 )
+      printf( "done.\n" );
+    else
+      printf( TERM_FGCOL_LIGHT_RED "error!\n" );
+    printf( TERM_RESET_COL );
+  }
+  return 1;
+}
+
 static void shell_rm( char *args )
 {
   char *p1 = NULL, *p2 = NULL;
-  int res = 0;
-  int ask = 1;
+  int ptype, ask = 1;
+  char *pdevname = NULL, *pattern = NULL;
 
   if( *args )
   {
@@ -331,19 +415,37 @@ static void shell_rm( char *args )
         *p2 = 0;
         if( strcasecmp( p1 + 1, "-f" ) )
         {
-          printf( "Invalid argument '%s'\n", p1 + 1 );
-          goto rmdone;
+          printf( "Invalid argument '%s'.\n", p1 + 1 );
+          return;
         }
         else
           ask = 0;
       }
-      // [TODO] make 'ask' count only if multiple files are removed
-      res = unlink( args ) == 0 ? 1 : 0;
+      ptype = cmn_get_path_type( args, NULL );
+      if( ptype == PATH_TYPE_INVALID )
+        printf( "Invalid argument '%s'.\n", args );
+      else if( ptype == PATH_TYPE_FS ) // forcs <fs>/* pattern
+      {
+        if( ( pdevname = malloc( strlen( args ) + 3 ) ) == NULL )
+        {
+          printf( "Not enough memory.\n" );
+          return;
+        }
+        strcpy( pdevname, args );
+        if( pdevname[ strlen( pdevname ) - 1 ] != '/' )
+          strcat( pdevname, "/" );
+        strcat( pdevname, "*" );
+        pattern = pdevname;
+      }
+      else
+        pattern = args;
+      shellh_pattern_iterator( pattern, shell_rm_iterator_cb, &ask );
     }
   }
-rmdone:  
-  if( !res )
-    printf( "Remove failed.\n" );
+  else
+    printf( "Missing argument.\n" );
+  if( pdevname )
+    free( pdevname );
 }
 
 // 'ee' handler

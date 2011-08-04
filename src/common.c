@@ -505,3 +505,20 @@ int cmn_match_fname( const char *fname, const char *pattern )
   return *fname == *pattern;
 }
 
+// Returns the path type (file, wildcards, fs or invalid)
+// If apropriate it also returns the pointer to the filename/wildcard pattern in pname
+int cmn_get_path_type( const char *path, const char **pname )
+{
+  const char *p;
+
+  if( !path || *path != '/' )
+    return PATH_TYPE_INVALID;
+  if( ( p = strchr( path + 1, '/' ) ) == path + 1 )
+    return PATH_TYPE_INVALID;
+  if( p == NULL || *( p + 1 ) == '\0' ) // should be a FS name
+    return strchr( path, '*' ) ? PATH_TYPE_INVALID : PATH_TYPE_FS;
+  if( pname )
+    *pname = p + 1;
+  return strchr( p + 1, '*' ) ? PATH_TYPE_WC : PATH_TYPE_FILE;
+}
+
