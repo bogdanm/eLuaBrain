@@ -20,4 +20,4 @@ luarpc
 *.eeprom
 *~
 *.*~
-
+luac.cross*
