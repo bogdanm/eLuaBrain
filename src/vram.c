@@ -108,7 +108,7 @@ static int vram_cvt_escape( char* inbuf, vram_ansi_op* res )
     case 'H': // gotoxy
     case 'f':
       res->op = ANSI_SEQ_GOTOXY;
-      if( *p != 'H' )
+      if( last != 'H' )
         sscanf( p, "%d;%d", &res->p1, &res->p2 );
       else
         res->p1 = res->p2 = 1;
