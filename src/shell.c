@@ -120,25 +120,26 @@ static void shellh_print_action_prompt()
 
 // ----------------------------------------------------------------------------
 // 'help' handler
+#define SHELLH_CMD            TERM_FGCOL_LIGHT_BLUE
+#define SHELLH_HELP           TERM_FGCOL_LIGHT_CYAN
 static void shell_help( char* args )
 {
   args = args;
   printf( "Shell commands:\n" );
-  printf( "  exit        - exit from this shell\n" );
-  printf( "  help        - print this help\n" );
-  printf( "  ls [pattern] - lists filesystems files and sizes (optionally matching 'pattern')\n" );
-  printf( "  cat or type - lists file contents\n" );
-  printf( "  lua [args]  - run Lua with the given arguments\n" );
-  printf( "  recv [path] - receive a file via XMODEM, if there is a path, save"
-          "                there, otherwise run it.");
-  printf( "  cp <src> <dst> [-b] [-c] [-o] - copy source file 'src' to 'dst'\n" );
+  printf( "  %sexit        %s- exit from this shell\n" TERM_RESET_COL, SHELLH_CMD, SHELLH_HELP );
+  printf( "  %shelp        %s- print this help\n" TERM_RESET_COL, SHELLH_CMD, SHELLH_HELP );
+  printf( "  %sls [pattern] %s- lists filesystems files and sizes (optionally matching 'pattern')\n" TERM_RESET_COL, SHELLH_CMD, SHELLH_HELP);
+  printf( "  %scat or type %s- lists file contents\n" TERM_RESET_COL, SHELLH_CMD, SHELLH_HELP );
+  printf( "  %slua [args]  %s- run Lua with the given arguments\n" TERM_RESET_COL, SHELLH_CMD, SHELLH_HELP );
+  printf( "  %srecv [path] %s- receive a file via XMODEM; save it if [path] is given, run it if not.\n" TERM_RESET_COL, SHELLH_CMD, SHELLH_HELP );
+  printf( "  %scp <src> <dst> [-b] [-c] [-o] %s- copy source file 'src' to 'dst'\n", SHELLH_CMD, SHELLH_HELP );
   printf( "     -b: backup mode (prepend the destination file name with '_b').\n" );
   printf( "     -c: ask for confirmation before copying a file.\n" );
-  printf( "     -o: overwrite destination files without confirmation.\n" );
-  printf( "  ee <file>   - dump file to the EEPROM connected on I2C1\n" );
-  printf( "  edit <file> - edits the given file\n" );
-  printf( "  ver         - print eLua version\n" );
-  printf( "  rm <file> [-f] - removes the file, use '-f' to supress confirmation\n" );
+  printf( "     -o: overwrite destination files without confirmation.\n" TERM_RESET_COL );
+  printf( "  %see <file>   %s- dump file to the EEPROM connected on I2C1\n" TERM_RESET_COL, SHELLH_CMD, SHELLH_HELP );
+  printf( "  %sedit <file> %s- edits the given file\n" TERM_RESET_COL, SHELLH_CMD, SHELLH_HELP );
+  printf( "  %sver         %s- print eLua version\n" TERM_RESET_COL, SHELLH_CMD, SHELLH_HELP );
+  printf( "  %srm <file> [-f] %s- removes the file, use '-f' to supress confirmation\n" TERM_RESET_COL, SHELLH_CMD, SHELLH_HELP );
 }
 
 // ----------------------------------------------------------------------------
@@ -429,7 +430,7 @@ static int shell_rm_iterator_cb( const char *fsname, struct dm_dirent *ent, void
   {
     printf( TERM_FGCOL_LIGHT_GREEN "Deleting %s ... ", fullpattern );
     if( unlink( fullpattern ) == 0 )
-      printf( "done.\n" );
+      printf( TERM_FGCOL_LIGHT_BLUE "done.\n" );
     else
       printf( TERM_FGCOL_LIGHT_RED "error!\n" );
     printf( TERM_RESET_COL );
@@ -537,7 +538,7 @@ static void shell_ee( char *args )
 }
 
 // ----------------------------------------------------------------------------
-// 'copy' handler
+// 'cp' handler
 #ifdef BUILD_RFS
 #define SHELL_COPY_BUFSIZE    ( ( 1 << RFS_BUFFER_SIZE ) - ELUARPC_WRITE_REQUEST_EXTRA )
 #else
