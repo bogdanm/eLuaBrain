@@ -1044,6 +1044,7 @@ int elua_net_accept( u16 port, unsigned bufsize, unsigned timer_id, s32 to_us, e
     {
       elua_net_close( s );
       s = -1;
+      break;
     }
   }  
   elua_uip_accept_request = 0;
