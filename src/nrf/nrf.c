@@ -155,18 +155,20 @@ void nrf_set_rf_setup( int data_rate, int pwr, int lna )
 
 void nrf_set_rx_addr( int pipe, const u8* paddr )
 {
+  nrf_write_register( NRF_REG_RX_ADDR( pipe ), paddr, 5 ); 
+}
+
+void nrf_set_own_addr( const u8 *paddr )
+{
   unsigned i;
 
-  if( pipe == 0 )
-  {
-    // This is (re)set later in nrf_set_mode
-    memcpy( nrf_p0_addr, paddr, 5 );
-    // And it is also used as a random seed
-    nrf_lfsr = ( ( u32 )paddr[ 0 ] << 24 ) | ( ( u32 )paddr[ 1 ] << 16 ) | ( ( u32 )paddr[ 2 ] << 8 ) | paddr[ 3 ];
-    for( i = 0; i < paddr[ 4 ] % 4 + 1; i ++ )
-      nrfh_rand();
-  }
-  nrf_write_register( NRF_REG_RX_ADDR( pipe ), paddr, 5 ); 
+  // This is (re)set later in nrf_set_mode
+  memcpy( nrf_p0_addr, paddr, 5 );
+  // And it is also used as a random seed
+  nrf_lfsr = ( ( u32 )paddr[ 0 ] << 24 ) | ( ( u32 )paddr[ 1 ] << 16 ) | ( ( u32 )paddr[ 2 ] << 8 ) | paddr[ 3 ];
+  for( i = 0; i < paddr[ 4 ] % 4 + 1; i ++ )
+    nrfh_rand();
+  nrf_set_rx_addr( 0, paddr );
 }
 
 void nrf_get_rx_addr( int pipe, u8 *addrbuf )
@@ -188,9 +190,11 @@ void nrf_set_mode( int mode )
 {
   if( mode == nrf_crt_mode )
     return;
-  nrf_write_register_byte( NRF_REG_CONFIG, ( nrf_read_register_byte( NRF_REG_CONFIG ) & 0xFE ) | mode );
-  nrf_ll_set_ce( mode == NRF_MODE_RX ? 1 : 0 );
+  nrf_ll_set_ce( 0 );
   nrf_set_rx_addr( 0, nrf_p0_addr );
+  nrf_write_register_byte( NRF_REG_CONFIG, ( nrf_read_register_byte( NRF_REG_CONFIG ) & 0xFE ) | mode );
+  if( mode == NRF_MODE_RX )
+    nrf_ll_set_ce( 1 );
   nrf_crt_mode = ( u8 )mode;
 }
 
@@ -246,6 +250,7 @@ unsigned nrf_send_packet( const u8 *addr, const u8 *pdata, unsigned len )
     if( stat & NRF_INT_TX_DS_MASK )
       break;
   }
+  nrf_set_rx_addr( 0, nrf_p0_addr );
   return len;
 }
 
@@ -325,6 +330,12 @@ void nrf_init()
   // Power up, 2 bytes CRC, interrupts disabled
   // [TODO] change interrupts to enabled eventually
   nrf_write_register_byte( NRF_REG_CONFIG, 0x0E );
+  // Clear all data
+  nrf_flush_tx();
+  nrf_clear_interrupt( NRF_INT_TX_DS_MASK );
+  while( nrf_has_data() )
+    nrf_flush_rx();
+  nrf_clear_interrupt( NRF_INT_RX_DR_MASK );
   // Always start in TX mode
   nrf_set_mode( NRF_MODE_TX );
 

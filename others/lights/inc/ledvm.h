@@ -25,8 +25,8 @@ enum
   LEDVM_ERR_INVALID_OPCODE,
   LEDVM_ERR_INVALID_INSTRUCTION,
   LEDVM_ERR_TOO_MANY_CALLS,
-  LEDVM_ERR_INVALID_RET,
-  LEDVM_ERR_INVALID_PC
+  LEDVM_ERR_INVALID_PC,
+  LEDVM_ERR_FINISHED
 };
 
 void ledvm_init();
@@ -35,7 +35,8 @@ u16 ledvm_get_pc();
 
 // Low-level interface (to be implemented by host)
 void ledvm_ll_setrgb( s8 r, s8 g, s8 b );
-void ledvm_ll_delayms( u32 ms );
+void ledvm_ll_delayms_start( u32 ms );
+int ledvm_ll_delay_elapsed();
 int ledvm_ll_getinst( u16 pc, u8 *pinst );
 int ledvm_ll_rand();
 

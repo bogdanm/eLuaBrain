@@ -53,6 +53,7 @@
 #define NRF_CONFIG_CRC_2BYTES 1
 #define NRF_CONFIG_MODE_PTX   0
 #define NRF_CONFIG_MODE_PRX   1
+#define NRF_CONFIG_POWER_MASK 0x02
 
 // STAT reg constants
 #define NRF_STAT_RX_P_NONE    6
@@ -108,6 +109,7 @@ void nrf_set_payload_size( int pipe, u8 size );
 void nrf_set_mode( int mode );
 void nrf_clear_interrupt( u8 mask );
 int nrf_has_data();
+void nrf_set_own_addr( const u8 *paddr );
 unsigned nrf_send_packet( const u8 *addr, const u8 *pdata, unsigned len );
 unsigned nrf_get_packet( u8 *pdata, unsigned maxlen, int *pipeno );
 

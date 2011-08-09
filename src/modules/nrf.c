@@ -54,13 +54,14 @@ static int nrfm_write( lua_State *L )
 static int nrfm_read( lua_State *L )
 {
   int timeout = luaL_optinteger( L, 1, PLATFORM_UART_INFINITE_TIMEOUT );
-  int timer_id = luaL_optinteger( L, 1, -1 );
+  int timer_id = luaL_optinteger( L, 2, -1 );
   luaL_Buffer b;
   u8 data[ NRF_MAX_PAYLOAD_SIZE ];
   unsigned len = 0;
   timer_data_type tmr_start, tmr_crt;
 
   nrf_init();
+  luaL_buffinit( L, &b );
   if( timeout == 0 )
     len = nrf_get_packet( data, NRF_MAX_PAYLOAD_SIZE, NULL );
   else if( timeout == PLATFORM_UART_INFINITE_TIMEOUT )
@@ -95,7 +96,7 @@ static int nrfm_set_address( lua_State *L )
   nrf_init();
   if( !nrfmh_parse_address( addr, pipeaddr ) )
     return luaL_error( L, "invalid address" );
-  nrf_set_rx_addr( 0, pipeaddr );
+  nrf_set_own_addr( pipeaddr );
   return 0;
 }
 
@@ -121,3 +122,4 @@ LUALIB_API int luaopen_nrf( lua_State* L )
 {
   LREGISTER( L, AUXLIB_NRF, nrf_map );
 }
+

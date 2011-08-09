@@ -34,9 +34,11 @@
 #define NRF_PIN_CE                        PD3
 #define NRF_PIN_IRQ                       PD2
 #define NRF_HW_ADDR                       { 0x74, 0xA3, 0xC9, 0xEF, 0x68 }
+#define NRF_SRV_HW_ADDR                   { 0xAB, 0x31, 0xC6, 0x79, 0xFE }
 
 // *****************************************************************************
 // LEDs definitions
+
 #define LED_PORT_OUT                      PORTC
 #define LED_PORT_IN                       PINC
 #define LED_PORT_DIR                      DDRC
@@ -46,6 +48,15 @@
 #define LED_MASK                          ( _BV( LED_R_PIN ) | _BV( LED_G_PIN ) | _BV( LED_B_PIN ) )
 #define LED_BASE_FREQ_HZ                  100
 #define LED_PWM_STEPS                     32
+
+// *****************************************************************************
+// LED program data
+
+#define PGM_EE_SIZE                       ( 32 * 1024L )
+#define PGM_EE_PAGE_SIZE                  64
+#define PGM_MAX                           8
+#define PGM_MAX_INSTR                     ( PGM_EE_SIZE / ( PGM_MAX * 4 ) )
+#define PGM_MAX_BYTES                     ( PGM_MAX_INSTR * 4 )
 
 // *****************************************************************************
 // Other macros

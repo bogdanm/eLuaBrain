@@ -30,7 +30,7 @@ typedef struct {
   u32 rgb_delay;              // default delay for RGB set ops
   u16 cstack[ LEDVM_MAX_CALLS ];  // call stack
   u8 numcalls;                // call stack depth
-  u32 crtdelay;               // current delay
+  u8 delay_flag;              // executing a delay
 } LEDVM_DATA;
 
 typedef int ( *p_handler )( const u8* );
@@ -52,7 +52,8 @@ static s8 vmh_clip_rgb( u8 ch, s8 v )
 
 static void vmh_delay( u32 period )
 {
-  vm_d.crtdelay = period;
+  ledvm_ll_delayms_start( period );
+  vm_d.delay_flag = 1;
 }
 
 static void vmh_set_rgbdata( const s8 *newv, int dodelay )
@@ -249,8 +250,8 @@ static int vm_h_ret( const u8 *pdata )
 {
   if( !vmh_check_empty_inst( pdata ) )
     return LEDVM_ERR_INVALID_INSTRUCTION;
-  if( vm_d.numcalls == 0 )
-    return LEDVM_ERR_INVALID_RET;
+  if( vm_d.numcalls == 0 )  // 'ret' on an empty call stack means program exit
+    return LEDVM_ERR_FINISHED;
   vmh_check_mask( pdata[ 0 ] );
   vm_d.pc = vm_d.cstack[ -- vm_d.numcalls ];
   return LEDVM_ERR_OK;
@@ -339,11 +340,11 @@ int ledvm_run()
   int res;
   u8 code;
 
-  if( vm_d.crtdelay )
+  if( vm_d.delay_flag )
   {
-    vm_d.crtdelay --;
-    ledvm_ll_delayms( 1.0 );
-    return LEDVM_ERR_OK;
+    if( !ledvm_ll_delay_elapsed() )
+      return LEDVM_ERR_OK;
+    vm_d.delay_flag = 0;
   }
   res = ledvm_ll_getinst( vm_d.pc, inst );
   code = inst[ 0 ] >> 4;
