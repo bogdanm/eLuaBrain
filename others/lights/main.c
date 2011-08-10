@@ -27,9 +27,13 @@ static u8 pgm_recv_slot;
 static u16 pgm_recv_addr;
 static u8 pgm_recv_buffer[ PGM_EE_PAGE_SIZE ];
 static u8 pgm_recv_buf_idx;
+static u8 pgm_cycle;
 static const u8 pgm_radio_ack[] = { 0xA0, 0xC5, 0xDE, 0x17 };
 // Delay data
 static volatile u32 delay_cnt;
+// Buttons
+static u8 btn_debounce_mask, btn_state;
+static volatile u8 btn_counters[ BTN_TOTAL ];
 
 #define TIMER_PRESCALER                   1
 #define start_timer()                     TCCR1B  = ( TCCR1B & ( u8 )~0x07 ) | TIMER_PRESCALER 
@@ -45,9 +49,75 @@ static volatile u32 delay_cnt;
 #define CMD_DEL                           0xFB // parameters: i, i, progam number
 
 // ****************************************************************************
+// Button handling
+
+static void btn_init()
+{
+  BTN_PORT_OUT |= BTN_ALL_MASK;
+  BTN_PORT_DIR &= ( u8 )~BTN_ALL_MASK;
+}
+
+// Handle button debouncing
+static void btn_handler()
+{
+  u8 v = BTN_PORT_IN, mask;
+  unsigned i;
+
+  for( i = 0, mask = 1 << BTN_FIRST; i < BTN_TOTAL; i ++, mask <<= 1 )
+    if( btn_debounce_mask & mask ) // already debouncing button
+    {
+      if( btn_counters[ i ] == 0 ) // end debounce, check state
+      {
+        if( ( v & mask ) == 0 )
+          btn_state |= mask;
+        else
+          btn_state &= ( u8 )~mask;
+        btn_debounce_mask &= ( u8 )~mask;
+      }
+    }
+    else if( ( v & mask ) == 0 ) // button pressed, start debouncing
+    {
+      btn_debounce_mask |= mask;
+      btn_counters[ i ] = 0xFF;
+    }
+}
+
+static int btn_is_pressed( u8 idx )
+{
+  u8 mask = 1 << idx, v;
+
+  if( btn_debounce_mask & mask )
+    return 0;
+  v = btn_state & mask;
+  btn_state &= ( u8 )~mask;
+  return v ? 1 : 0;
+}
+
+// ****************************************************************************
+// Repeat LED indicator
+
+#define ind_on()                          IND_PORT_OUT |= _BV( IND_PIN )
+#define ind_off()                         IND_PORT_OUT &= ( u8 )~_BV( IND_PIN )
+
+static void ind_init()
+{
+  ind_off();
+  IND_PORT_DIR |= _BV( IND_PIN );
+}
+
+static void ind_set( int value )
+{
+  pgm_cycle = value;
+  if( value )
+    ind_on();
+  else
+    ind_off();
+}
+
+// ****************************************************************************
 // LED handling
 
-void leds_init()
+static void leds_init()
 {
   LED_PORT_DIR |= _BV( LED_R_PIN ) | _BV( LED_G_PIN ) | _BV( LED_B_PIN );
   cr = cg = cb = 0;
@@ -67,6 +137,14 @@ ISR( TIMER1_COMPA_vect )
   temp = 0;
   if( delay_cnt > 0 )
     delay_cnt --;
+  // Unroll button debouncing loop for speed
+  if( btn_counters[ 0 ] > 0 )
+    btn_counters[ 0 ] --;
+  if( btn_counters[ 1 ] > 0 )
+    btn_counters[ 1 ] --;
+  if( btn_counters[ 2 ] > 0 )
+    btn_counters[ 2 ] --;
+  // Time to sync  ?
   if( pwm == 0 && sync )
   {
     vr = cr;
@@ -209,6 +287,8 @@ int main()
   int res;
 
   leds_init();
+  btn_init();
+  ind_init();
   uart_init();
   sei();
   ledvm_init();
@@ -228,10 +308,13 @@ int main()
       if( res != LEDVM_ERR_OK )
       {
         if( res == LEDVM_ERR_FINISHED ) // program finished, look for the next one
-        { 
-          res = pgm_get_next_index( pgm_crt, 1 );
-          if( res != -1 ) // if found use the other program, otherwise don't change it
-            pgm_crt = res;
+        {
+          if( pgm_cycle )
+          {
+            res = pgm_get_next_index( pgm_crt, 1 );
+            if( res != -1 ) // if found use the other program, otherwise don't change it
+              pgm_crt = res;
+          }
           ledvm_init();
         }
         else
@@ -243,52 +326,74 @@ int main()
     }
       
     // New data via radio?
-    if( nrf_get_packet( data, 4, NULL ) != 4 )
-      continue;
-
-    // Got data, interpret it
-    if( data[ 0 ] == CMD_START_WRITE )
+    if( nrf_get_packet( data, 4, NULL ) == 4 )
     {
-      pgm_recv_on = 1;
-      pgm_recv_slot = data[ 3 ];
-      pgm_recv_addr = 0;
-      pgm_recv_buf_idx = 0;
-      if( pgm_recv_slot == pgm_crt )
-        pgm_crt = -1;
-    }
-    else if( data[ 0 ] == CMD_END_WRITE )
-    {
-      pgm_recv_on = 0;
-      pgm_recv_to_flash();
-      pgm_set_program_state( pgm_recv_slot, 1 );
-      if( pgm_crt == -1 )
-        pgm_crt = pgm_get_first_index();
-    }
-    else if( data[ 0 ] == CMD_RUN )
-    {
-      if( pgm_mask & ( 1 << data[ 3 ] ) )
+      // Got data, interpret it
+      if( data[ 0 ] == CMD_START_WRITE )
       {
-        pgm_crt = data[ 3 ];
-        ledvm_init();
+        pgm_recv_on = 1;
+        pgm_recv_slot = data[ 3 ];
+        pgm_recv_addr = 0;
+        pgm_recv_buf_idx = 0;
+        if( pgm_recv_slot == pgm_crt )
+          pgm_crt = -1;
+      }
+      else if( data[ 0 ] == CMD_END_WRITE )
+      {
+        pgm_recv_on = 0;
+        pgm_recv_to_flash();
+        pgm_set_program_state( pgm_recv_slot, 1 );
+        if( pgm_crt == -1 )
+          pgm_crt = pgm_get_first_index();
+      }
+      else if( data[ 0 ] == CMD_RUN )
+      {
+        if( pgm_mask & ( 1 << data[ 3 ] ) )
+        {
+          pgm_crt = data[ 3 ];
+          ledvm_init();
+        }
+      }
+      else if( data[ 0 ] == CMD_RAW )
+      {
+        pgm_crt = -1;
+        ledvm_ll_setrgb( data[ 1 ], data[ 2 ], data[ 3 ] );
+      }
+      else if( data[ 0 ] == CMD_DEL ) 
+      {
+        pgm_set_program_state( data[ 3 ], 0 );
+        if( pgm_crt == data[ 3 ] )
+          pgm_crt = pgm_get_first_index();
+      }
+      else if( pgm_recv_on ) // instruction
+      {
+        memcpy( pgm_recv_buffer + pgm_recv_buf_idx, data, 4 );
+        pgm_recv_buf_idx += 4;
+        if( pgm_recv_buf_idx == PGM_EE_PAGE_SIZE )
+          pgm_recv_to_flash();
       }
     }
-    else if( data[ 0 ] == CMD_RAW )
+
+    // Handle buttons
+    if( pgm_crt != -1 )
     {
-      pgm_crt = -1;
-      ledvm_ll_setrgb( data[ 1 ], data[ 2 ], data[ 3 ] );
-    }
-    else if( data[ 0 ] == CMD_DEL ) 
-    {
-      pgm_set_program_state( data[ 3 ], 0 );
-      if( pgm_crt == data[ 3 ] )
-        pgm_crt = pgm_get_first_index();
-    }
-    else if( pgm_recv_on ) // instruction
-    {
-      memcpy( pgm_recv_buffer + pgm_recv_buf_idx, data, 4 );
-      pgm_recv_buf_idx += 4;
-      if( pgm_recv_buf_idx == PGM_EE_PAGE_SIZE )
-        pgm_recv_to_flash();
+      btn_handler();
+      if( btn_is_pressed( BTN_NEXT_PIN ) )
+      {
+        res = pgm_get_next_index( pgm_crt, 1 );
+        if( res != -1 )
+          pgm_crt = res;
+        ledvm_init();
+      }
+      else if( btn_is_pressed( BTN_PREV_PIN ) )
+      {
+        res = pgm_get_next_index( pgm_crt, -1 );
+        if( res != -1 )
+          pgm_crt = res;
+        ledvm_init();
+      }
+      else if( btn_is_pressed( BTN_REPEAT_PIN ) )
+        ind_set( 1 - pgm_cycle );
     }
   }  
 }

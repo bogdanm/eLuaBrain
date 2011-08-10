@@ -59,6 +59,28 @@
 #define PGM_MAX_BYTES                     ( PGM_MAX_INSTR * 4 )
 
 // *****************************************************************************
+// Buttons
+
+#define BTN_PORT_OUT                      PORTD
+#define BTN_PORT_IN                       PIND
+#define BTN_PORT_DIR                      DDRD
+#define BTN_NEXT_PIN                      PD5
+#define BTN_PREV_PIN                      PD6
+#define BTN_REPEAT_PIN                    PD7
+#define BTN_FIRST                         BTN_NEXT_PIN
+#define BTN_LAST                          BTN_REPEAT_PIN
+#define BTN_ALL_MASK                      ( _BV( BTN_NEXT_PIN ) | _BV( BTN_PREV_PIN ) | _BV( BTN_REPEAT_PIN ) )
+#define BTN_TOTAL                         3
+
+// *****************************************************************************
+// Repeat mode indicator LED
+
+#define IND_PORT_OUT                      PORTB
+#define IND_PORT_IN                       PINB
+#define IND_PORT_DIR                      DDRB
+#define IND_PIN                           PB0
+
+// *****************************************************************************
 // Other macros
 
 #define nop()                             asm( "nop\n\t":: )
