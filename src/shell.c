@@ -128,10 +128,12 @@ static void shell_help( char* args )
   printf( "Shell commands:\n" );
   printf( "  %sexit        %s- exit from this shell\n" TERM_RESET_COL, SHELLH_CMD, SHELLH_HELP );
   printf( "  %shelp        %s- print this help\n" TERM_RESET_COL, SHELLH_CMD, SHELLH_HELP );
-  printf( "  %sls [pattern] %s- lists filesystems files and sizes (optionally matching 'pattern')\n" TERM_RESET_COL, SHELLH_CMD, SHELLH_HELP);
+  printf( "  %sls [pattern] %s- lists filesystems files and sizes\n" TERM_RESET_COL, SHELLH_CMD, SHELLH_HELP);
   printf( "  %scat or type %s- lists file contents\n" TERM_RESET_COL, SHELLH_CMD, SHELLH_HELP );
   printf( "  %slua [args]  %s- run Lua with the given arguments\n" TERM_RESET_COL, SHELLH_CMD, SHELLH_HELP );
-  printf( "  %srecv [path] %s- receive a file via XMODEM; save it if [path] is given, run it if not.\n" TERM_RESET_COL, SHELLH_CMD, SHELLH_HELP );
+#ifdef BUILD_XMODEM
+  printf( "  %srecv [path] %s- receive file via XMODEM; save if [path] is given, run if not.\n" TERM_RESET_COL, SHELLH_CMD, SHELLH_HELP );
+#endif
   printf( "  %scp <src> <dst> [-b] [-c] [-o] %s- copy source file 'src' to 'dst'\n", SHELLH_CMD, SHELLH_HELP );
   printf( "     -b: backup mode (prepend the destination file name with '_b').\n" );
   printf( "     -c: ask for confirmation before copying a file.\n" );
@@ -140,6 +142,7 @@ static void shell_help( char* args )
   printf( "  %sedit <file> %s- edits the given file\n" TERM_RESET_COL, SHELLH_CMD, SHELLH_HELP );
   printf( "  %sver         %s- print eLua version\n" TERM_RESET_COL, SHELLH_CMD, SHELLH_HELP );
   printf( "  %srm <file> [-f] %s- removes the file, use '-f' to supress confirmation\n" TERM_RESET_COL, SHELLH_CMD, SHELLH_HELP );
+  printf( "You can also run a Lua file by giving its path (without using 'lua').\n" );
 }
 
 // ----------------------------------------------------------------------------
@@ -191,15 +194,10 @@ static void shell_lua( char* args )
 
 // ----------------------------------------------------------------------------
 // 'recv' handler
+
+#ifdef BUILD_XMODEM
 static void shell_recv( char* args )
 {
-  args = args;
-
-#ifndef BUILD_XMODEM
-  printf( "XMODEM support not compiled, unable to recv\n" );
-  return;
-#else // #ifndef BUILD_XMODEM
-
   char *p;
   long actsize;
   lua_State* L;
@@ -264,8 +262,8 @@ static void shell_recv( char* args )
   }
   free( shell_prog );
   shell_prog = NULL;
-#endif // #ifndef BUILD_XMODEM
 }
+#endif // #ifdef BUILD_XMODEM
 
 // ----------------------------------------------------------------------------
 // 'ver' handler
@@ -783,7 +781,9 @@ static const SHELL_COMMAND shell_commands[] =
 {
   { "help", shell_help },
   { "lua", shell_lua },
+#ifdef BUILD_XMODEM
   { "recv", shell_recv },
+#endif
   { "ver", shell_ver },
   { "exit", NULL },
   { "ls", shell_ls },
@@ -805,6 +805,7 @@ void shell_start()
   const SHELL_COMMAND* pcmd;
   int i, inside_quotes;
   char quote_char;
+  FILE *fp;
 
   printf( SHELL_WELCOMEMSG, ELUA_STR_VERSION );
   while( 1 )
@@ -881,6 +882,14 @@ void shell_start()
     }
     *p = 0;
     i = 0;
+    // Is 'temp' a file name? If so, try to execute it with 'lua'
+    if( ( fp = fopen( temp, "rb" ) ) != NULL )
+    {
+      fclose( fp );
+      *p = ' ';
+      shell_lua( temp );
+      continue;
+    }
     while( 1 )
     {
       pcmd = shell_commands + i;
@@ -908,7 +917,6 @@ void shell_start()
 #else
       break;
 #endif
-
   }
   // Shell exit point
   if( shell_prog )
