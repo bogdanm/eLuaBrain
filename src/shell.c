@@ -137,7 +137,7 @@ static void shell_help( char* args )
   printf( "  %scp <src> <dst> [-b] [-c] [-o] %s- copy source file 'src' to 'dst'\n", SHELLH_CMD, SHELLH_HELP );
   printf( "     -b: backup mode (prepend the destination file name with '_b').\n" );
   printf( "     -c: ask for confirmation before copying a file.\n" );
-  printf( "     -o: overwrite destination files without confirmation.\n" TERM_RESET_COL );
+  printf( "     -f: overwrite destination files without confirmation.\n" TERM_RESET_COL );
   printf( "  %see <file>   %s- dump file to the EEPROM connected on I2C1\n" TERM_RESET_COL, SHELLH_CMD, SHELLH_HELP );
   printf( "  %sedit <file> %s- edits the given file\n" TERM_RESET_COL, SHELLH_CMD, SHELLH_HELP );
   printf( "  %sver         %s- print eLua version\n" TERM_RESET_COL, SHELLH_CMD, SHELLH_HELP );
@@ -713,7 +713,7 @@ static void shell_cp( char *args )
           flags |= SHELL_CP_FLAG_BACKUP;
         else if( !strcasecmp( args, "-c" ) )
           flags |= SHELL_CP_FLAG_CONFIRM;
-        else if( !strcasecmp( args, "-o" ) )
+        else if( !strcasecmp( args, "-f" ) )
           flags |= SHELL_CP_FLAG_OVERWRITE;
         else
         {
