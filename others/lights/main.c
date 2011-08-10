@@ -197,7 +197,10 @@ static void pgm_init()
 {
   // Check internal EEPROM data 
   if( eeprom_read_byte( PGMADDR ) == 0xFF ) // initial EEPROM is blank
+  {
     eeprom_write_byte( PGMADDR, 0x00 );
+    eeprom_busy_wait();
+  }
   pgm_mask = eeprom_read_byte( PGMADDR );
   pgm_crt = pgm_get_first_index();
 }
@@ -221,6 +224,7 @@ void pgm_set_program_state( u8 slot, u8 state )
     return;
   pgm_mask = newstate;
   eeprom_write_byte( PGMADDR, pgm_mask );
+  eeprom_busy_wait();
 }
 
 // ****************************************************************************
@@ -363,7 +367,10 @@ int main()
       {
         pgm_set_program_state( data[ 3 ], 0 );
         if( pgm_crt == data[ 3 ] )
+        {
           pgm_crt = pgm_get_first_index();
+          ledvm_init();
+        }
       }
       else if( pgm_recv_on ) // instruction
       {
