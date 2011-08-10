@@ -121,6 +121,33 @@ static int luaterm_print( lua_State* L )
   return 0;
 }
 
+// Lua: cprint( [x], [y], string, [fgcol], [bgcol]
+static int luaterm_cprint( lua_State *L )
+{  
+  const char* buf;
+  size_t len;
+  int x = -1, y = -1, s = 1;
+  int oldfg, oldbg, fgcol, bgcol;
+
+  // Check if the function has integer arguments
+  if( lua_isnumber( L, 1 ) && lua_isnumber( L, 2 ) )
+  {
+    x = lua_tointeger( L, 1 );
+    y = lua_tointeger( L, 2 );
+    term_gotoxy( x, y );
+    s = 3;
+  } 
+  luaL_checktype( L, s, LUA_TSTRING );
+  buf = lua_tolstring( L, s, &len );
+  term_get_color( &oldfg, &oldbg );
+  fgcol = luaL_optinteger( L, s + 1, TERM_COL_DONT_CHANGE );
+  bgcol = luaL_optinteger( L, s + 2, TERM_COL_DONT_CHANGE );
+  term_set_color( fgcol, bgcol );
+  term_putstr( buf, len );
+  term_set_color( oldfg, oldbg );
+  return 0;
+}
+
 // Lua: cursorx = getcx()
 static int luaterm_getcx( lua_State* L )
 {
@@ -162,19 +189,19 @@ static int luaterm_setcolor( lua_State *L )
   return 0;
 }
 
-// Lua: setfg( fgcol )
+// Lua: setfg( [fgcol] )
 static int luaterm_setfg( lua_State *L )
 {
-  int fgcol = ( int )luaL_checkinteger( L, 1 );
+  int fgcol = ( int )luaL_optinteger( L, 1, TERM_COL_DEFAULT );
 
   term_set_color( fgcol, TERM_COL_DONT_CHANGE );
   return 0;
 }
 
-// Lua: setbg( fgcol )
+// Lua: setbg( [bgcol] )
 static int luaterm_setbg( lua_State *L )
 {
-  int bgcol = ( int )luaL_checkinteger( L, 1 );
+  int bgcol = ( int )luaL_optinteger( L, 1, TERM_COL_DEFAULT );
 
   term_set_color( TERM_COL_DONT_CHANGE, bgcol );
   return 0;
@@ -440,14 +467,37 @@ static int luaterm_menu( lua_State *L )
   return 1;
 }
 
-// Lua: center( y, text )
+// Lua: center( y, text, [fgcol], [bgcol] )
 static int luaterm_center( lua_State *L )
 {
   int y = luaL_checkinteger( L, 1 );
   const char *pstr = luaL_checkstring( L, 2 );
+  int fgcol = luaL_optinteger( L, 3, TERM_COL_DONT_CHANGE );
+  int bgcol = luaL_optinteger( L, 4, TERM_COL_DONT_CHANGE );
+  int oldf, oldb;
 
+  term_get_color( &oldf, &oldb );
+  term_set_color( fgcol, bgcol );
   term_gotoxy( ( term_get_cols() - strlen( pstr ) ) / 2, y );
   term_cstr( pstr );
+  term_set_color( oldf, oldb );
+  return 0;
+}
+
+// Lua: clrline( y, [bgcol] )
+static int luaterm_clrline( lua_State *L )
+{
+  int y = luaL_checkinteger( L, 1 );
+  unsigned cx = term_get_cx(), cy = term_get_cy();
+  int bgcol = luaL_optinteger( L, 2, TERM_COL_DONT_CHANGE );
+  int oldb;
+  
+  term_get_color( NULL, &oldb );
+  term_gotoxy( 0, y );
+  term_set_color( TERM_COL_DONT_CHANGE, bgcol );
+  term_clreol();
+  term_set_color( TERM_COL_DONT_CHANGE, oldb );
+  term_gotoxy( cx, cy );
   return 0;
 }
 
@@ -493,6 +543,7 @@ const LUA_REG_TYPE term_map[] =
   { LSTRKEY( "getlines" ), LFUNCVAL( luaterm_getlines ) },
   { LSTRKEY( "getcols" ), LFUNCVAL( luaterm_getcols ) },
   { LSTRKEY( "print" ), LFUNCVAL( luaterm_print ) },
+  { LSTRKEY( "cprint" ), LFUNCVAL( luaterm_cprint ) },
   { LSTRKEY( "getcx" ), LFUNCVAL( luaterm_getcx ) },
   { LSTRKEY( "getcy" ), LFUNCVAL( luaterm_getcy ) },
   { LSTRKEY( "getchar" ), LFUNCVAL( luaterm_getchar ) },
@@ -508,6 +559,7 @@ const LUA_REG_TYPE term_map[] =
   { LSTRKEY( "set_last_line" ), LFUNCVAL( luaterm_set_last_line ) },
   { LSTRKEY( "menu" ), LFUNCVAL( luaterm_menu ) },
   { LSTRKEY( "center" ), LFUNCVAL( luaterm_center ) },
+  { LSTRKEY( "clrline" ), LFUNCVAL( luaterm_clrline ) },
 #if LUA_OPTIMIZE_MEMORY > 0
   { LSTRKEY( "__metatable" ), LROVAL( term_map ) },
   { LSTRKEY( "NOWAIT" ), LNUMVAL( TERM_INPUT_DONT_WAIT ) },

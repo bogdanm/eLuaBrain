@@ -545,8 +545,10 @@ void vram_close_box( void *pbox )
 
 void vram_get_color( int *pfgcol, int *pbgcol )  
 {
-  *pfgcol = vram_fg_col;
-  *pbgcol = vram_bg_col;
+  if( pfgcol )
+    *pfgcol = vram_fg_col;
+  if( pbgcol )
+    *pbgcol = vram_bg_col;
 }
 
 void vram_set_last_line( int line )
