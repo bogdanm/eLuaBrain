@@ -74,6 +74,8 @@ static int ededit_key_backspace()
       ed_cursory --;
     edmove_set_cursorx( linepos );
     edutils_set_flag( ed_crt_buffer, EDFLAG_DIRTY, 1 );
+    if( ed_nlines < EDITOR_LINES && ed_startline == 0 ) 
+      edutils_set_flag( ed_crt_buffer, EDFLAG_DEL_LAST_LINE, 1 );
     edutils_show_screen();
   }
   else // not the first column, simply remove a char and update the display

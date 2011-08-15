@@ -117,6 +117,13 @@ void edutils_show_screen()
   //edhw_clrscr();
   for( i = ed_startline; i < ed_startline + ed_nlines; i ++ )
     edutils_line_display( i - ed_startline, i );
+  if( edutils_is_flag_set( ed_crt_buffer, EDFLAG_DEL_LAST_LINE ) )
+  {
+    edhw_gotoxy( 0, ed_nlines );
+    for( i = 0; i < TERM_COLS; i ++ )
+      edhw_writechar( ' ' );
+    edutils_set_flag( ed_crt_buffer, EDFLAG_DEL_LAST_LINE, 0 );
+  }
   edutils_display_status();
 }
 

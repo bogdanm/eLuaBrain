@@ -37,6 +37,7 @@ typedef struct
 #define EDFLAG_DIRTY                  1 // is the buffer dirty ?
 #define EDFLAG_WAS_EMPTY              2 // was the buffer initially empty when loaded ?
 #define EDFLAG_SELECT                 4 // block selection mode
+#define EDFLAG_DEL_LAST_LINE          8 // the next display opertion must remove the last line on the screen
 
 // Cursor types
 enum
