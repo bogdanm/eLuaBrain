@@ -526,10 +526,10 @@ static int luaterm_msgbox( lua_State *L )
   const char *title = luaL_checkstring( L, 2 );
   int style = luaL_optinteger( L, 3, 0 ); 
   int fgcol = luaL_optinteger( L, 4, TERM_COL_LIGHT_BLUE );
-  int bgcol = luaL_optinteger( L, 5, TERM_COL_LIGHT_GRAY );
+  int bgcol = luaL_optinteger( L, 5, TERM_COL_DARK_GRAY );
   int oldfg, oldbg;
   int key;
-  int attrs = luaL_optinteger( L, 6, TERM_BOX_FLAG_BORDER | TERM_BOX_FLAG_RESTORE | TERM_BOX_FLAG_CENTER );
+  const int attrs = TERM_BOX_FLAG_BORDER | TERM_BOX_FLAG_RESTORE | TERM_BOX_FLAG_CENTER;
   TERM_BOX *p;
   int mainw = strlen( msg );
   unsigned i, mask;

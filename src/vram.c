@@ -7,6 +7,7 @@
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
 
 // *****************************************************************************
 // Local variables
@@ -63,17 +64,22 @@ enum
   ANSI_SGR_FIRST_FGCOL = 30,
   ANSI_SGR_LAST_FGCOL = 37,
   ANSI_SGR_FIRST_BGCOL = 40,
-  ANSI_SGR_LAST_BGCOL = 47
+  ANSI_SGR_LAST_BGCOL = 47,
+  ANSI_SGR_FIRST_BRIGHT = 60,
+  ANSI_SGR_FORCE_BRIGHT_DELTA = 30
 };
 
 // Map ANSI colors to VRAM colors
 static const u8 vram_ansi_col_lut[] = 
 {
   VRAM_COL_BLACK, VRAM_COL_DARK_RED, VRAM_COL_DARK_GREEN, VRAM_COL_BROWN,
-  VRAM_COL_DARK_BLUE, VRAM_COL_DARK_MAGENTA, VRAM_COL_DARK_CYAN, VRAM_COL_DARK_GRAY  
+  VRAM_COL_DARK_BLUE, VRAM_COL_DARK_MAGENTA, VRAM_COL_DARK_CYAN, VRAM_COL_DARK_GRAY,
+  VRAM_COL_LIGHT_GRAY, VRAM_COL_LIGHT_RED, VRAM_COL_LIGHT_GREEN, VRAM_COL_LIGHT_YELLOW,
+  VRAM_COL_LIGHT_BLUE, VRAM_COL_LIGHT_MAGENTA, VRAM_COL_LIGHT_CYAN, VRAM_COL_WHITE
 };
-#define ANSI_COL_SIZE         ( sizeof( vram_ansi_col_lut ) / sizeof( u8 ) )
-static u8 vram_ansi_brightness = ANSI_SGR_FAINT;
+
+#define ANSI_COL_HALF_SIZE    8
+static u8 vram_ansi_brightness = 0;
 
 typedef struct
 {
@@ -141,18 +147,6 @@ static int vram_cvt_escape( char* inbuf, vram_ansi_op* res )
   return 1;
 }
 
-static void vram_ansi_set_color( int fg, int bg )
-{
-  if( vram_ansi_brightness == ANSI_SGR_BRIGHT )
-  {
-    if( fg >= 0 )
-      fg += ANSI_COL_SIZE;
-    if( bg >= 0 )
-      bg += ANSI_COL_SIZE;
-  }
-  vram_set_color( fg, bg );
-}
-
 static void vram_ansi_execute()
 {
   vram_ansi_op op;
@@ -192,39 +186,50 @@ static void vram_ansi_execute()
         
       case ANSI_SEQ_SETSGR:
         {
-          int ft, bt, r1, r2;
+          int ft, bt, r1, r2, f1, f2;
           if( op.p1 == ANSI_SGR_RESET )
           {
             ft = bt = VRAM_COL_DEFAULT;
-            vram_ansi_brightness = ANSI_SGR_FAINT;
+            vram_ansi_brightness = 0;
           }    
           else if( op.p1 == ANSI_SGR_BRIGHT || op.p1 == ANSI_SGR_FAINT )
           {
             ft = bt = VRAM_COL_DONT_CHANGE;
-            vram_ansi_brightness = op.p1;
+            vram_ansi_brightness = op.p1 == ANSI_SGR_FAINT ? 0 : ANSI_COL_HALF_SIZE;
           }       
           else 
           {
             ft = bt = VRAM_COL_DONT_CHANGE;
+            f1 = f2 = 0;
+            if( op.p1 >= ANSI_SGR_FIRST_BRIGHT )
+            {
+              op.p1 -= ANSI_SGR_FORCE_BRIGHT_DELTA;
+              f1 = ANSI_COL_HALF_SIZE;
+            }
+            if( op.p2 >= ANSI_SGR_FIRST_BRIGHT )
+            {
+              op.p2 -= ANSI_SGR_FORCE_BRIGHT_DELTA;
+              f2 = ANSI_COL_HALF_SIZE;
+            }
             r1 = op.p1 >= ANSI_SGR_FIRST_FGCOL && op.p1 <= ANSI_SGR_LAST_FGCOL;
             r2 = op.p1 >= ANSI_SGR_FIRST_BGCOL && op.p1 <= ANSI_SGR_LAST_BGCOL;
             if( !r1 && !r2 )
               return;
             if( r2 )
-              bt = vram_ansi_col_lut[ op.p1 - ANSI_SGR_FIRST_BGCOL ];
+              bt = vram_ansi_col_lut[ op.p1 - ANSI_SGR_FIRST_BGCOL + ( vram_ansi_brightness | f1 ) ];
             else
-              ft = vram_ansi_col_lut[ op.p1 - ANSI_SGR_FIRST_FGCOL ];
+              ft = vram_ansi_col_lut[ op.p1 - ANSI_SGR_FIRST_FGCOL + ( vram_ansi_brightness | f1 ) ];
             r1 = op.p2 >= ANSI_SGR_FIRST_FGCOL && op.p2 <= ANSI_SGR_LAST_FGCOL;
             r2 = op.p2 >= ANSI_SGR_FIRST_BGCOL && op.p2 <= ANSI_SGR_LAST_BGCOL;
             if( r1 || r2 )
             {
               if( r2 )
-                bt = vram_ansi_col_lut[ op.p2 - ANSI_SGR_FIRST_BGCOL ];
+                bt = vram_ansi_col_lut[ op.p2 - ANSI_SGR_FIRST_BGCOL + ( vram_ansi_brightness | f2 ) ];
               else
-                ft = vram_ansi_col_lut[ op.p2 - ANSI_SGR_FIRST_FGCOL ];
+                ft = vram_ansi_col_lut[ op.p2 - ANSI_SGR_FIRST_FGCOL + ( vram_ansi_brightness | f2 ) ];
             }            
           }
-          vram_ansi_set_color( ft, bt );
+          vram_set_color( ft, bt );
           break;
         }
      }
