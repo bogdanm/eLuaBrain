@@ -32,7 +32,7 @@ static const u8 pgm_radio_ack[] = { 0xA0, 0xC5, 0xDE, 0x17 };
 // Delay data
 static volatile u32 delay_cnt;
 // Buttons
-static u8 btn_debounce_mask, btn_state;
+static u8 btn_debounce_mask, btn_state, btn_val_prev;
 static volatile u8 btn_counters[ BTN_TOTAL ];
 
 #define TIMER_PRESCALER                   1
@@ -55,13 +55,13 @@ static void btn_init()
 {
   BTN_PORT_OUT |= BTN_ALL_MASK;
   BTN_PORT_DIR &= ( u8 )~BTN_ALL_MASK;
+  btn_val_prev = BTN_PORT_IN;
 }
 
 // Handle button debouncing
 static void btn_handler()
 {
-  u8 v = BTN_PORT_IN, mask;
-  unsigned i;
+  u8 v = BTN_PORT_IN, mask, i;
 
   for( i = 0, mask = 1 << BTN_FIRST; i < BTN_TOTAL; i ++, mask <<= 1 )
     if( btn_debounce_mask & mask ) // already debouncing button
@@ -75,11 +75,12 @@ static void btn_handler()
         btn_debounce_mask &= ( u8 )~mask;
       }
     }
-    else if( ( v & mask ) == 0 ) // button pressed, start debouncing
+    else if( ( ( v & mask ) == 0 ) && ( btn_val_prev & mask ) ) // button pressed, start debouncing
     {
       btn_debounce_mask |= mask;
       btn_counters[ i ] = 0xFF;
     }
+  btn_val_prev = v;
 }
 
 static int btn_is_pressed( u8 idx )
