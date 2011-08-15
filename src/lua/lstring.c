@@ -108,7 +108,10 @@ TString *luaS_newlstr (lua_State *L, const char *str, size_t l) {
 
 
 LUAI_FUNC TString *luaS_newrolstr (lua_State *L, const char *str, size_t l) {
-  return luaS_newlstr_helper(L, str, l, 1);
+  if(l+1 < sizeof(char**)) // no point in creating a RO string, as it would actually be larger
+    return luaS_newlstr_helper(L, str, l, 0);
+  else
+    return luaS_newlstr_helper(L, str, l, 1);
 }
 
 
