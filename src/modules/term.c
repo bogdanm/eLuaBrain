@@ -11,10 +11,17 @@
 #include "utils.h"
 #include <string.h>
 #include <stdlib.h>
+#include <ctype.h>
 
 // Menu attributes
 #define TERM_MENU_ATTR_NO_ENTER   1
 #define TERM_MENU_ATTR_NO_ESC     2
+
+// Message box buttons
+#define MSGBOX_OK     1
+#define MSGBOX_YES    2
+#define MSGBOX_NO     4
+#define MSGBOX_CANCEL 8
 
 // Lua: clrscr()
 static int luaterm_clrscr( lua_State* L )
@@ -501,6 +508,76 @@ static int luaterm_clrline( lua_State *L )
   return 0;
 }
 
+#define MSGBOX_OK             1
+#define MSGBOX_YES            2
+#define MSGBOX_NO             4
+#define MSGBOX_CANCEL         8
+#define MSGBOX_LAST   MSGBOX_CANCEL
+#define MSGBOX_FIRST  MSGBOX_OK
+
+static const char *msgbox_buttons[] = { "OK", "Yes", "No", "Cancel" };
+static const u8 msgbox_keys[] = { 'o', 'y', 'n', 'c' };
+
+// Lua: key = msgbox( msg, title, style, [fgcol], [bgcol] )
+// style is either : MSGBOX_YES, MSGBOX_NO, MSGBOX_OK, MSGBOX_CANCEL, a combination of them or 0
+static int luaterm_msgbox( lua_State *L )
+{
+  const char *msg = luaL_checkstring( L, 1 );
+  const char *title = luaL_checkstring( L, 2 );
+  int style = luaL_optinteger( L, 3, 0 ); 
+  int fgcol = luaL_optinteger( L, 4, TERM_COL_LIGHT_BLUE );
+  int bgcol = luaL_optinteger( L, 5, TERM_COL_LIGHT_GRAY );
+  int oldfg, oldbg;
+  int key;
+  int attrs = luaL_optinteger( L, 6, TERM_BOX_FLAG_BORDER | TERM_BOX_FLAG_RESTORE | TERM_BOX_FLAG_CENTER );
+  TERM_BOX *p;
+  int mainw = strlen( msg );
+  unsigned i, mask;
+
+  if( strlen( title ) > mainw )
+    mainw = strlen( title );
+  term_get_color( &oldfg, &oldbg );
+  term_set_color( fgcol, bgcol );
+  if( ( p = term_box( 0, 0, mainw + 4 , 3 + ( style != 0 ), title, attrs ) ) == NULL )
+    return 0;
+  term_gotoxy( p->x + 2, p->y + 1 );
+  term_cstr( msg );
+  if( style != 0 ) // buttons
+  {
+    term_gotoxy( p->x + 2, p->y + 2 );
+    for( i = 0, mask =  MSGBOX_FIRST; mask <= MSGBOX_LAST; mask <<= 1, i ++ ) 
+      if( style & mask )
+      {
+        term_set_color( TERM_COL_LIGHT_RED, TERM_COL_DONT_CHANGE );
+        term_putch( msgbox_buttons[ i ][ 0 ] );
+        term_set_color( TERM_COL_LIGHT_BLUE, TERM_COL_DONT_CHANGE );
+        term_cstr( msgbox_buttons[ i ] + 1 );
+        term_set_color( TERM_COL_BLACK, TERM_COL_DONT_CHANGE );
+        term_putch( '/' );
+      }
+    term_left( 1 );
+    term_putch( ' ' );
+  }
+  while( 1 )
+  {
+    key = term_getch( TERM_INPUT_WAIT );
+    if( style == 0 )
+      break;
+    if( !isalpha( key ) )
+      continue;
+    key = tolower( key );
+    for( i = 0; i < sizeof( msgbox_keys ) / sizeof( u8 ); i ++ )
+      if( ( key == msgbox_keys[ i ] ) && ( style & ( 1 << i ) ) )
+        break;
+    if( i < sizeof( msgbox_keys ) / sizeof( u8 ) )
+      break;
+  }
+  term_close_box( p );
+  lua_pushinteger( L, key );
+  term_set_color( oldfg, oldbg );
+  return 1;
+}
+
 // Key codes by name
 #undef _D
 #define _D( x ) #x
@@ -560,6 +637,7 @@ const LUA_REG_TYPE term_map[] =
   { LSTRKEY( "menu" ), LFUNCVAL( luaterm_menu ) },
   { LSTRKEY( "center" ), LFUNCVAL( luaterm_center ) },
   { LSTRKEY( "clrline" ), LFUNCVAL( luaterm_clrline ) },
+  { LSTRKEY( "msgbox" ), LFUNCVAL( luaterm_msgbox ) },
 #if LUA_OPTIMIZE_MEMORY > 0
   { LSTRKEY( "__metatable" ), LROVAL( term_map ) },
   { LSTRKEY( "NOWAIT" ), LNUMVAL( TERM_INPUT_DONT_WAIT ) },
@@ -571,6 +649,10 @@ const LUA_REG_TYPE term_map[] =
   { LSTRKEY( "BOX_CENTER" ), LNUMVAL( TERM_BOX_FLAG_CENTER ) },
   { LSTRKEY( "MENU_NO_ENTER" ), LNUMVAL( TERM_MENU_ATTR_NO_ENTER ) },
   { LSTRKEY( "MENU_NO_ESC" ), LNUMVAL( TERM_MENU_ATTR_NO_ESC ) },
+  { LSTRKEY( "OK" ), LNUMVAL( MSGBOX_OK ) },
+  { LSTRKEY( "YES" ), LNUMVAL( MSGBOX_YES ) },
+  { LSTRKEY( "NO" ), LNUMVAL( MSGBOX_NO ) },
+  { LSTRKEY( "CANCEL" ), LNUMVAL( MSGBOX_CANCEL ) },
   COLLINE( COL_BLACK ),
   COLLINE( COL_DARK_BLUE ),
   COLLINE( COL_DARK_GREEN ),
