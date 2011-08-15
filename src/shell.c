@@ -142,6 +142,7 @@ static void shell_help( char* args )
   printf( "  %sedit <file> %s- edits the given file\n" TERM_RESET_COL, SHELLH_CMD, SHELLH_HELP );
   printf( "  %sver         %s- print eLua version\n" TERM_RESET_COL, SHELLH_CMD, SHELLH_HELP );
   printf( "  %srm <file> [-f] %s- removes the file, use '-f' to supress confirmation\n" TERM_RESET_COL, SHELLH_CMD, SHELLH_HELP );
+  printf( "  %sreset%s - resets the terminal and clears the screen\n" TERM_RESET_COL, SHELLH_CMD, SHELLH_HELP );
   printf( "You can also run a Lua file by giving its path (without using 'lua').\n" );
 }
 
@@ -775,6 +776,14 @@ cpdone:
 }
 
 // ----------------------------------------------------------------------------
+// 'reset' handler
+
+static void shell_reset( char *args )
+{
+  term_reset();
+}
+
+// ----------------------------------------------------------------------------
 // Shell command table
 // Insert shell commands here
 static const SHELL_COMMAND shell_commands[] =
@@ -794,6 +803,7 @@ static const SHELL_COMMAND shell_commands[] =
   { "ee", shell_ee },
   { "edit", shell_edit },
   { "rm", shell_rm },
+  { "reset", shell_reset },
   { NULL, NULL }
 };
 
