@@ -11,6 +11,7 @@
 #include "platform_conf.h"
 #include "linenoise.h"
 #include <string.h>
+#include <time.h>
 
 // Lua: elua.egc_setup( mode, [ memlimit ] )
 static int elua_egc_setup( lua_State *L )
@@ -54,6 +55,24 @@ static int elua_save_history( lua_State *L )
 #endif // #ifdef BUILD_LINENOISE
 }
 
+// Lua: s = strftime( fmt, time_t )
+#define MAX_TIME_BUF_SIZE     80
+static int elua_strftime( lua_State *L )
+{
+  const char *fmt = luaL_checkstring( L, 1 );
+  time_t t = ( time_t )luaL_checkinteger( L, 2 );
+  struct tm *tm = NULL;
+  char tbuf[ MAX_TIME_BUF_SIZE + 1 ];
+  luaL_Buffer b;
+    
+  tm = localtime( &t );
+  strftime( tbuf, MAX_TIME_BUF_SIZE, fmt, tm );
+  luaL_buffinit( L, &b );
+  luaL_addstring( &b, tbuf );
+  luaL_pushresult( &b );
+  return 1;    
+}
+
 // Module function map
 #define MIN_OPT_LEVEL 2
 #include "lrodefs.h"
@@ -62,6 +81,7 @@ const LUA_REG_TYPE elua_map[] =
   { LSTRKEY( "egc_setup" ), LFUNCVAL( elua_egc_setup ) },
   { LSTRKEY( "version" ), LFUNCVAL( elua_version ) },  
   { LSTRKEY( "save_history" ), LFUNCVAL( elua_save_history ) },
+  { LSTRKEY( "strftime" ), LFUNCVAL( elua_strftime ) },
 #if LUA_OPTIMIZE_MEMORY > 0
   { LSTRKEY( "EGC_NOT_ACTIVE" ), LNUMVAL( EGC_NOT_ACTIVE ) },
   { LSTRKEY( "EGC_ON_ALLOC_FAILURE" ), LNUMVAL( EGC_ON_ALLOC_FAILURE ) },
