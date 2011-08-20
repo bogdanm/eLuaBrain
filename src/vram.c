@@ -31,7 +31,7 @@ static u8 vram_crt_attr;
 
 #define VRAM_CHARADDR( x, y )   ( ( y ) * VRAM_COLS + ( x ) + ( VRAM_FIRST_DATA >> 1 ) )
 #define VRAM_CHARADDR8( x, y )  ( ( char* )vram_data + ( ( ( y ) * VRAM_COLS + ( x ) ) << 1 ) + VRAM_FIRST_DATA )
-#define VRAM_MKCOL( fg, bg )         ( ( ( bg ) << 4 ) + fg )
+#define VRAM_MKCOL( fg, bg )         ( ( ( bg ) << 4 ) + ( fg ) )
 #define VRAM_ANSI_ESC           0x1B
 
 // *****************************************************************************
@@ -565,9 +565,21 @@ void vram_change_attr( unsigned x, unsigned y, unsigned len, int newfg, int newb
 {
   char *pdata = VRAM_CHARADDR8( x, y );
   char newcol = VRAM_MKCOL( newfg, newbg );
+  char oldcol;
   unsigned i;
   
-  for( i = 0; i < len; i ++, pdata += 2 )
-    *pdata = newcol;
+  if( newfg > 0 && newbg > 0 )
+    for( i = 0; i < len; i ++, pdata += 2 )
+      *pdata = newcol;
+  else
+    for( i = 0; i < len; i ++, pdata += 2 )
+    {
+      oldcol = *pdata;
+      if( newfg != TERM_COL_DONT_CHANGE )
+        oldcol = ( oldcol & 0xF0 ) | newfg;
+      if( newbg != TERM_COL_DONT_CHANGE )
+        oldcol = ( oldcol & 0x0F ) | ( newbg << 4 );
+      *pdata = oldcol;
+    }
 }
 

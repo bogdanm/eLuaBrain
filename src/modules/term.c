@@ -320,6 +320,7 @@ static int luaterm_getstr( lua_State *L )
         vflag = 1;
       else // call validator with current string and last char
       {
+        lua_pushvalue( L, -1 ); 
         lua_pushstring( L, input );
         current[ 0 ] = c;
         lua_pushstring( L, current );
@@ -578,6 +579,19 @@ static int luaterm_msgbox( lua_State *L )
   return 1;
 }
 
+// Lua: setattr( x, y, len, newfg, [newbg] )
+static int luaterm_setattr( lua_State *L )
+{
+  unsigned x = ( unsigned )luaL_checkinteger( L, 1 );
+  unsigned y = ( unsigned )luaL_checkinteger( L, 2 );
+  unsigned len = ( unsigned )luaL_checkinteger( L, 3 );
+  int newfg = ( int )luaL_checkinteger( L, 4 );
+  int newbg = ( int )luaL_optinteger( L, 5, TERM_COL_DONT_CHANGE );
+
+  term_change_attr( x, y, len, newfg, newbg );
+  return 0;
+}
+
 // Key codes by name
 #undef _D
 #define _D( x ) #x
@@ -638,6 +652,7 @@ const LUA_REG_TYPE term_map[] =
   { LSTRKEY( "center" ), LFUNCVAL( luaterm_center ) },
   { LSTRKEY( "clrline" ), LFUNCVAL( luaterm_clrline ) },
   { LSTRKEY( "msgbox" ), LFUNCVAL( luaterm_msgbox ) },
+  { LSTRKEY( "setattr" ), LFUNCVAL( luaterm_setattr) },
 #if LUA_OPTIMIZE_MEMORY > 0
   { LSTRKEY( "__metatable" ), LROVAL( term_map ) },
   { LSTRKEY( "NOWAIT" ), LNUMVAL( TERM_INPUT_DONT_WAIT ) },
