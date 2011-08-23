@@ -335,6 +335,8 @@ DSTATUS disk_initialize (
 
     if (drv) return STA_NOINIT;            /* Supports only single drive */
     if (Stat & STA_NODISK) return Stat;    /* No card in the socket */
+    if ((Stat & STA_NOINIT) == 0)          /* prevent re-initialization */
+      return Stat;
     
     do
     {
