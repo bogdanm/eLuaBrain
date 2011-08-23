@@ -83,7 +83,6 @@ int main( void )
 {
   int i;
   FILE* fp;
-  const DM_DEVICE *d;
 
   // Initialize platform first
   if( platform_init() != PLATFORM_OK )
@@ -98,10 +97,9 @@ int main( void )
   // Register the ROM filesystem
   dm_register( romfs_init() );
 
-  // Register the MMC filesystem
-  i = 0;
-  while( ( d = mmcfs_init( i ++ ) ) != NULL )
-    dm_register( d );
+  // Register the MMC filesystems
+  for( i = 0; i < 2; i ++ )
+    dm_register( mmcfs_init( i ) );
 
   // Register the Semihosting filesystem
   dm_register( semifs_init() );

@@ -8,5 +8,6 @@
 
 // FS functions
 const DM_DEVICE* mmcfs_init();
+void mmcfs_int_handler();
 
 #endif

@@ -82,7 +82,7 @@ int dm_unregister( const char* name )
   
   // Remove it
   if( i != dm_num_devs - 1 )
-    memmove( dm_list + i, dm_list + i + 1, sizeof( DM_DEVICE* ) );
+    memmove( dm_list + i, dm_list + i + 1, ( dm_num_devs - i - 1 ) * sizeof( DM_DEVICE* ) );
   dm_num_devs --;
   return DM_OK;
 }

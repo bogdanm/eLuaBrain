@@ -5,6 +5,7 @@
 #include "platform_conf.h"
 #include "elua_int.h"
 #include "common.h"
+#include "mmcfs.h"
 
 // Platform-specific headers
 #include "stm32f10x.h"
@@ -134,7 +135,16 @@ void EXTI15_10_IRQHandler()
   for( i = 10; i < 16; i++ )
   {
     if( EXTI_GetITStatus( exti_line[ i ] ) != RESET )
-      all_exti_irqhandler( i );
+    {
+      // NOTE: cheat here: server MMC interrupt
+      if( i == MMCFS_CARD_PIN )
+      {
+        EXTI_ClearITPendingBit( exti_line[ i ] );
+        mmcfs_int_handler();
+      }
+      else
+        all_exti_irqhandler( i );
+    }
   }
 }
 

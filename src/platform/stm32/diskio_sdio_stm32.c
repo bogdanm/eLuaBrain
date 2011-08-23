@@ -45,6 +45,7 @@
 #include <stdio.h>
 
 static SD_CardInfo SDCardInfo2;
+volatile DSTATUS Stat = STA_NOINIT;
 
 /*--------------------------------------------------------------------------
 
@@ -63,6 +64,8 @@ DSTATUS disk_initialize (
 {
   if( drv == 0 )
   {
+    if( ( Stat & STA_NOINIT ) == 0 )
+      return 0;
     SD_Init();
     SD_InitializeCards();
     SD_GetCardInfo(&SDCardInfo2);
@@ -74,6 +77,7 @@ DSTATUS disk_initialize (
     nvic_init_structure.NVIC_IRQChannelSubPriority = 0;
     nvic_init_structure.NVIC_IRQChannelCmd = ENABLE;
     NVIC_Init(&nvic_init_structure);
+    Stat &= ~STA_NOINIT;
   } 
   else 
   {
@@ -92,7 +96,7 @@ DSTATUS disk_status (
 	BYTE drv		/* Physical drive number (0) */
 )
 {
-	return 0;
+	return drv == 0 ? Stat : 0;
 }
 
 
@@ -107,6 +111,8 @@ DRESULT disk_read (
 	BYTE count			/* Sector count (1..255) */
 )
 {
+  if( drv == 0 && ( Stat & STA_NOINIT ) )
+    return RES_NOTRDY;
   while( count )
   {
     if( drv == 0 )
@@ -136,7 +142,9 @@ DRESULT disk_write (
 	DWORD sector,		/* Start sector number (LBA) */
 	BYTE count			/* Sector count (1..255) */
 )
-{
+{  
+  if( drv == 0 && ( Stat & STA_NOINIT ) )
+    return RES_NOTRDY;
   while( count )
   {
     if( drv == 0 )
@@ -185,6 +193,8 @@ DRESULT disk_ioctl (
 {		
 	DRESULT res= RES_OK;
 
+  if( drv == 0 && ( Stat & STA_NOINIT ) )
+    return RES_NOTRDY;
   switch (ctrl) {
   case CTRL_SYNC :		/// Make sure that no pending write process
     if( drv == 0 )

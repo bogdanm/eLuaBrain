@@ -175,6 +175,8 @@
 #define MMCFS_CS_PORT                0
 #define MMCFS_CS_PIN                 8
 #define MMCFS_SPI_NUM                0
+#define MMCFS_CARD_PIN               11
+#define MMCFS_CARD_PORT              5
 
 // PS/2 configuration
 #define PS2_DATA_PORT         6

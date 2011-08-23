@@ -11,6 +11,7 @@
 #ifdef BUILD_MMCFS
 #include "ff.h"
 #include "diskio.h"
+#include "platform.h"
 #include <fcntl.h>
 
 #define MMCFS_MAX_FDS   4
@@ -315,16 +316,43 @@ static DM_DEVICE nand_device =
   mmcfs_unlink_r_nand   // unlink
 };
 
+#define MMC_CARD_RESNUM        PLATFORM_IO_ENCODE( MMCFS_CARD_PORT, MMCFS_CARD_PIN, PLATFORM_IO_ENC_PIN )
+
 const DM_DEVICE* mmcfs_init( unsigned i )
 {
   if( i >= 2 )
     return NULL;
 
+  if( i == 0 )
+  {
+    platform_pio_op( MMCFS_CARD_PORT, 1 << MMCFS_CARD_PIN, PLATFORM_IO_PIN_DIR_INPUT );
+    platform_cpu_set_interrupt( INT_GPIO_NEGEDGE, MMC_CARD_RESNUM, PLATFORM_CPU_ENABLE );
+    platform_cpu_set_interrupt( INT_GPIO_POSEDGE, MMC_CARD_RESNUM, PLATFORM_CPU_ENABLE );
+    if( platform_pio_op( MMCFS_CARD_PORT, 1 << MMCFS_CARD_PIN, PLATFORM_IO_PIN_GET ) )
+      return NULL;
+  }
+
   // Mount the MMC file system using logical disk 0
   if ( f_mount( i, i == 0 ? &mmc_fs : &nand_fs ) != FR_OK )
     return NULL;
-
   return i == 0 ? &mmcfs_device : &nand_device;
+}
+
+extern volatile DSTATUS Stat;
+
+void mmcfs_int_handler()
+{
+  Stat = STA_NOINIT;
+  if( platform_pio_op( MMCFS_CARD_PORT, 1 << MMCFS_CARD_PIN, PLATFORM_IO_PIN_GET ) == 0 ) // card inserted
+  {
+    f_mount( 0, &mmc_fs );
+    dm_register( &mmcfs_device );    
+  }
+  else // card removed
+  {
+    dm_unregister( "/mmc" );
+    f_mount( 0, NULL );
+  }
 }
 
 #else // #ifdef BUILD_MMCFS
@@ -332,6 +360,10 @@ const DM_DEVICE* mmcfs_init( unsigned i )
 const DM_DEVICE* mmcfs_init()
 {
   return NULL;
+}
+
+void mmcfs_int_handler()
+{
 }
 
 #endif // BUILD_MMCFS
