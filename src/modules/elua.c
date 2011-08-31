@@ -10,6 +10,7 @@
 #include "version.h"
 #include "platform_conf.h"
 #include "linenoise.h"
+#include "devman.h"
 #include <string.h>
 #include <time.h>
 
@@ -73,6 +74,22 @@ static int elua_strftime( lua_State *L )
   return 1;    
 }
 
+// Lua: res = fs_mounted( fs )
+static int elua_fs_mounted( lua_State *L )
+{
+  const char *pname = luaL_checkstring( L, 1 );
+  DM_DIR *pdir;
+  int res = 0;
+
+  if( ( pdir = dm_opendir( pname ) ) != NULL )
+  {
+    dm_closedir( pdir );
+    res = 1;
+  }
+  lua_pushboolean( L, res );
+  return 1;
+}
+
 // Module function map
 #define MIN_OPT_LEVEL 2
 #include "lrodefs.h"
@@ -82,6 +99,7 @@ const LUA_REG_TYPE elua_map[] =
   { LSTRKEY( "version" ), LFUNCVAL( elua_version ) },  
   { LSTRKEY( "save_history" ), LFUNCVAL( elua_save_history ) },
   { LSTRKEY( "strftime" ), LFUNCVAL( elua_strftime ) },
+  { LSTRKEY( "fs_mounted" ), LFUNCVAL( elua_fs_mounted ) },
 #if LUA_OPTIMIZE_MEMORY > 0
   { LSTRKEY( "EGC_NOT_ACTIVE" ), LNUMVAL( EGC_NOT_ACTIVE ) },
   { LSTRKEY( "EGC_ON_ALLOC_FAILURE" ), LNUMVAL( EGC_ON_ALLOC_FAILURE ) },
