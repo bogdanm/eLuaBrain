@@ -102,6 +102,10 @@ enum
 #define TERM_PAGING_ON              1
 #define TERM_PAGING_OFF             0
 
+// Mode (extended ASCII or color setting)
+#define TERM_MODE_ASCII             0
+#define TERM_MODE_COLS              1
+
 // ****************************************************************************
 // Exported functions
 
@@ -133,6 +137,7 @@ void term_close_box( void *pbox );
 void term_enable_paging( int enabled );
 void term_set_last_line( int line );
 void term_change_attr( unsigned x, unsigned y, unsigned len, int newfg, int newbg );
+void term_set_mode( int mode );
 
 #define TERM_KEYCODES\
   _D( KC_UP ),\

@@ -183,6 +183,10 @@ void term_init( unsigned lines, unsigned cols, p_term_out term_out_func,
   term_translate = term_translate_func;
 }                
 
+void term_set_mode( int mode )
+{
+  vram_set_mode( mode );
+}
 
 #elif !defined( BUILD_TERM )
 

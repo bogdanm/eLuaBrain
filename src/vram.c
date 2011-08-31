@@ -28,11 +28,20 @@ static u8 vram_paging_enabled;
 static u8 vram_paging_lines;
 static u8 vram_last_line;
 static u8 vram_crt_attr;
+static u8 vram_mode;
 
 #define VRAM_CHARADDR( x, y )   ( ( y ) * VRAM_COLS + ( x ) + ( VRAM_FIRST_DATA >> 1 ) )
 #define VRAM_CHARADDR8( x, y )  ( ( char* )vram_data + ( ( ( y ) * VRAM_COLS + ( x ) ) << 1 ) + VRAM_FIRST_DATA )
 #define VRAM_MKCOL( fg, bg )         ( ( ( bg ) << 4 ) + ( fg ) )
 #define VRAM_ANSI_ESC           0x1B
+
+#define VRAM_COL_FIRST_FG       128
+#define VRAM_COL_LAST_FG        143
+#define VRAM_COL_FIRST_BG       144
+#define VRAM_COL_LAST_BG        159
+#define VRAM_COL_FIRST_ID       VRAM_COL_FIRST_FG
+#define VRAM_COL_LAST_ID        VRAM_COL_LAST_BG
+#define VRAM_COL_RESET_ID       255
 
 // *****************************************************************************
 // ANSI sequence interpreter
@@ -270,6 +279,7 @@ void vram_init()
   vram_p_type = pv + VRAM_OFF_TYPE;
   *vram_p_type = VRAM_CURSOR_BLOCK_BLINK;
   vram_last_line = VRAM_LINES - 1;
+  vram_mode = TERM_MODE_ASCII;
   vram_set_color( VRAM_DEFAULT_FG_COL, VRAM_DEFAULT_BG_COL );
   vram_clrscr();  
 } 
@@ -277,6 +287,7 @@ void vram_init()
 void vram_putchar( char c )
 {
   unsigned i;
+  u8 nc = ( u8 )c;
   
   // Take care of the ANSI state machine
   if( c == VRAM_ANSI_ESC )
@@ -338,6 +349,24 @@ void vram_putchar( char c )
   {
     for( i = 0; i < VRAM_TAB_SIZE; i ++ )
       vram_putchar( ' ' );    
+  }
+  else if( vram_mode == TERM_MODE_COLS && ( ( nc >= VRAM_COL_FIRST_ID && nc <= VRAM_COL_LAST_ID ) || nc == VRAM_COL_RESET_ID ) ) 
+  {
+    int newfg, newbg;
+
+    if( nc == VRAM_COL_RESET_ID )
+      newfg = newbg = VRAM_COL_DEFAULT;
+    else if( nc < VRAM_COL_FIRST_BG )
+    {
+      newfg = nc - VRAM_COL_FIRST_FG;
+      newbg = VRAM_COL_DONT_CHANGE;
+    }
+    else
+    {
+      newfg = VRAM_COL_DONT_CHANGE;
+      newbg = nc - VRAM_COL_FIRST_BG;
+    }
+    term_set_color( newfg, newbg );
   }
   else
   {
@@ -581,5 +610,10 @@ void vram_change_attr( unsigned x, unsigned y, unsigned len, int newfg, int newb
         oldcol = ( oldcol & 0x0F ) | ( newbg << 4 );
       *pdata = oldcol;
     }
+}
+
+void vram_set_mode( int mode )
+{
+  vram_mode = mode;
 }
 

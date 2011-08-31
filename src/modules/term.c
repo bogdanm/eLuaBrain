@@ -592,6 +592,15 @@ static int luaterm_setattr( lua_State *L )
   return 0;
 }
 
+// Lua: setmode( [mode] ) (defaults to term.MODE_ASCII)
+static int luaterm_setmode( lua_State *L )
+{
+  int mode = luaL_optinteger( L, 1, TERM_MODE_ASCII );
+
+  term_set_mode( mode );
+  return 0;
+}
+
 // Key codes by name
 #undef _D
 #define _D( x ) #x
@@ -653,6 +662,7 @@ const LUA_REG_TYPE term_map[] =
   { LSTRKEY( "clrline" ), LFUNCVAL( luaterm_clrline ) },
   { LSTRKEY( "msgbox" ), LFUNCVAL( luaterm_msgbox ) },
   { LSTRKEY( "setattr" ), LFUNCVAL( luaterm_setattr) },
+  { LSTRKEY( "setmode" ), LFUNCVAL( luaterm_setmode ) },
 #if LUA_OPTIMIZE_MEMORY > 0
   { LSTRKEY( "__metatable" ), LROVAL( term_map ) },
   { LSTRKEY( "NOWAIT" ), LNUMVAL( TERM_INPUT_DONT_WAIT ) },
@@ -668,6 +678,8 @@ const LUA_REG_TYPE term_map[] =
   { LSTRKEY( "YES" ), LNUMVAL( MSGBOX_YES ) },
   { LSTRKEY( "NO" ), LNUMVAL( MSGBOX_NO ) },
   { LSTRKEY( "CANCEL" ), LNUMVAL( MSGBOX_CANCEL ) },
+  { LSTRKEY( "MODE_ASCII" ), LNUMVAL( TERM_MODE_ASCII ) },
+  { LSTRKEY( "MODE_COLS" ), LNUMVAL( TERM_MODE_COLS ) },
   COLLINE( COL_BLACK ),
   COLLINE( COL_DARK_BLUE ),
   COLLINE( COL_DARK_GREEN ),
