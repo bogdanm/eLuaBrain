@@ -23,6 +23,7 @@
 #include "platform_conf.h"
 #include "editor.h"
 #include "common.h"
+#include "help.h"
 #ifdef BUILD_SHELL
 
 #define EE_I2C_ADDR               0xA0
@@ -134,7 +135,7 @@ static void shell_help( char* args )
 #ifdef BUILD_XMODEM
   printf( "  %srecv [path] %s- receive file via XMODEM; save if [path] is given, run if not.\n" TERM_RESET_COL, SHELLH_CMD, SHELLH_HELP );
 #endif
-  printf( "  %scp <src> <dst> [-b] [-c] [-o] %s- copy source file 'src' to 'dst'\n", SHELLH_CMD, SHELLH_HELP );
+  printf( "  %scp <src> <dst> [-b] [-c] [-f] %s- copy source file 'src' to 'dst'\n", SHELLH_CMD, SHELLH_HELP );
   printf( "     -b: backup mode (prepend the destination file name with '_b').\n" );
   printf( "     -c: ask for confirmation before copying a file.\n" );
   printf( "     -f: overwrite destination files without confirmation.\n" TERM_RESET_COL );
@@ -143,6 +144,7 @@ static void shell_help( char* args )
   printf( "  %sver         %s- print eLua version\n" TERM_RESET_COL, SHELLH_CMD, SHELLH_HELP );
   printf( "  %srm <file> [-f] %s- removes the file, use '-f' to supress confirmation\n" TERM_RESET_COL, SHELLH_CMD, SHELLH_HELP );
   printf( "  %sreset%s - resets the terminal and clears the screen\n" TERM_RESET_COL, SHELLH_CMD, SHELLH_HELP );
+  printf( "  %sapihelp [topic] %s- help on eLua's API, lists all modules without arguments" TERM_RESET_COL, SHELLH_CMD, SHELLH_HELP );
   printf( "You can also run a Lua file by giving its path (without using 'lua').\n" );
 }
 
@@ -784,6 +786,22 @@ static void shell_reset( char *args )
 }
 
 // ----------------------------------------------------------------------------
+// 'apihelp' handler
+
+static void shell_apihelp( char *args )
+{
+  if( *args != 0 )
+    *strchr( args, ' ' ) = 0;
+  help_init( HELP_FILE_NAME ); 
+  term_set_mode( TERM_MODE_COLS );
+  term_enable_paging( TERM_PAGING_ON );
+  help_help( args );
+  term_set_mode( TERM_MODE_ASCII );
+  term_enable_paging( TERM_PAGING_OFF );
+  help_close();
+}
+
+// ----------------------------------------------------------------------------
 // Shell command table
 // Insert shell commands here
 static const SHELL_COMMAND shell_commands[] =
@@ -804,6 +822,7 @@ static const SHELL_COMMAND shell_commands[] =
   { "edit", shell_edit },
   { "rm", shell_rm },
   { "reset", shell_reset },
+  { "apihelp", shell_apihelp },
   { NULL, NULL }
 };
 

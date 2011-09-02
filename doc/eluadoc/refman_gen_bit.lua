@@ -10,8 +10,7 @@ data_en =
   menu_name = "bit",
 
   -- Overview
-  overview = [[Since Lua doesn't have (yet) built-in capabilities for bit operations, the $bit$ module was added to eLua to fill this gap. It is based on the ^http://luaforge.net/projects/bitlib^bitlib^
-  library written by Reuben Thomas (slightly adapted to eLua) and provides basic bit operations (like setting and clearing bits) and bitwise operations.]],
+  overview = [[Since Lua doesn't have (yet) built-in capabilities for bit operations, the $bit$ module was added to eLua to fill this gap. It is based on the ^http://luaforge.net/projects/bitlib^bitlib^ library written by Reuben Thomas (slightly adapted to eLua) and provides basic bit operations (like setting and clearing bits) and bitwise operations.]],
 
   -- Functions
   funcs = 

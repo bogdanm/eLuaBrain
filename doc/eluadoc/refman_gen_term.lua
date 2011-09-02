@@ -89,10 +89,9 @@ data_en =
       args = [[$mode (optional)$ - terminal input mode. It can be either:</p>
   <ul>
     <li>$term.WAIT$ - wait for a key to be pressed, then return it. This is the default behaviour if $mode$ is not specified. </li>
-    <li>$term.NOWAIT$ - if a key was pressed on the terminal return it, otherwise return -1.</li>
-  </ul><p>]],
+    <li>$term.NOWAIT$ - if a key was pressed on the terminal return it, otherwise return -1.</li></ul><p>]],
       ret = [[The char read from a terminal or -1 if no char is available. The 'char' can be an actual ASCII char, or a 'pseudo-char' which encodes special keys on
-  the keyboard. The list of the special chars and their meaning is given in the table below:</p>
+  the keyboard. The list of the special chars and their meaning is given in the table below:`</p>
 <table style="text-align: left; margin-left: 2em;">
 <tbody>
 <tr>
@@ -149,7 +148,22 @@ data_en =
 </tr>
 </tbody>
 </table>
-<p>]]
+<p>`  
+  Key code            | Physical key
+  ====================================
+  term.KC_UP          | up arrow
+  term.KC_DOWN        | down arrow
+  term.KC_LEFT        | left arrow
+  term.KC_RIGHT       | right arrow
+  term.KC_HOME        | HOME
+  term.KC_END         | END
+  term.KC_PAGEUP      | PAGE UP
+  term.KC_PAGEDOWN    | PAGE DOWN
+  term.KC_ENTER       | ENTER (CR)
+  term.KC_TAB         | TAB
+  term.KC_BACKSPACE   | BACKSPACE
+  terk.KC_ESC         | ESC (escape)
+`]]
     },
 
   },

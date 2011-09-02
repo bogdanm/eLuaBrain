@@ -5,11 +5,18 @@ module( ..., package.seeall )
 
 local sf = string.format
 
+-- True if generating HTML docs, false otherwise
+local htmld
+
 -------------------------------------------------------------------------------
 -- Data structure declarations
 
 -- List here all the sections for which we're generating the documentation
-local doc_sections = { "arch_platform", "refman_gen", "refman_ps_lm3s", "refman_ps_str9", "refman_ps_mbed", "refman_ps_mizar32" }
+local doc_sections_html = { "arch_platform", "refman_gen", "refman_ps_lm3s", "refman_ps_str9", "refman_ps_mbed", "refman_ps_mizar32" }
+local doc_sections_target = { "refman_gen" }
+--local target_doc_modules =  { "bit", "pd", "cpu", "pack", "adc", "term", "pio", "uart", "spi", "tmr", "pwm", "net", "elua", "i2c" }
+local target_doc_modules =  { "pd", "cpu", "elua" }
+--local target_doc_modules =  { "cpu" }
 
 -- List here all the components of each section
 local components = 
@@ -45,12 +52,20 @@ local function dot( str )
   return str
 end
 
+-- Check if an element is part of a list
+local function is_in_list( el, list )
+  for i = 1, #list do
+    if list[ i ] == el then return true end
+  end
+end
+
 --[[ Process the given string as follows:
 - $string$ becomes <b>string</b>
 - %string% becomes <i>string</i>
 - @ref@text@ becomes <a href="ref">text</a>
 - ^ref^text^ also becomes <a href="ref">text</a>
-- $$, %%, @@, ^^ become $, %, @, ^ respectively
+- `html`target` gives a text that will be different in the online and target versions
+- $$, %%, @@, ^^, ~~ become $, %, @, ^, ~ respectively
 - the string "eLua" becomes <b>eLua</b>
 - strings between two tildas (~~) get special code-like formatting
 - newlines are changed to ' ' if 'keepnl' isn't true
@@ -64,42 +79,53 @@ local function format_string( str, keepnl )
   str = str:gsub( "@@", "\003" )
   str = str:gsub( "%^%^", "\004" )
   str = str:gsub( "~~", "\005" )
+  str = str:gsub( "``", "\007" )
 
-   -- Translate 'special' HTML chars to their equivalents
-  local tr_table = 
-  {
-    [ "%&" ] = "&amp;",
-  }
-  for char, rep in pairs( tr_table ) do
+  -- In target mode add spaces in front of <li></li> items
+  if not htmld then str = str:gsub( "<li>(.-)</li>", "  %1" ) end
+
+  -- In target mode remove all HTML tags
+  if not htmld then str = str:gsub( "<[^<].->", "" ) end
+
+  -- Translate 'special' HTML chars to their equivalents
+  local tr_table_html = { [ "%&" ] = "&amp;" }
+  local tr_table_online = { [ "%&" ] = "&" }
+  for char, rep in pairs( htmld and tr_table_html or tr_table_online ) do
     str = str:gsub( char, rep )
   end
 
   -- some double chars are replaced directly with their HTML codes
-  str = str:gsub( "<<", "&lt;" )
-  str = str:gsub( ">>", "&gt;" )
+  str = str:gsub( "<<", htmld and "&lt;" or "<" )
+  str = str:gsub( ">>", htmld and "&gt;" or ">" )
 
   -- replace eLua with <b>eLua</b>
-  str = str:gsub( "eLua", "<b>eLua</b>" )
+  str = str:gsub( "eLua", htmld and "<b>eLua</b>" or "eLua" )
 
   -- $string$ becomes <b>string></b>
-  str = str:gsub( "%$(.-)%$", "<b>%1</b>" )
+  str = str:gsub( "%$(.-)%$", htmld and "<b>%1</b>" or CLMAGENTA .. "%1" .. CRESET )
 
   -- %string% becomes <i>string</i>
-  str = str:gsub( "%%(.-)%%", "<i>%1</i>" )
+  str = str:gsub( "%%(.-)%%", htmld and "<i>%1</i>" or CLGREEN .. "%1" .. CRESET )
+
+  -- `html`target` is selected depeding on htmld
+  str = str:gsub( "`(.-)`(.-)`", htmld and '%1' or '%2'  )
 
   -- @ref@text@ becomes <a href="ref">text</a>
-  str = str:gsub( "@(.-)@(.-)@", '<a href="%1">%2</a>' )
+  str = str:gsub( "@(.-)@(.-)@", htmld and '<a href="%1">%2</a>' or '%2'  )
 
   -- ^ref^text^ becomes <a href="ref">text</a>
-  str = str:gsub( "%^(.-)%^(.-)%^", '<a href="%1">%2</a>' )
+  str = str:gsub( "%^(.-)%^(.-)%^", htmld and '<a href="%1">%2</a>' or '' )
 
   -- strings between two tildas (~~) get special code-like formatting
   -- must keep '\n', so replace it with "temps" for now
-  str = str:gsub( "~(.-)~", function( data ) return '<pre class="code">' .. data:gsub( "\n", "\006" ) .. "</pre>" end )
+  str = str:gsub( "~(.-)~", function( data ) return htmld and '<pre class="code">' .. data:gsub( "\n", "\006" ) .. "</pre>" or CLYELLOW .. data .. CRESET end )
   str = str:gsub( "~~", "~" )
 
   -- other "\n" chars should dissapear now
-  if not keepnl then  str = str:gsub( "\n", " " ) end
+  if not keepnl and htmld then str = str:gsub( "\n", " " ) end
+
+  -- In target mode remove all empty lines
+  if not htmld then str = str:gsub( "([^\n]-\n)", function( data ) return data:sub( 1, -2 ):find( "%S" ) and data or ""  end ) end
 
   -- put back the "temps"
   str = str:gsub( "\001", "%$" )
@@ -108,6 +134,7 @@ local function format_string( str, keepnl )
   str = str:gsub( "\004", "%^" )
   str = str:gsub( "\005", "~" )
   str = str:gsub( "\006", "\n" )
+  str = str:gsub( "\007", "`" )
 
   -- all done
   return str
@@ -117,27 +144,32 @@ end
 -- Content generation
 
 -- Build the documentation starting from the given file
-local function build_file( fname )
+local function build_file( fname, section )
   dofile( fname )
   local res = {}
 
   for _, lang in pairs( languages ) do
     res[ lang ] = {}
     res[ lang ].menu = {}
+    res[ lang ].data = {}
     local menu = res[ lang ].menu
-    
+    local data = res[ lang ].data
+
     -- we need english always
     -- the other languages will be substituted with english if not found
     local resname = string.format( "data_%s", lang )
     local r = _G[ resname ]
     if not r then
       if lang == "en" then
-        return false, "data_en must exist in the description"
+        return false, "data_en must be part of the description"
       else
         print( string.format( "'%s': data for language '%s' not found, defaulting to english", fname, lang ) )
         r = _G.data_en
       end
     end
+
+    -- Get the module name
+    data.mod_name = r.mod_name or r.menu_name
 
     -- process names
     if not r.menu_name then
@@ -156,13 +188,16 @@ local function build_file( fname )
     if not r.overview then
       return false, "overview not found"
     end
-    page = page .. '<a name="overview" /><h3>Overview</h3>\n<p>' .. format_string( r.overview ) .. "</p>\n\n"
+    local temp = format_string( r.overview )
+    page = page .. '<a name="overview" /><h3>Overview</h3>\n<p>' .. temp .. "</p>\n\n"
+    data.mod_desc = format_string( r.target_overview or r.overview ) .. "\n"
 
     -- process structures if needed
     if r.structures then
       local structures = r.structures
       menu.structs = {}
       page = page .. '<a name="structures" /><h3>Data structures, constants and types</h3>\n'
+      data.mod_desc = data.mod_desc .. CLMAGENTA .. "\n== Data structures and types ==\n\n" .. CRESET
       for i = 1, #structures do
         local s = structures[ i ]
         menu.structs[ #menu.structs + 1 ] = s.name
@@ -173,10 +208,15 @@ local function build_file( fname )
         page = page .. string.format( '<a name="%s" />', name2link( res.en.menu.structs[ i ] ) )
         page = page .. "<pre><code>" .. format_string( s.text, true ) .. "</code></pre>\n"
         -- description
-        page = page .. '<div class="docdiv">\n<p>' .. format_string( s.desc ) .. "</p>\n</div>\n\n"
+        temp = format_string( s.desc )
+        page = page .. '<div class="docdiv">\n<p>' .. format_string( temp ) .. "</p>\n</div>\n\n"
+        temp = target_desc or temp
+        data.mod_desc = data.mod_desc .. s.name .. ":\n"
+        for l in temp:gmatch( "([^\n]+)\n" ) do data.mod_desc = data.mod_desc .. "  " .. l .. "\n" end
+        data.mod_desc = data.mod_desc .. "\n"
       end 
     end
-
+    data.funcs = {}
     -- process functions now
     if not r.funcs then
       return false, "funcs not found"
@@ -186,6 +226,7 @@ local function build_file( fname )
     menu.funcs = {}
     for i = 1, #funcs do
       local f = funcs[ i ]
+      local df = {}
       if not f.sig or not f.desc then
         return false, "function without sig or desc fields"
       end
@@ -193,6 +234,8 @@ local function build_file( fname )
       if not funcname then
         return false, string.format( "'%s' should contain the function name between '*' chars", f.sig )
       end
+      df.name = funcname
+      df.desc = CLBLUE .. f.sig:gsub( "#(.-)#", CLYELLOW .. "%1" .. CLBLUE ) .. "\n  " .. CRESET .. dot( format_string( f.target_desc or f.desc ) ) .. "\n"
       menu.funcs[ #menu.funcs + 1 ] = funcname
       -- signature
       page = page .. string.format( '<a name="%s" />', funcname )
@@ -206,13 +249,20 @@ local function build_file( fname )
         if type( a ) == "string" or ( type( a ) == "table" and #a == 1 ) then
           local text = type( a ) == "string" and a or a[ 1 ]
           page = page .. dot( format_string( text ) ) .. "</p>"
+          df.desc = df.desc .. CLBLUE .. "  Argument:\n" .. CRESET .. "    " .. dot( format_string( text ) ) .. "\n"
         else
           page = page .. "</p>\n<ul>\n"
-          for i = 1, #a do page = page .. "  <li>" .. dot( format_string( a[ i ] ) ) .. "</li>\n" end
+          df.desc = df.desc .. CLBLUE .. "  Arguments:\n" .. CRESET
+          for i = 1, #a do 
+            page = page .. "  <li>" .. dot( format_string( a[ i ] ) ) .. "</li>\n" 
+            df.desc = df.desc .. "    " .. dot( format_string( a[ i ] ) ) .. "\n"
+          end
+          --df.desc = df.desc .. "\n"
           page = page .. "</ul>"
         end
       else
         page = page .. "none.</p>"
+        df.desc = df.desc .. CLBLUE .. "  Arguments: " .. CRESET .. "none.\n"
       end
       page = page .. "\n"
       -- return value
@@ -222,19 +272,31 @@ local function build_file( fname )
         if type( r ) == "string" or ( type( r ) == "table" and #r == 1 ) then
           local text = type( r ) == "string" and r or r[ 1 ]
           page = page .. dot( format_string( text ) ) .. "</p>"
+          df.desc = df.desc .. CLBLUE .. "  Returns:\n" .. CRESET .. "    " .. dot( format_string( text ) )  .. "\n"
         else
           page = page .. "</p>\n<ul>\n"
-          for i = 1, #r do page = page .. "  <li>" .. dot( format_string( r[ i ] ) ) .. "</li>\n" end
+          df.desc = df.desc .. CLBLUE .. "  Returns:\n" .. CRESET
+          for i = 1, #r do 
+            page = page .. "  <li>" .. dot( format_string( r[ i ] ) ) .. "</li>\n"
+            df.desc = df.desc .. "    " .. dot( format_string( r[ i ] ) ) .. "\n"
+          end
+          -- df.desc = df.desc .. "\n"
           page = page .. "</ul>"
         end
       else
         page = page .. "nothing.</p>"
+        df.desc = df.desc .. CLBLUE .. "  Returns: " .. CRESET .. "nothing.\n"
       end
       page = page .. "\n\n"
+      -- print( df.name )
+      -- print( df.desc )
+      -- os.exit( 0 )
+      data.funcs[ #data.funcs + 1 ] = df
     end
     page = page .. "</div>\n"
 
     -- aux data (if any)
+    -- TOOD: integrate this in the online docs?
     if r.auxdata then
       local auxdata = r.auxdata
       menu.auxdata = {}
@@ -257,7 +319,8 @@ local function build_file( fname )
     page = page:gsub( "<p>%s-</p>", "" )
     res[ lang ].page = page
   end
-
+  -- print( res.en.data.mod_name )
+  -- print( res.en.data.mod_desc )
   return res
 end
 
@@ -314,50 +377,61 @@ end
 -------------------------------------------------------------------------------
 -- Generate documentation from eluadoc for all languages
 
-function gen_html_doc()
+function gen_html_doc( is_target )
   local menu, genfiles = {}, {}
 
+  htmld = not is_target
   for k, v in pairs( components ) do
     table.sort( v )
   end
-
-  for _, section in pairs( doc_sections ) do 
+  
+  local targetdata = {}
+  for _, section in pairs( htmld and doc_sections_html or doc_sections_target ) do 
     -- Generate documentation for each module in turn
     local fulldata = {}
     menu[ section ] = {}
     local ms = menu[ section ]
     -- First generate HTML documentation
     for _, modname in pairs( components[ section ] ) do
-      local descfname = string.format( "eluadoc/%s_%s.lua", section, modname )
-      local res, err = build_file( descfname )
-      if res then
-        fulldata[ modname ] = res
-        -- Write doc for each language
-        for _, lang in pairs( languages ) do
-          local fname = string.format( "%s/%s_%s.html", lang, section, modname )
-          local f = io.open( fname, "wb" )
-          if not f then
-            print( string.format( "Unable to open %s for writing", fname ) )
-            return
+      if htmld or is_in_list( modname, target_doc_modules ) then
+        local descfname = string.format( "eluadoc/%s_%s.lua", section, modname )
+        local res, err = build_file( descfname, section )
+        if res then
+          fulldata[ modname ] = res
+          targetdata[ modname ] = res
+          -- Write doc for each language
+          if htmld then
+            for _, lang in pairs( languages ) do
+              local fname = string.format( "%s/%s_%s.html", lang, section, modname )
+              local f = io.open( fname, "wb" )
+              if not f then
+                print( string.format( "Unable to open %s for writing", fname ) )
+                return
+              else
+                f:write( res[ lang ].page )
+                f:close()
+                print( ( "Wrote %s" ):format( fname ) )
+                genfiles[ #genfiles + 1 ] = fname
+              end
+            end
           else
-            f:write( res[ lang ].page )
-            f:close()
-            print( ( "Wrote %s" ):format( fname ) )
-            genfiles[ #genfiles + 1 ] = fname
+            print( string.format( "Processed file %s", descfname ) )
           end
+        else
+          print( string.format( "Error processing module '%s': %s", modname, err ) )
+          return
         end
-      else
-        print( string.format( "Error processing module '%s': %s", modname, err ) )
-        return
       end
     end 
 
     -- Then generate menu data
-    for _, modname in pairs( components[ section ] ) do
-      local submenu= gen_menu( fulldata, modname, section )
-      ms[ #ms + 1 ] = submenu
+    if htmld then
+      for _, modname in pairs( components[ section ] ) do
+        local submenu= gen_menu( fulldata, modname, section )
+        ms[ #ms + 1 ] = submenu
+      end
     end
   end
-  return menu, genfiles
+  return menu, genfiles, targetdata
 end
 
