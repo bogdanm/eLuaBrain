@@ -271,7 +271,7 @@ static int luaterm_setpaging( lua_State *L )
   return 0;
 }
 
-// Lua: getstr( x, y, prompt, maxlen, [validator] )
+// Lua: str = getstr( x, y, prompt, maxlen, [validator] )
 static int luaterm_getstr( lua_State *L )
 {
   int cx = luaL_checkinteger( L, 1 );

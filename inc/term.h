@@ -176,6 +176,7 @@ void term_set_mode( int mode );
   _D( KC_F10 ),\
   _D( KC_F11 ),\
   _D( KC_F12 ),\
+  _D( KC_CTRL_F1 ),\
   _D( KC_CTRL_F2 ),\
   _D( KC_CTRL_F4 ),\
   _D( KC_INSERT ),\

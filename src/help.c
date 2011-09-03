@@ -308,7 +308,7 @@ void help_help( const char* topic )
       printf( HLRED "Module '%s' not found\n" HRESET, topic );
       return;
     }
-    printf( HLBLUE "Module: " HRESET "%s\n%s", pm->name, pm->desc );
+    printf( HLBLUE "Module: " HRESET "%s\n%s\n", pm->name, pm->desc );
     printf( HLBLUE "Function list: \n" HRESET );
     for( i = j = 0; i < pm->nfuncs; i ++ )
       printf( HLGREEN "  %s\n" HRESET, pm->pfuncs[ i ] );

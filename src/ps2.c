@@ -459,6 +459,7 @@ static const ps2_keymap ps2_term_mapping[] =
   { 'b', KC_CTRL_B },
   { 'x', KC_CTRL_X },
   { 'v', KC_CTRL_V },
+  { KC_F1, KC_CTRL_F1 },
   { KC_F2, KC_CTRL_F2 },
   { KC_F4, KC_CTRL_F4 },
 };
