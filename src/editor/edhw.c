@@ -164,7 +164,7 @@ char* edhw_read( const char *title, const char *text, unsigned maxlen, p_ed_vali
       input = NULL;
       break;
     }
-    else if( c < TERM_FIRST_KEY && strlen( input ) < maxlen) // regular ASCII char, ignore everything else
+    else if( c < TERM_FIRST_KEY && strlen( input ) < maxlen ) // regular ASCII char, ignore everything else
     {
       vflag = validator ? validator( input, c ) : 1;
       if( vflag )

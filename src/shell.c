@@ -796,7 +796,7 @@ static void shell_apihelp( char *args )
   if( *args != 0 )
     *strchr( args, ' ' ) = 0;
   // [HELP]
-  help_init( "/rom/eluadoc.bin" ); 
+  help_init( "/rfs/eluadoc.bin" ); 
   term_set_mode( TERM_MODE_COLS );
   term_enable_paging( TERM_PAGING_ON );
   help_help( args );

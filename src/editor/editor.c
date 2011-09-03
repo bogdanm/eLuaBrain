@@ -13,6 +13,7 @@
 #include "lauxlib.h"
 #include "lualib.h"
 #include "edutils.h"
+#include "help.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -170,6 +171,76 @@ static void editor_goto_line()
   edmove_goto_line( newl );
 }
 
+// Show help page
+static void editor_help()
+{
+}
+
+// Show API help interface
+#define EDITOR_MAX_HELP_TOPIC 40
+static void editor_apihelp()
+{
+  char input[ EDITOR_MAX_HELP_TOPIC + 1 ];
+  int c, cx, cy, esc, entered;
+
+  term_clrscr();
+  term_set_mode( TERM_MODE_COLS );
+  term_enable_paging( TERM_PAGING_ON );
+   // [HELP]
+  help_init( "/rfs/eluadoc.bin" ); 
+  printf( "API help mode\n" );
+  printf( "  Enter a topic to get help on, this can be a module name or a function name.\n" );
+  printf( "  If nothing is entered, a list of all the available modules will be shown.\n" );
+  printf( "  Press ESC at the prompt to return to the editor.\n\n" );
+  while( 1 )
+  {
+    printf( "Enter topic: " );
+    cx = term_get_cx();
+    cy = term_get_cy();
+    input[ 0 ] = '\0';
+    entered = esc = 0;
+    while( 1 )
+    {
+      c = term_getch( TERM_INPUT_WAIT );
+      if( c == KC_BACKSPACE )
+      {
+        if( entered > 0 )
+        {
+          term_gotoxy( cx - 1, cy );
+          term_putch( ' ' );
+          term_gotoxy( -- cx, cy );
+          input[ --entered ] = '\0';
+        }
+      }
+      else if( c == KC_ENTER ) // NL
+      {
+        printf( "\n" );
+        break;
+      }
+      else if( c == KC_ESC ) // Escape
+      {
+        esc = 1;
+        break;
+      }
+      else if( c < TERM_FIRST_KEY && strlen( input ) < EDITOR_MAX_HELP_TOPIC ) // regular ASCII char, ignore everything else
+      {
+        term_putch( c );
+        term_gotoxy( ++cx, cy );
+        input[ entered ++ ] = c;
+        input[ entered ] = '\0';
+      }
+    }
+    if( esc )
+      break;
+    help_help( input );
+  }
+  term_enable_paging( TERM_PAGING_OFF );
+  term_set_mode( TERM_MODE_ASCII );
+  help_close();
+  edhw_init();
+  edutils_show_screen();
+}
+
 // Exit from editor
 static int editor_exit()
 {
@@ -236,6 +307,14 @@ int editor_mainloop()
     res = 0;
     switch( c )
     {
+      case KC_F1:
+        editor_help();
+        break;
+
+      case KC_CTRL_F1:
+        editor_apihelp();
+        break;
+
       case KC_F5:
         editor_run();
         break;
