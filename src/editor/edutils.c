@@ -72,7 +72,7 @@ void edutils_display_status()
   edhw_invertcols( 1 );
   // Write current position
   temp[ 0 ] = temp[ TERM_COLS ] = '\0';
-  snprintf( temp, TERM_COLS, " %c %s    Col: %d    Line: %d/%d     Buffer: %d line(s)", edutils_is_flag_set( ed_crt_buffer, EDFLAG_DIRTY ) ? '*' : ' ', 
+  snprintf( temp, TERM_COLS, " %c %s   Col: %d   Line: %d/%d   Buffer: %d line(s)   F1 - help", edutils_is_flag_set( ed_crt_buffer, EDFLAG_DIRTY ) ? '*' : ' ', 
             ed_crt_buffer->fpath ? ed_crt_buffer->fpath : "(none)",  ed_cursorx + ed_startx + 1, ed_cursory + ed_startline + 1, 
             ed_crt_buffer->file_lines, ed_sellines ? ed_lastsel - ed_firstsel + 1 : 0 );
   edhw_gotoxy( 0, TERM_LINES - 1 );

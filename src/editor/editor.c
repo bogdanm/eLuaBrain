@@ -174,6 +174,37 @@ static void editor_goto_line()
 // Show help page
 static void editor_help()
 {
+  term_clrscr();
+  term_set_cursor( TERM_CURSOR_OFF );
+  printf( "Special keys\n" );
+  printf( "------------\n" );
+  printf( "  Key       | Action        \n" );
+  printf( "  ==========================================================\n" );
+  printf( "  F1        | Shows this help page\n" );
+  printf( "  CTRL+F1   | Enters the API help mode\n" );
+  printf( "  F2        | Save current file\n" );
+  printf( "  CTRL+F2   | Save current file under a different name\n" );
+  printf( "  F4        | Starts block selection mode (see next section)\n" );
+  printf( "  CTRL+F4   | Clears the block buffer (see next section)\n" );
+  printf( "  CTRL+V    | Pastes the block buffer\n" );
+  printf( "  F5        | Run the current file\n" );
+  printf( "  F7        | Go to the specified line\n" );
+  printf( "  F10       | Exit from the editor\n" );
+  printf( "  CTRL+Y    | Deletes the current line\n" );
+  printf( "  CTRL+E    | Delete to the end of the line\n" );
+  printf( "  CTRL+B    | Delete to the beginning of the line\n" );
+  printf( "  ==========================================================\n" );  
+  printf( "\nCopy and paste\n" );
+  printf( "--------------\n" );
+  printf( "The editor has limited support for copying and pasting blocks of text. " );
+  printf( "Press F4 to enter block selection mode. In this mode the editor will highlight the lines that are selected. Press F4 again to end block selection mode. " );
+  printf( "After pressing F4 the second time, the selected block of text is kept in memory in the block buffer. " );
+  printf( "To paste it, press CTRL+V. This will also clear the block buffer. " );
+  printf( "To clear the block buffer without pasting press CTRL+F4.\n" );
+  printf( "\nPress any key to return to the editor.\n" );
+  term_getch( TERM_INPUT_WAIT );
+  edhw_init();
+  edutils_show_screen();
 }
 
 // Show API help interface
