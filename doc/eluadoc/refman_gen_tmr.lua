@@ -9,19 +9,11 @@ data_en =
   -- Menu name
   menu_name = "tmr",
 
+  desc = "Timer operations",
+
   -- Overview
-  overview = [[This module contains functions for accessing the hardware timers of the eLua CPU. In addition, if virtual timers are enabled 
-  (see @arch_platform_timers.html#virtual_timers@here@ and @building.html@here@ for details), they can be used just like the "regular" (hardware)
-  timers with a single exception: you can't set the clock of a virtual timer (using @#tmr.setclock@tmr.setclock@). To use virtual timers with this
-  module, specify $tmr.VIRTx$ as the timer ID instead of a number. For example, if the eLua image was configured to support 4 virtual timers, they will
-  be available by using $tmr.VIRT0$ to $tmr.VIRT3$ as timer IDs.</p>
-  <p>All "time units" (delays, differences in time) in this module, as well as in other parts of eLua (timeouts) are expressed in microseconds. However,
-  please keep in mind that the actual timer resolution depends on many factors. For example, it's very likely that the @#tmr.delay@tmr.delay@ function won't
-  be able to delay for the exact amount you specify (in us), as the real delay depends on a number of variables, most notably the base clock of the timer 
-  and the size of the timer counter register (32 bits on some platforms, 16 bits on most platforms, other values are less common). To ensure that the delay 
-  you're requesting is achievable, use @#tmr.getmindelay@tmr.getmindelay@ and @#tmr.getmaxdelay@tmr.getmaxdelay@ to obtain the maximum and the minimum 
-  achievable wait times on your timer, respectively. Even if your delay is within these limits, the $precision$ of this function still varies a lot, 
-  mainly as a function of the timer base clock.]],
+  overview = [[This module contains functions for accessing the hardware timers of the eLua CPU. In addition, if virtual timers are enabled` (see @arch_platform_timers.html#virtual_timers@here@ and @building.html@here@ for details),`,` they can be used just like the "regular" (hardware) timers with a single exception: you can't set the clock of a virtual timer (using @#tmr.setclock@tmr.setclock@). To use virtual timers with this module, specify $tmr.VIRTx$ as the timer ID instead of a number. For example, if the eLua image was configured to support 4 virtual timers, they will be available by using $tmr.VIRT0$ to $tmr.VIRT3$ as timer IDs.</p>
+<p>All "time units" (delays, differences in time) in this module, as well as in other parts of eLua (timeouts) are expressed in microseconds. However, please keep in mind that the actual timer resolution depends on many factors. For example, it's very likely that the @#tmr.delay@tmr.delay@ function won't be able to delay for the exact amount you specify (in us), as the real delay depends on a number of variables, most notably the base clock of the timer and the size of the timer counter register (32 bits on some platforms, 16 bits on most platforms, other values are less common). To ensure that the delay you're requesting is achievable, use @#tmr.getmindelay@tmr.getmindelay@ and @#tmr.getmaxdelay@tmr.getmaxdelay@ to obtain the maximum and the minimum achievable wait times on your timer, respectively. Even if your delay is within these limits, the $precision$ of this function still varies a lot, mainly as a function of the timer base clock.]],
 
   -- Functions
   funcs = 
@@ -77,8 +69,7 @@ data_en =
         "$id$ - the timer ID.",
         "$clock$ - the timer clock (in Hz)."
       },
-       ret = [[The actual clock set on the timer (in Hz). Depending on the hardware, this might have a different value than the $clock$ argument. 
-$NOTE:$ this function does not work with virtual timers.]]       
+       ret = [[The actual clock set on the timer (in Hz). Depending on the hardware, this might have a different value than the $clock$ argument. $NOTE:$ this function does not work with virtual timers.]]       
     },
 
     { sig = "clock = #tmr.getclock#( id )",
@@ -88,7 +79,7 @@ $NOTE:$ this function does not work with virtual timers.]]
     },
 
     { sig = "#tmr.set_match_int#( id, period, type )",
-      desc = "Setup the timer match interrupt. Only available if interrupt support is enabled, check @inthandlers.html@here@ for details.",
+      desc = "Setup the timer match interrupt. Only available if interrupt support is enabled`, check @inthandlers.html@here@ for details.`.`",
       args = 
       {
         "$id$ - the timer ID.",

@@ -9,6 +9,8 @@ data_en =
   -- Menu name
   menu_name = "uart",
 
+  desc = "UART interface operations",
+
   -- Overview
   overview = [[This module contains functions for accessing the serial ports (UARTs) of the eLua CPU.]],
 
@@ -20,8 +22,7 @@ uart.VUART1
 .............
 uart.VUART7]],
       name = "UART constants",
-      desc = [[If @sermux.html@virtual UART@ support is enabled in eLua these constants are automatically defined
-to the IDs of the virtual UARTs in the system.]]       
+      desc = [[If @sermux.html@virtual UART@ support is enabled in eLua these constants are automatically defined to the IDs of the virtual UARTs in the system.]]       
     }
   }, 
 
@@ -36,8 +37,7 @@ to the IDs of the virtual UARTs in the system.]]
         "$baud$ - serial baud rate",
         "$databits$ - number of data bits",
         "$parity$ - parity type, can be either $uart.PAR_EVEN$, $uart.PAR_ODD$ or $uart.PAR_NONE$",
-        [[$stopbits$ - the number of stop bits, can be either $uart.STOP_1$ (for 1 stop bit), $uart.STOP_1_5$ (for 1.5 stop bits) or $uart.STOP_2$ 
-(for 2 stop bits)]]
+        [[$stopbits$ - the number of stop bits, can be either $uart.STOP_1$ (for 1 stop bit), $uart.STOP_1_5$ (for 1.5 stop bits) or $uart.STOP_2$ (for 2 stop bits)]]
       },
       ret = "The actual baud rate set on the serial port. Depending on the hardware, this might have a different value than the $baud$ parameter"
     },
@@ -71,10 +71,10 @@ to the IDs of the virtual UARTs in the system.]]
         "$id$ - the ID of the serial port",
         [[$format$ - format of data to read. This can be either:
 <ul>
-  <li>$'*l'$ - read until an end of line character (a $\n$) is found (the $\n$ is not returned) or a timeout occurs.</li>
-  <li>$'*n'$ - read an integer. The integer can optionally have a sign. Reading continues until the first non-digit character is detected or a timeout occurs. This is the only case in which $read$ returns a number instead of an integer.</li>
-  <li>$'*s'$ - read until a spacing character (like a space or a TAB) is found (the spacing character is not returned) or a timeout occurs.</li>
-  <li>$a positive number$ - read at most this many characters before returning (reading can stop earlier if a timeout occurs).</li></ul>]],
+    <li>$'*l'$ - read until an end of line character (a $\n$) is found (the $\n$ is not returned) or a timeout occurs.</li>
+    <li>$'*n'$ - read an integer. The integer can optionally have a sign. Reading continues until the first non-digit character is detected or a timeout occurs. This is the only case in which $read$ returns a number instead of an integer.</li>
+    <li>$'*s'$ - read until a spacing character (like a space or a TAB) is found (the spacing character is not returned) or a timeout occurs.</li>
+    <li>$a positive number$ - read at most this many characters before returning (reading can stop earlier if a timeout occurs).</li></ul>]],
         [[$timeout (optional)$ - timeout of the receive operation, can be either $uart.NO_TIMEOUT$ or 0 for non-blocking operation, $uart.INF_TIMEOUT$ for blocking operation, or a positive number that specifies the inter-char timeout in microseconds (in this case, the $timer_id$ parameter is also required). The default value of this argument is $uart.INF_TIMEOUT$]],
         [[$timer_id (optional)$ - the ID of the timer for the receive operation, needed if the $timeout$ parameter specifies an actual timeout (that is, $timeout$ is neither $uart.NO_TIMEOUT$, nor $uart.INF_TIMEOUT$).]]
       },
@@ -95,8 +95,7 @@ to the IDs of the virtual UARTs in the system.]]
       args =
       {
         "$id$ - the ID of the serial port.",
-        [[$type$ - the flow control type, it can be either $uart.FLOW_NONE$ (no flow control), $uart.FLOW_RTS$ for RTS flow control, $uart.FLOW_CTS$ for CTS flow control or 
-          $uart.FLOW_RTS + uart.FLOW_CTS$ for full RTS/CTS flow control.]]
+        [[$type$ - the flow control type, it can be either $uart.FLOW_NONE$ (no flow control), $uart.FLOW_RTS$ for RTS flow control, $uart.FLOW_CTS$ for CTS flow control or $uart.FLOW_RTS + uart.FLOW_CTS$ for full RTS/CTS flow control.]]
       }
     }
   },

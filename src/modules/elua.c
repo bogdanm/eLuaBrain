@@ -11,6 +11,8 @@
 #include "platform_conf.h"
 #include "linenoise.h"
 #include "devman.h"
+#include "help.h"
+#include "term.h"
 #include <string.h>
 #include <time.h>
 
@@ -90,6 +92,24 @@ static int elua_fs_mounted( lua_State *L )
   return 1;
 }
 
+// Lua: res = help( [topic] )
+static int elua_help( lua_State *L )
+{
+  const char *topic = NULL;
+
+  // [HELP]
+  if( lua_type( L, 1 ) == LUA_TSTRING )
+    topic = luaL_checkstring( L, 1 );
+  help_init( "/rfs/eluadoc.bin" ); 
+  term_set_mode( TERM_MODE_COLS );
+  term_enable_paging( TERM_PAGING_ON );
+  help_help( topic );
+  term_set_mode( TERM_MODE_ASCII );
+  term_enable_paging( TERM_PAGING_OFF );
+  help_close();
+  return 0;
+}
+
 // Module function map
 #define MIN_OPT_LEVEL 2
 #include "lrodefs.h"
@@ -100,6 +120,7 @@ const LUA_REG_TYPE elua_map[] =
   { LSTRKEY( "save_history" ), LFUNCVAL( elua_save_history ) },
   { LSTRKEY( "strftime" ), LFUNCVAL( elua_strftime ) },
   { LSTRKEY( "fs_mounted" ), LFUNCVAL( elua_fs_mounted ) },
+  { LSTRKEY( "help" ), LFUNCVAL( elua_help ) },
 #if LUA_OPTIMIZE_MEMORY > 0
   { LSTRKEY( "EGC_NOT_ACTIVE" ), LNUMVAL( EGC_NOT_ACTIVE ) },
   { LSTRKEY( "EGC_ON_ALLOC_FAILURE" ), LNUMVAL( EGC_ON_ALLOC_FAILURE ) },

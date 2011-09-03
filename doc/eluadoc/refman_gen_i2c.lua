@@ -9,9 +9,11 @@ data_en =
   -- Menu name
   menu_name = "i2c",
 
+  desc = "I2C interface operations",
+
   -- Overview
   overview = [[This module contains functions for accessing the I2C interfaces of the eLua CPU.</p>
-  <p><span class="warning">IMPORTANT</span>: right now, only master I2C mode is implemented in eLua.]],
+`<p><span class="warning">IMPORTANT</span>`$IMPORTANT$`: right now, only master I2C mode is implemented in eLua.]],
 
   -- Functions
   funcs = 

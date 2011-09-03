@@ -9,17 +9,16 @@ data_en =
   -- Menu name
   menu_name = "pack",
 
+  desc = "Binary data manipulation",
+
   -- Overview
-  overview = [[This module allows for arbitrary packing of data into Lua strings and unpacking data from Lua strings. In this way, a string can be used to store data in a platform-independent 
-manner. It is based on the ^http://www.tecgraf.puc-rio.br/~~lhf/ftp/lua/#lpack^lpack^ module from Luiz Henrique de Figueiredo (with some minor tweaks). </p>
-<p>Both methods of this module (@#pack@pack@ and @#unpack@unpack@) use a $format string$ to describe how to pack/unpack the data. The format string contains one or more $data specifiers$, each
-data specifier is applied to a single variable that must be packed/unpacked. The data specifier has the following general format:</p>
+  overview = [[This module allows for arbitrary packing of data into Lua strings and unpacking data from Lua strings. In this way, a string can be used to store data in a platform-independent manner. It is based on the ^http://www.tecgraf.puc-rio.br/~~lhf/ftp/lua/#lpack^lpack^ module from Luiz Henrique de Figueiredo (with some minor tweaks). </p><p>Both methods of this module (@#pack@pack@ and @#unpack@unpack@) use a $format string$ to describe how to pack/unpack the data. The format string contains one or more $data specifiers$, each data specifier is applied to a single variable that must be packed/unpacked. The data specifier has the following general format:</p>
 ~[endianness]<<format specifier>>[count]~
 <p>where:</p>
-<ul>
+`<ul>
   <li>$endianness$ is an optional endian flags that specifies how the numbers that are to be packed/unpacked are stored in memory. It can be either:
   <ol>
-    <li>$'<<'$ for little endian.</li>
+  <li>$'<<'$ for little endian.</li>
     <li>$'>>'$ for big endian.</li>
     <li>$'='$ for native endian (the platform's endian order, default).</li>
   </ol></li>
@@ -99,7 +98,30 @@ data specifier is applied to a single variable that must be packed/unpacked. The
   </table></li>
   <li>$count$ is an optional counter for the $format specifier$. For example, $i5$ instructs the code to pack/unpack 5 integer variables, as opposed to $i$ that specifies a
   single integer variable.</li>
-</ul><p>]],
+</ul><p>`- $endianness$ is an optional endian flag that specifies how the numbers that are to be packed/unpacked are stored in memory. It can be either:
+  $<<$ for little endian
+  $>>$ for big endian.
+  $=$ for native endian (the platform's endian order, default).
+- $format specifier$ desribes what kind of variable(s) will be packed/unpacked. $The format specifier is case-sensitive$. The possible values of this parameter are summarized in the table below:
+  Format specifier | Corresponding variable type
+  ===================================================
+  $z$                | zero-terminated string
+  $p$                | string preceded by length byte
+  $P$                | string preceded by length word
+  $a$                | string preceded by length size_t
+  $A$                | string
+  $f$                | float
+  $d$                | double
+  $n$                | Lua number
+  $c$                | char
+  $b$                | byte (unsigned char)
+  $h$                | short
+  $H$                | unsigned short
+  $i$                | int
+  $I$                | unsigned int
+  $l$                | long
+  $L$                | unsigned long
+- $count$ is an optional counter for the format specifier. For example, $i5$ instructs the code to pack/unpack 5 integer variables instead of just one.`]],
 
   -- Functions
   funcs = 
@@ -108,20 +130,20 @@ data specifier is applied to a single variable that must be packed/unpacked. The
       desc = "Packs variables in a string.",
       args = 
       {
-        "$format$ - format specifier (as described @#overview@here@).",
+        "$format$ - format specifier` (as described @#overview@here@).`.`",
         "$val1$ - first variable to pack.",
         "$val2$ - second variable to pack.",
-        "$valn$ - nth variable to pack.",
+        "$valn$ - %n%th variable to pack.",
       },
       ret = "$packed$ - a string containing the packed representation of all variables according to the format."
     },
 
     { sig = "nextpos, val1, val2, ..., valn = #pack.unpack#( string, format, [ init ] )",
-      desc = "Unpacks a string",
+      desc = "Unpacks a string into one or more variables.",
       args = 
       {
         "$string$ - the string to unpack.",
-        "$format$ - format specifier (as described @#overview@here@).",
+        "$format$ - format specifier` (as described @#overview@here@).`.`",
         "$init$ - $(optional)$ marks where in $string$ the unpacking should start (1 if not specified)."
       },
       ret = 
@@ -129,7 +151,7 @@ data specifier is applied to a single variable that must be packed/unpacked. The
         "$nextpos$ - the position in the string after unpacking.",
         "$val1$ - the first unpacked value.",
         "$val2$ - the second unpacked value.",
-        "$valn$ - the nth unpacked value."
+        "$valn$ - the %n%th unpacked value."
       }
     }
   },

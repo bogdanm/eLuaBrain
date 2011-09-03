@@ -21,6 +21,7 @@ int help_init( const char *fname );
 void help_close();
 int help_get_num_modules();
 const char* help_get_module_name_at( int index );
+const char* help_get_module_overview_at( int index );
 HELP_MOD_DATA* help_load_module_idx( int index );
 HELP_MOD_DATA* help_load_module_name( const char *name );
 void help_unload_module();

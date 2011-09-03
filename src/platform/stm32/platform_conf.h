@@ -36,6 +36,7 @@
 #define ENABLE_ENC
 #define BUILD_ENC28J60
 #define BUILD_NRF
+#define BUILD_HELP
 
 #define MMCFS_SDIO_STM32
 #define RFS_TRANSPORT_UDP

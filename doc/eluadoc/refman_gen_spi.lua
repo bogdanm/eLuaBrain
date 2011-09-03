@@ -9,9 +9,11 @@ data_en =
   -- Menu name
   menu_name = "spi",
 
+  desc = "SPI interface operations",
+
   -- Overview
   overview = [[This module contains functions for accessing the SPI interfaces of the eLua CPU.</p>
-  <p><span class="warning">IMPORTANT</span>: right now, only master SPI mode is implemented in eLua.]],
+`<p><span class="warning">IMPORTANT</span>`$IMPORTANT$`: right now, only master SPI mode is implemented in eLua.]],
 
   -- Functions
   funcs = 

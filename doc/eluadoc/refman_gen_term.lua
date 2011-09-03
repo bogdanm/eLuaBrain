@@ -9,8 +9,10 @@ data_en =
   -- Menu name
   menu_name = "term",
 
+  desc = "Screen and keyboard (terminal) operations",
+
   -- Overview
-  overview = [[This module contains functions for accessing ANSI-compatible terminals (and terminal emulators) from Lua.]],
+  overview = [[This module contains functions for accessing ANSI-compatible terminals (and terminal emulators) from Lua. For $STMBrain$ this module is an interface to both the PS/2 keyboard and the screen (VGA interface).]],
 
   -- Functions
   funcs = 
@@ -162,7 +164,7 @@ data_en =
   term.KC_ENTER       | ENTER (CR)
   term.KC_TAB         | TAB
   term.KC_BACKSPACE   | BACKSPACE
-  terk.KC_ESC         | ESC (escape)
+  term.KC_ESC         | ESC (escape)
 `]]
     },
 

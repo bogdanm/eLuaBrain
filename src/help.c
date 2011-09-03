@@ -1,5 +1,8 @@
 // Online help reader
 
+#include "platform_conf.h"
+
+#ifdef BUILD_HELP
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -20,11 +23,13 @@ static int help_crt_module_nfuncs = -1;
 #define HELP_SIG_SIZE         4
 #define HELP_MOD_ENTRY_DSIZE  6
 #define HELP_MOD_EXTRA_OFFSET 8
+#define HELP_MODNAME_ALIGN    12
 
 // This defines an entry in the module table
 typedef struct
 {
   const char *name;
+  const char *overview;
   u32 offset;
   u16 len;
 } HELP_MODTABLE_DATA;
@@ -79,10 +84,14 @@ static HELP_MODTABLE_DATA* helph_get_modtable_data( int index )
     return NULL;
   while( i < index )
   {
-    p += strlen( p ) + 1 + HELP_MOD_ENTRY_DSIZE;
+    p += strlen( p ) + 1;
+    p += strlen( p ) + 1;
+    p += HELP_MOD_ENTRY_DSIZE;
     i ++;
   }
   md.name = p;
+  p += strlen( p ) + 1;
+  md.overview = p;
   p += strlen( p ) + 1;
   md.offset = *( u32* )p;
   p += 4;
@@ -201,7 +210,9 @@ int help_init( const char *fname )
   while( p < help_mod_table + temp32 )
   {
     help_num_modules ++;
-    p += strlen( p ) + 1 + HELP_MOD_ENTRY_DSIZE; // skip name, offet, entry size
+    p += strlen( p ) + 1;
+    p += strlen( p ) + 1;
+    p += HELP_MOD_ENTRY_DSIZE; // skip name, overview, offset, entry size
   }
   return 1;
 error:
@@ -226,6 +237,13 @@ const char* help_get_module_name_at( int index )
   return pm ? pm->name : NULL;
 }
 
+const char* help_get_module_overview_at( int index )
+{
+  HELP_MODTABLE_DATA *pm = helph_get_modtable_data( index );
+
+  return pm ? pm->overview : NULL;
+}
+
 HELP_MOD_DATA* help_load_module_idx( int index )
 {
   return helph_load_module( index );
@@ -246,7 +264,7 @@ void help_unload_module()
 // Main interface: prints the help on a given topic
 void help_help( const char* topic )
 {
-  unsigned i;
+  unsigned i, j;
   HELP_MOD_DATA *pm;
   const char *pdot;
   char *modname;
@@ -258,7 +276,17 @@ void help_help( const char* topic )
   {
     printf( HLBLUE "Available modules:\n" HRESET );
     for( i = 0; i < help_num_modules; i ++ )
-      printf( HLGREEN "  %s\n" HRESET, help_get_module_name_at( i ) );
+    {
+      pdot = help_get_module_overview_at( i );
+      printf( HLGREEN "  %s" HRESET, help_get_module_name_at( i ) );
+      for( j = strlen( help_get_module_name_at( i ) ); j < HELP_MODNAME_ALIGN; j ++ )
+        printf( " " );
+      printf( " - " );
+      if( *pdot == 0 )
+        printf( HLRED "(overview not available)\n" HRESET );
+      else
+        printf( HLYELLOW "%s\n" HRESET, pdot );
+   }
   }
   else if( *topic == '*' ) // *module: list all functions with their description
   {
@@ -268,12 +296,12 @@ void help_help( const char* topic )
       printf( HLRED "Module '%s' not found\n" HRESET, topic );
       return;
     }
-    printf( HLBLUE "Module: " HRESET "%s\n%s", pm->name, pm->desc );
+    printf( HLBLUE "Module: " HRESET "%s\n%s\n", pm->name, pm->desc );
     for( i = 0; i < pm->nfuncs; i ++ )
       printf( "%s\n", pm->pfuncs[ i ] + strlen( pm->pfuncs[ i ] ) + 1 );
     help_unload_module();
   }
-  else if( strchr( topic, '.' ) == NULL ) // module
+  else if( helph_module_name_to_idx( topic ) != -1 ) // is this a module?
   {
     if( ( pm = help_load_module_name( topic ) ) == NULL )
     {
@@ -282,42 +310,55 @@ void help_help( const char* topic )
     }
     printf( HLBLUE "Module: " HRESET "%s\n%s", pm->name, pm->desc );
     printf( HLBLUE "Function list: \n" HRESET );
-    for( i = 0; i < pm->nfuncs; i ++ )
+    for( i = j = 0; i < pm->nfuncs; i ++ )
       printf( HLGREEN "  %s\n" HRESET, pm->pfuncs[ i ] );
     help_unload_module();
   }
-  else // module/function
+  else // this must be a function
   {
-    pdot = topic + strlen( topic ) - 1;
-    while( *pdot != '.' )
-      pdot --;
+    if( ( pdot = strchr( topic, '.' ) ) == NULL )
+    {
+      printf( HLRED "Module '%s' not found\n" HRESET, topic );
+      return;
+    }
+    // Basic sanity check
     if( pdot == topic || pdot == topic + strlen( topic ) - 1 )
     {
       printf( HLRED "Invalid help syntax\n" HRESET );
       return;
     }
-    if( ( modname = strndup( topic, pdot - topic ) ) == NULL )
+    // Now loop after all '.' chars until we find the right module/function combo
+    pdot = topic;
+    while( *pdot )
     {
-      printf( HLRED "Not enough memory\n" HRESET );
-      return;
-    }
-    if( ( pm = help_load_module_name( modname ) ) == NULL )
-    {
-      printf( HLRED "Module '%s' not found\n" HRESET, modname );
-      free( modname );
-      return;
-    }
-    if( ( pfunc = helph_find_function_in_module( pm, topic ) ) == NULL )
-    {
-      printf( HLRED "Function '%s' not found in module '%s'\n" HRESET, pdot + 1, modname );
+      if( ( pdot = strchr( pdot, '.' ) ) == NULL )
+        break;
+      if( ( modname = strndup( topic, pdot - topic ) ) == NULL )
+      {
+        printf( HLRED "Not enough memory\n" HRESET );
+        return;
+      }
+      pdot ++;
+      if( ( pm = help_load_module_name( modname ) ) == NULL )
+      {
+        free( modname );
+        continue;
+      }
+      if( ( pfunc = helph_find_function_in_module( pm, topic ) ) == NULL )
+      {
+        free( modname );
+        help_unload_module();
+        continue;
+      }
+      pfunc += strlen( pfunc ) + 1;
+      printf( "%s\n", pfunc );
       free( modname );
       help_unload_module();
       return;
     }
-    pfunc += strlen( pfunc ) + 1;
-    printf( "%s\n", pfunc );
-    free( modname );
-    help_unload_module();
+    printf( HLRED "Unable to find module or function '%s'\n" HRESET, topic );
   }
 }
+
+#endif // #ifdef BUILD_HELP
 

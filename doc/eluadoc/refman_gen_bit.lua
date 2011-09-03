@@ -8,9 +8,12 @@ data_en =
 
   -- Menu name
   menu_name = "bit",
+  
+  desc = "Bitwise operations",
 
   -- Overview
-  overview = [[Since Lua doesn't have (yet) built-in capabilities for bit operations, the $bit$ module was added to eLua to fill this gap. It is based on the ^http://luaforge.net/projects/bitlib^bitlib^ library written by Reuben Thomas (slightly adapted to eLua) and provides basic bit operations (like setting and clearing bits) and bitwise operations.]],
+  overview = [[Since Lua doesn't have (yet) built-in capabilities for bit operations, the $bit$ module was added to eLua to fill this gap. It is based on the ^http://luaforge.net/projects/bitlib^bitlib^ library written by Reuben Thomas (slightly adapted to eLua) and provides basic bit operations (like setting and clearing bits) and bitwise operations.
+$NOTE$: $STMBrain$ comes with a special patch that adds a more comprehensible C-like syntax for bit operations: $<<<<$ for left shift, $>>>>$ for right shift, $&$ for AND, $|$ for OR, $^^^^$ for XOR (note the difference here : $^^^^$, not $^^$, since $^^$ already means exponentiation in Lua) and $~~$ for NOT (unary negation). The patch also adds $\$ as an operator for integer division (it returns the quotient converted to an integer). This patch and the $bit$ library can be used at the same time.]],
 
   -- Functions
   funcs = 

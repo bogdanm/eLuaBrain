@@ -604,7 +604,7 @@ local function generate_target( data )
       local fenc = generate_func( f )
       e = e .. encstr( f.name ) .. enc16( #fenc ) .. fenc
     end
-    m[ #m + 1 ] = { name = d.mod_name, enc = e, offset = 0 }
+    m[ #m + 1 ] = { name = d.mod_name, overview = d.mod_overview, enc = e, offset = 0 }
   end
   -- Layout modules one after the other and generate module table
   local total, mtable = 0, ""
@@ -612,7 +612,7 @@ local function generate_target( data )
     local e = m[ i ]
     e.offset = total
     total = total + #e.enc
-    mtable = mtable .. encstr( e.name ) .. enc32( e.offset ) .. enc16( #e.enc )
+    mtable = mtable .. encstr( e.name ) .. encstr( e.overview ) .. enc32( e.offset ) .. enc16( #e.enc )
     -- print(e.name, e.offset, #e.enc)
   end
   -- print( total )

@@ -144,7 +144,9 @@ static void shell_help( char* args )
   printf( "  %sver         %s- print eLua version\n" TERM_RESET_COL, SHELLH_CMD, SHELLH_HELP );
   printf( "  %srm <file> [-f] %s- removes the file, use '-f' to supress confirmation\n" TERM_RESET_COL, SHELLH_CMD, SHELLH_HELP );
   printf( "  %sreset%s - resets the terminal and clears the screen\n" TERM_RESET_COL, SHELLH_CMD, SHELLH_HELP );
+#ifdef BUILD_HELP  
   printf( "  %sapihelp [topic] %s- help on eLua's API, lists all modules without arguments" TERM_RESET_COL, SHELLH_CMD, SHELLH_HELP );
+#endif
   printf( "You can also run a Lua file by giving its path (without using 'lua').\n" );
 }
 
@@ -788,11 +790,13 @@ static void shell_reset( char *args )
 // ----------------------------------------------------------------------------
 // 'apihelp' handler
 
+#ifdef BUILD_HELP
 static void shell_apihelp( char *args )
 {
   if( *args != 0 )
     *strchr( args, ' ' ) = 0;
-  help_init( HELP_FILE_NAME ); 
+  // [HELP]
+  help_init( "/rfs/eluadoc.bin" ); 
   term_set_mode( TERM_MODE_COLS );
   term_enable_paging( TERM_PAGING_ON );
   help_help( args );
@@ -800,6 +804,7 @@ static void shell_apihelp( char *args )
   term_enable_paging( TERM_PAGING_OFF );
   help_close();
 }
+#endif // #ifdef BUILD_HELP
 
 // ----------------------------------------------------------------------------
 // Shell command table
@@ -822,7 +827,9 @@ static const SHELL_COMMAND shell_commands[] =
   { "edit", shell_edit },
   { "rm", shell_rm },
   { "reset", shell_reset },
+#ifdef BUILD_HELP  
   { "apihelp", shell_apihelp },
+#endif  
   { NULL, NULL }
 };
 

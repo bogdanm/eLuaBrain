@@ -15,8 +15,8 @@ local htmld
 local doc_sections_html = { "arch_platform", "refman_gen", "refman_ps_lm3s", "refman_ps_str9", "refman_ps_mbed", "refman_ps_mizar32" }
 local doc_sections_target = { "refman_gen" }
 --local target_doc_modules =  { "bit", "pd", "cpu", "pack", "adc", "term", "pio", "uart", "spi", "tmr", "pwm", "net", "elua", "i2c" }
-local target_doc_modules =  { "pd", "cpu", "elua" }
---local target_doc_modules =  { "cpu" }
+--local target_doc_modules =  { "pd", "cpu", "elua" }
+local target_doc_modules =  { "elua", "cpu", "pd", "bit", "pack", "uart", "spi", "pio", "pwm", "i2c", "tmr", "term" }
 
 -- List here all the components of each section
 local components = 
@@ -82,10 +82,10 @@ local function format_string( str, keepnl )
   str = str:gsub( "``", "\007" )
 
   -- In target mode add spaces in front of <li></li> items
-  if not htmld then str = str:gsub( "<li>(.-)</li>", "  %1" ) end
+  if not htmld then str = str:gsub( "<li>(.-)</li>", "  - %1" ) end
 
   -- In target mode remove all HTML tags
-  if not htmld then str = str:gsub( "<[^<].->", "" ) end
+  if not htmld then str = str:gsub( "<(.-)>", function( t ) return t:sub( 1, 1 ) == "<" and "<" .. t .. ">" or "" end ) end
 
   -- Translate 'special' HTML chars to their equivalents
   local tr_table_html = { [ "%&" ] = "&amp;" }
@@ -111,10 +111,10 @@ local function format_string( str, keepnl )
   str = str:gsub( "`(.-)`(.-)`", htmld and '%1' or '%2'  )
 
   -- @ref@text@ becomes <a href="ref">text</a>
-  str = str:gsub( "@(.-)@(.-)@", htmld and '<a href="%1">%2</a>' or '%2'  )
+  str = str:gsub( "@(.-)@(.-)@", htmld and '<a href="%1">%2</a>' or CLCYAN .. '%2' .. CRESET  )
 
   -- ^ref^text^ becomes <a href="ref">text</a>
-  str = str:gsub( "%^(.-)%^(.-)%^", htmld and '<a href="%1">%2</a>' or '' )
+  str = str:gsub( "%^(.-)%^(.-)%^", htmld and '<a href="%1">%2</a>' or CLCYAN .. '%2' .. CRESET )
 
   -- strings between two tildas (~~) get special code-like formatting
   -- must keep '\n', so replace it with "temps" for now
@@ -168,8 +168,9 @@ local function build_file( fname, section )
       end
     end
 
-    -- Get the module name
+    -- Get the module name and overview
     data.mod_name = r.mod_name or r.menu_name
+    data.mod_overview = r.desc or ""
 
     -- process names
     if not r.menu_name then
@@ -211,9 +212,12 @@ local function build_file( fname, section )
         temp = format_string( s.desc )
         page = page .. '<div class="docdiv">\n<p>' .. format_string( temp ) .. "</p>\n</div>\n\n"
         temp = target_desc or temp
-        data.mod_desc = data.mod_desc .. s.name .. ":\n"
-        for l in temp:gmatch( "([^\n]+)\n" ) do data.mod_desc = data.mod_desc .. "  " .. l .. "\n" end
-        data.mod_desc = data.mod_desc .. "\n"
+        -- data.mod_desc = data.mod_desc .. CLBLUE .. s.name .. ":\n" .. CRESET .. temp .. "\n"
+        data.mod_desc = data.mod_desc .. CLBLUE .. s.name .. ":\n" .. CRESET
+        local t2 = s.text
+        if t2:sub( -1, -1 ) ~= "\n" then t2 = t2 .. "\n" end
+        for l in t2:gmatch( "([^\n]-)\n" ) do data.mod_desc = data.mod_desc .. "  " .. CLCYAN .. l .. "\n" .. CRESET end
+        data.mod_desc = data.mod_desc .. temp .. "\n"
       end 
     end
     data.funcs = {}
@@ -249,20 +253,20 @@ local function build_file( fname, section )
         if type( a ) == "string" or ( type( a ) == "table" and #a == 1 ) then
           local text = type( a ) == "string" and a or a[ 1 ]
           page = page .. dot( format_string( text ) ) .. "</p>"
-          df.desc = df.desc .. CLBLUE .. "  Argument:\n" .. CRESET .. "    " .. dot( format_string( text ) ) .. "\n"
+          df.desc = df.desc .. CLGREEN .. "  Arguments:\n" .. CRESET .. "    " .. dot( format_string( text ) ) .. "\n"
         else
           page = page .. "</p>\n<ul>\n"
-          df.desc = df.desc .. CLBLUE .. "  Arguments:\n" .. CRESET
+          df.desc = df.desc .. CLGREEN .. "  Arguments:\n" .. CRESET
           for i = 1, #a do 
             page = page .. "  <li>" .. dot( format_string( a[ i ] ) ) .. "</li>\n" 
-            df.desc = df.desc .. "    " .. dot( format_string( a[ i ] ) ) .. "\n"
+            df.desc = df.desc .. "    * " .. dot( format_string( a[ i ] ) ) .. "\n"
           end
           --df.desc = df.desc .. "\n"
           page = page .. "</ul>"
         end
       else
         page = page .. "none.</p>"
-        df.desc = df.desc .. CLBLUE .. "  Arguments: " .. CRESET .. "none.\n"
+        df.desc = df.desc .. CLGREEN .. "  Arguments: " .. CRESET .. "none.\n"
       end
       page = page .. "\n"
       -- return value
@@ -272,20 +276,20 @@ local function build_file( fname, section )
         if type( r ) == "string" or ( type( r ) == "table" and #r == 1 ) then
           local text = type( r ) == "string" and r or r[ 1 ]
           page = page .. dot( format_string( text ) ) .. "</p>"
-          df.desc = df.desc .. CLBLUE .. "  Returns:\n" .. CRESET .. "    " .. dot( format_string( text ) )  .. "\n"
+          df.desc = df.desc .. CLGREEN .. "  Returns:\n" .. CRESET .. "    " .. dot( format_string( text ) )  .. "\n"
         else
           page = page .. "</p>\n<ul>\n"
-          df.desc = df.desc .. CLBLUE .. "  Returns:\n" .. CRESET
+          df.desc = df.desc .. CLGREEN .. "  Returns:\n" .. CRESET
           for i = 1, #r do 
             page = page .. "  <li>" .. dot( format_string( r[ i ] ) ) .. "</li>\n"
-            df.desc = df.desc .. "    " .. dot( format_string( r[ i ] ) ) .. "\n"
+            df.desc = df.desc .. "    * " .. dot( format_string( r[ i ] ) ) .. "\n"
           end
           -- df.desc = df.desc .. "\n"
           page = page .. "</ul>"
         end
       else
         page = page .. "nothing.</p>"
-        df.desc = df.desc .. CLBLUE .. "  Returns: " .. CRESET .. "nothing.\n"
+        df.desc = df.desc .. CLGREEN .. "  Returns: " .. CRESET .. "nothing.\n"
       end
       page = page .. "\n\n"
       -- print( df.name )
@@ -319,8 +323,8 @@ local function build_file( fname, section )
     page = page:gsub( "<p>%s-</p>", "" )
     res[ lang ].page = page
   end
-  -- print( res.en.data.mod_name )
-  -- print( res.en.data.mod_desc )
+  --print( res.en.data.mod_name )
+  --print( res.en.data.mod_desc )
   return res
 end
 

@@ -9,6 +9,8 @@ data_en =
   -- Menu name
   menu_name = "pwm",
 
+  desc = "PWM generation",
+
   -- Overview
   overview = [[This module contains functions for accessing the PWM (Pulse Width Modulation) modules of the eLua CPU.]],
 
@@ -21,8 +23,7 @@ data_en =
       {
         "$id$ - the ID of the PWM module.",
         "$frequency$ - the frequency of the PWM module (in Hz).",
-        [[$duty$ - the duty cycle of the PWM module given in percents. This must be an integer between 0 and 100. $NOTE$: depending on the hardware, some
-duty cycles (particulary 0 and 100) might not be achievable.]]
+        [[$duty$ - the duty cycle of the PWM module given in percents. This must be an integer between 0 and 100. $NOTE$: depending on the hardware, some duty cycles (particulary 0 and 100) might not be achievable.]]
       },
       ret = "The actual frequency set on the PWM module. Depending on the hardware, this might have a different value than the $frequency$ argument."
     },
@@ -44,7 +45,7 @@ duty cycles (particulary 0 and 100) might not be achievable.]]
         "$id$ - the ID of the PWM module.",
         "$clock$ - the desired base clock."
       },
-      ret = "The actual base clock set on the PWM module.  Depending on the hardware, this might have a different value than the $clock$ argument."
+      ret = "The actual base clock set on the PWM module. Depending on the hardware, this might have a different value than the $clock$ argument."
     },
 
     {  sig = "clock = #pwm.getclock#( id )",
