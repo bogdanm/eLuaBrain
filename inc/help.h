@@ -14,7 +14,7 @@ typedef struct
   const char *name;
   const char *desc;
   u16 nfuncs;
-  char **pfuncs;
+  const char **pfuncs;
 } HELP_MOD_DATA;
 
 int help_init( const char *fname );

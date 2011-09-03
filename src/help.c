@@ -7,11 +7,13 @@
 #include <stdlib.h>
 #include <string.h>
 #include "help.h"
+#include "devman.h"
 
 // ****************************************************************************
 // Local variables and macros
 
 static FILE *help_fp;
+static const char* help_file_address; 
 static int help_num_modules = -1;
 static char *help_mod_table;
 static unsigned help_mod_table_size;
@@ -43,7 +45,8 @@ static void helph_unload_module()
 {
   if( help_crt_module )
   {
-    free( help_crt_module );
+    if( !help_file_address )
+      free( help_crt_module );
     help_crt_module = NULL;
     help_crt_module_nfuncs = -1;
   }
@@ -65,11 +68,13 @@ static void helph_cleanup()
   }
   if( help_mod_table )
   {
-    free( help_mod_table );
+    if( !help_file_address )
+      free( help_mod_table );
     help_mod_table_size = 0;
     help_mod_table = NULL;
   }
   helph_unload_module();
+  help_file_address = NULL;
   help_num_modules = -1;
 }
 
@@ -113,12 +118,17 @@ static HELP_MOD_DATA* helph_load_module( int idx )
   if( ( pm = helph_get_modtable_data( idx ) ) == NULL )
     return NULL;
   helph_unload_module();
-  if( ( help_crt_module = ( char* )malloc( pm->len ) ) == NULL )
-    return NULL;
-  if( fseek( help_fp, pm->offset + help_mod_table_size + HELP_MOD_EXTRA_OFFSET, SEEK_SET ) != 0 )
-    goto error;
-  if( fread( help_crt_module, 1, pm->len, help_fp ) != pm->len )
-    goto error;
+  if( !help_file_address )
+  {
+    if( ( help_crt_module = ( char* )malloc( pm->len ) ) == NULL )
+      return NULL;
+    if( fseek( help_fp, pm->offset + help_mod_table_size + HELP_MOD_EXTRA_OFFSET, SEEK_SET ) != 0 )
+      goto error;
+    if( fread( help_crt_module, 1, pm->len, help_fp ) != pm->len )
+      goto error;
+  }
+  else
+    help_crt_module = ( char* )help_file_address + pm->offset + help_mod_table_size + HELP_MOD_EXTRA_OFFSET;
   // Allocate the module data structure
   if( ( help_crt_module_data = ( HELP_MOD_DATA* )malloc( sizeof( HELP_MOD_DATA ) ) ) == NULL )
     goto error;
@@ -133,7 +143,7 @@ static HELP_MOD_DATA* helph_load_module( int idx )
   help_crt_module_nfuncs = *( u16* )p;
   p += 2;
   help_crt_module_data->nfuncs = help_crt_module_nfuncs;
-  if( ( help_crt_module_data->pfuncs = ( char ** )malloc( sizeof( char* ) * help_crt_module_nfuncs ) ) == NULL )
+  if( ( help_crt_module_data->pfuncs = ( const char ** )malloc( sizeof( char* ) * help_crt_module_nfuncs ) ) == NULL )
     goto error;
   for( i = 0; i < help_crt_module_nfuncs; i ++ )
   {
@@ -192,6 +202,7 @@ int help_init( const char *fname )
   helph_cleanup();
   if( ( help_fp = fopen( fname, "rb" ) ) == NULL )
     return 0;
+  help_file_address = dm_getaddr( fileno( help_fp ) );
   if( fread( s, 1, HELP_SIG_SIZE, help_fp ) != HELP_SIG_SIZE )
     goto error;
   s[ HELP_SIG_SIZE ] = 0;
@@ -200,10 +211,15 @@ int help_init( const char *fname )
   // Help file identified, now read its header (module information)
   if( fread( &temp32, 1, 4, help_fp ) != 4 )
     goto error;
-  if( ( help_mod_table = ( char* )malloc( temp32 ) ) == NULL )
-    goto error;
-  if( fread( help_mod_table, 1, temp32, help_fp ) != temp32 )
-    goto error;
+  if( !help_file_address )
+  {
+    if( ( help_mod_table = ( char* )malloc( temp32 ) ) == NULL )
+      goto error;
+    if( fread( help_mod_table, 1, temp32, help_fp ) != temp32 )
+      goto error;
+  }
+  else
+    help_mod_table = ( char* )help_file_address + ftell( help_fp );
   p = help_mod_table;
   help_mod_table_size = ( unsigned )temp32;
   help_num_modules = 0;
