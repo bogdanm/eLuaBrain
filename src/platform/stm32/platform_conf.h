@@ -24,7 +24,7 @@
 #define BUILD_DHCPC
 #define BUILD_DNS
 #define BUILD_CON_GENERIC
-//#define BUILD_ADC
+#define BUILD_ADC
 //#define BUILD_RPC
 #define BUILD_RFS
 //#define BUILD_CON_TCP
@@ -54,14 +54,6 @@
 // Auxiliary libraries that will be compiled for this platform
 
 #define PS_LIB_TABLE_NAME     "stm32"
-
-//#ifdef FORSTM3210E_EVAL
-//#define AUXLIB_LCD      "stm3210lcd"
-//LUALIB_API int ( luaopen_lcd )( lua_State* L );
-//#define LCDLINE  _ROM( AUXLIB_LCD, luaopen_lcd, lcd_map )
-//#else
-#define LCDLINE
-//#endif
 
 #ifdef BUILD_ADC
 #define ADCLINE _ROM( AUXLIB_ADC, luaopen_adc, adc_map )
@@ -94,14 +86,12 @@
   _ROM( AUXLIB_PACK, luaopen_pack, pack_map )\
   _ROM( AUXLIB_BIT, luaopen_bit, bit_map )\
   _ROM( AUXLIB_CPU, luaopen_cpu, cpu_map )\
-  _ROM( AUXLIB_ELUA, luaopen_elua, elua_map )\
   _ROM( AUXLIB_TMR, luaopen_tmr, tmr_map )\
   _ROM( AUXLIB_I2C, luaopen_i2c, i2c_map )\
   ADCLINE\
   _ROM( AUXLIB_CAN, luaopen_can, can_map )\
   _ROM( AUXLIB_PWM, luaopen_pwm, pwm_map )\
   RPCLINE\
-  LCDLINE\
   _ROM( AUXLIB_ELUA, luaopen_elua, elua_map )\
   _ROM( LUA_MATHLIBNAME, luaopen_math, math_map )\
   _ROM( AUXLIB_NET, luaopen_net, net_map)\
