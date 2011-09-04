@@ -12,11 +12,9 @@ local htmld
 -- Data structure declarations
 
 -- List here all the sections for which we're generating the documentation
-local doc_sections_html = { "arch_platform", "refman_gen", "refman_ps_lm3s", "refman_ps_str9", "refman_ps_mbed", "refman_ps_mizar32" }
-local doc_sections_target = { "refman_gen" }
---local target_doc_modules =  { "bit", "pd", "cpu", "pack", "adc", "term", "pio", "uart", "spi", "tmr", "pwm", "net", "elua", "i2c" }
---local target_doc_modules =  { "pd", "cpu", "elua" }
-local target_doc_modules =  { "elua", "cpu", "pd", "bit", "pack", "uart", "spi", "pio", "pwm", "i2c", "tmr", "term", "can", "nrf", "adc" }
+local doc_sections_html = { "arch_platform", "refman_gen", "refman_ps_lm3s", "refman_ps_str9", "refman_ps_mbed", "refman_ps_mizar32", "refman_ps_stm32" }
+local doc_sections_target = { "refman_gen", "refman_ps_stm32" }
+local target_doc_modules =  { "elua", "cpu", "pd", "bit", "pack", "uart", "spi", "pio", "pwm", "i2c", "tmr", "term", "can", "nrf", "adc", "snd" }
 
 -- List here all the components of each section
 local components = 
@@ -27,6 +25,7 @@ local components =
   refman_ps_str9 = { "pio", "rtc" },
   refman_ps_mbed = { "pio" },
   refman_ps_mizar32 = { "lcd" },
+  refman_ps_stm32 = { "snd" }
 }
 
 -------------------------------------------------------------------------------
@@ -85,7 +84,8 @@ local function format_string( str, keepnl )
   if not htmld then str = str:gsub( "<li>(.-)</li>", "  - %1" ) end
 
   -- In target mode remove all HTML tags
-  if not htmld then str = str:gsub( "<(.-)>", function( t ) return t:sub( 1, 1 ) == "<" and "<" .. t .. ">" or "" end ) end
+  if not hrmld then str = str:gsub( "<br />", "" ) end
+  if not htmld then str = str:gsub( "<(%S-)>", function( t ) return t:sub( 1, 1 ) == "<" and "<" .. t .. ">" or "" end ) end
 
   -- Translate 'special' HTML chars to their equivalents
   local tr_table_html = { [ "%&" ] = "&amp;" }

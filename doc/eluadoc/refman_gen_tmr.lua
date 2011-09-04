@@ -84,7 +84,7 @@ data_en =
       {
         "$id$ - the timer ID.",
         "$period$ - the interrupt period in microseconds. Setting this to 0 disabled the timer match interrupt.",
-        "$type$ - $tmr.INT_ONESHOT$ to generate a single interrupt after *period* microseconds, or $tmr.INT_CYCLIC$ to generate interrupts every $period$ microseconds."
+        "$type$ - $tmr.INT_ONESHOT$ to generate a single interrupt after $period$ microseconds, or $tmr.INT_CYCLIC$ to generate interrupts every $period$ microseconds."
       }
     }
 

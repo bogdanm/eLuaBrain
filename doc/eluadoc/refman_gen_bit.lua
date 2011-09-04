@@ -108,7 +108,7 @@ $NOTE$: $STMBrain$ comes with a special patch that adds a more comprehensible C-
     },
 
     { sig = "number = #bit.lshift#( value, shift )",
-      desc = "Left-shift a number, equivalent to %value << shift% in C.",
+      desc = "Left-shift a number, equivalent to %value <<<< shift% in C.",
       args = 
       {
         "$value$ - the value to shift.",
