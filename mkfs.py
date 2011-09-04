@@ -113,10 +113,14 @@ def mkfs( dirname, outname, flist, mode, compcmd ):
     for c in fname:
       _add_data( ord( c ), outfile )
     _add_data( 0, outfile ) # ASCIIZ
-    size_l = len( filedata ) & 0xFF
-    size_h = ( len( filedata ) >> 8 ) & 0xFF
-    _add_data( size_l, outfile )
-    _add_data( size_h, outfile )
+    size_ll = len( filedata ) & 0xFF
+    size_lh = ( len( filedata ) >> 8 ) & 0xFF
+    size_hl = ( len( filedata ) >> 16 ) & 0xFF
+    size_hh = ( len( filedata ) >> 24 ) & 0xFF
+    _add_data( size_ll, outfile )
+    _add_data( size_lh, outfile )
+    _add_data( size_hl, outfile )
+    _add_data( size_hh, outfile )
     # Round to a multiple of 4
     actual = len( filedata )
     while _bytecnt & ( alignment - 1 ) != 0:

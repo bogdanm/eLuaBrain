@@ -44,7 +44,7 @@ u8 romfs_open_file( const char* fname, p_read_fs_byte p_read_func, FS* pfs )
 {
   u32 i, j;
   char fsname[ DM_MAX_FNAME_LENGTH + 1 ];
-  u16 fsize;
+  u32 fsize;
   
   // Look for the file
   i = 0;
@@ -66,7 +66,8 @@ u8 romfs_open_file( const char* fname, p_read_fs_byte p_read_func, FS* pfs )
     j = i + j + 1;
     // And read the size   
     fsize = p_read_func( j ) + ( p_read_func( j + 1 ) << 8 );
-    j += 2;
+    fsize += ( p_read_func( j + 2 ) << 16 ) + ( p_read_func( j + 3 ) << 24 );
+    j += 4;
     // Round to a multiple of ROMFS_ALIGN
     j = ( j + ROMFS_ALIGN - 1 ) & ~( ROMFS_ALIGN - 1 );
     if( !strncasecmp( fname, fsname, DM_MAX_FNAME_LENGTH ) )
@@ -185,8 +186,9 @@ static struct dm_dirent* romfs_readdir_r( struct _reent *r, void *d )
   while( ( dm_shared_fname[ j ++ ] = romfs_read( off ++ ) ) != '\0' );
   pent->fname = dm_shared_fname;
   pent->fsize = romfs_read( off ) + ( romfs_read( off + 1 ) << 8 );
+  pent->fsize += ( romfs_read( off + 2 ) << 16 ) + ( romfs_read( off + 3 ) << 24 );
   pent->ftime = 0;
-  off += 2;
+  off += 4;
   off = ( off + ROMFS_ALIGN - 1 ) & ~( ROMFS_ALIGN - 1 );
   *( u32* )d = off + pent->fsize;
   return pent;

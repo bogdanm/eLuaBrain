@@ -122,9 +122,11 @@ function mkfs( dirname, outname, flist, mode, compcmd )
           _add_data( fname:byte( i ), outfile )
         end
         _add_data( 0, outfile ) -- ASCIIZ
-        local plen = string.pack( "<h", #filedata )
+        local plen = string.pack( "<i", #filedata )
         _add_data( plen:byte( 1 ), outfile )
         _add_data( plen:byte( 2 ), outfile )
+        _add_data( plen:byte( 3 ), outfile )
+        _add_data( plen:byte( 4 ), outfile )
         -- Round to a multiple of 'alignment'
         local actual = #filedata
         while _bytecnt % alignment ~= 0 do

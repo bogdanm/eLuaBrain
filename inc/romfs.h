@@ -31,7 +31,7 @@ typedef struct
 {
   u32 baseaddr;
   u32 offset;
-  u16 size;
+  u32 size;
   p_read_fs_byte p_read_func;
 } FS;
   
