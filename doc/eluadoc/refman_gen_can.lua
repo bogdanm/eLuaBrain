@@ -9,18 +9,17 @@ data_en =
   -- Menu name
   menu_name = "can",
 
+  desc = "CAN interface operations",
+
   -- Overview
   overview = [[This module contains functions for accessing the CAN interfaces of the eLua CPU]],
   
   -- Structures
   structures =
   {
-    { text = [[// eLua CAN ID types
-enum
-{
-  ELUA_CAN_ID_STD = 0,      // exported as $can.ID_STD$
-  ELUA_CAN_ID_EXT,          // exported as $can.ID_EXT$
-};]],
+    { text = [[can.ID_STD
+can.ID_EXT
+]],
       name = "CAN ID types",
       desc = "These are the CAN identifier types supported by eLua. Standard identifiers are 11 bits in length, extended identifiers are 29 bits.",
     }
@@ -45,7 +44,7 @@ enum
       {
         "$id$ - the ID of the CAN interface.",
         "$canid$ - CAN identifier number.",
-        "$canidtype$ - identifier type as defined @#can_id_types@here@.",
+        "$canidtype$ - identifier type` as defined @#can_id_types@here@.`.`",
         "$message$ - message in string format, 8 or fewer bytes."
       },
     },
@@ -59,7 +58,7 @@ enum
       ret =
       {
         "$canid$ - CAN identifier number.",
-        "$canidtype$ - identifier type as defined @#can_id_types@here@.",
+        "$canidtype$ - identifier type` as defined @#can_id_types@here@.`.`",
         "$message$ - message in string format, 8 or fewer bytes."
       }
     }

@@ -9,12 +9,11 @@ data_en =
   -- Menu name
   menu_name = "adc",
 
+  desc = "ADC interface operations",
+
   -- Overview
-  overview = [[This module contains functions that access analog to digital converter (ADC) peripherals.</p>
-  <p>When utilizing this module, acquiring ADC data is a two step process: requesting sample conversions (using $adc.sample$) and extraction of conversion results from a conversion buffer (using $adc.getsample$, $adc.getsamples$ or $adc.insertsamples$). Various configuration parameters are available to set conversion rate, how results are extracted from the buffer and how these results are processed prior to extraction.</p>
-  <p>This module can be utilized if the device in use has a supported ADC peripheral (see @status.html@status@ for details) and if ADC functionality is enabled at build time (see @building.html@building@).</p>
-<p><span class="warning">IMPORTANT</span>: Platform support varies for this module (see @status.html#plat_notes@status notes@ for details) .
-  ]],
+  overview = [[This module contains functions that access analog to digital converter (ADC) peripherals.</p> <p>When utilizing this module, acquiring ADC data is a two step process: requesting sample conversions (using $adc.sample$) and extraction of conversion results from a conversion buffer (using $adc.getsample$, $adc.getsamples$ or $adc.insertsamples$). Various configuration parameters are available to set conversion rate, how results are extracted from the buffer and how these results are processed prior to extraction.</p> <p>This module can be utilized if the device in use has a supported ADC peripheral` (see @status.html@status@ for details) ` `and if ADC functionality is enabled at build time` (see @building.html@building@).`.`</p>
+`<p><span class="warning">IMPORTANT</span>`$IMPORTANT$`: Platform support varies for this module` (see @status.html#plat_notes@status notes@ for details).`.`]],
 
   -- Functions
   funcs = 
@@ -23,7 +22,7 @@ data_en =
       desc = "Initiate conversion and buffering of samples on an ADC channel.",
       args = 
       {
-        "$id$ - ADC channel ID. Optionally, this may be a table containing a list of channel IDs (i.e.: {0, 2, 3}), allowing synchronization of acquisition. NOTE: This acceptance of mixed types is only for the sample function.",
+        "$id$ - ADC channel ID. Optionally, this may be a table containing a list of channel IDs (i.e.: {0, 2, 3}), allowing synchronization of acquisition. $NOTE$: This acceptance of mixed types is only for the sample function.",
         "$count$ - number of samples to acquire and place in buffer."
       }
     },
@@ -68,7 +67,7 @@ data_en =
       {
         "$id$ - ADC channel ID.",
         "$clock$ - frequency to acquire samples at in Hz (number of samples per second), 0 to acquire as fast as possible.",
-        "$timer_id$ - Timer channel ID to use to control ADC conversion. <strong>Note:</strong> At this time, a timer selection will apply to all channels on a given ADC peripheral."
+        "$timer_id$ - Timer channel ID to use to control ADC conversion. `<strong>Note:</strong>`$Note$:` At this time, a timer selection will apply to all channels on a given ADC peripheral."
       },
       ret = "$clock$ - actual acquisition frequency that was set"
     },
@@ -100,3 +99,4 @@ data_en =
 }
 
 data_pt = data_en
+

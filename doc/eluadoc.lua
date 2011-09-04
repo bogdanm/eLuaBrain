@@ -16,13 +16,13 @@ local doc_sections_html = { "arch_platform", "refman_gen", "refman_ps_lm3s", "re
 local doc_sections_target = { "refman_gen" }
 --local target_doc_modules =  { "bit", "pd", "cpu", "pack", "adc", "term", "pio", "uart", "spi", "tmr", "pwm", "net", "elua", "i2c" }
 --local target_doc_modules =  { "pd", "cpu", "elua" }
-local target_doc_modules =  { "elua", "cpu", "pd", "bit", "pack", "uart", "spi", "pio", "pwm", "i2c", "tmr", "term" }
+local target_doc_modules =  { "elua", "cpu", "pd", "bit", "pack", "uart", "spi", "pio", "pwm", "i2c", "tmr", "term", "can", "nrf", "adc" }
 
 -- List here all the components of each section
 local components = 
 { 
   arch_platform = { "ll", "pio", "spi", "uart", "timers", "pwm", "cpu", "eth", "adc", "i2c", "can" },
-  refman_gen = { "bit", "pd", "cpu", "pack", "adc", "term", "pio", "uart", "spi", "tmr", "pwm", "net", "can", "rpc", "elua", "i2c" },
+  refman_gen = { "bit", "pd", "cpu", "pack", "adc", "term", "pio", "uart", "spi", "tmr", "pwm", "net", "can", "rpc", "elua", "i2c", "nrf" },
   refman_ps_lm3s = { "disp" },
   refman_ps_str9 = { "pio", "rtc" },
   refman_ps_mbed = { "pio" },
