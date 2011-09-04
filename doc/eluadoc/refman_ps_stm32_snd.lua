@@ -22,7 +22,7 @@ data_en =
       args = [[$song$ - the song to be played. The song is given in a string which contains notes and indications about their duration. Notes are specified like below:
 <ul>
     <li>$A$, $B$ ... $G$ - the given note.</li>
-    <li>$a$, $c$, $d$, $f$ and $g$ - shart notes.</li>
+    <li>$a$, $c$, $d$, $f$ and $g$ - sharp notes.</li>
     <li>$p$ - a pause (no sound).</li>
     <li>$1$, $2$ ... $9$ - octave number (default is $3$).</li>
     <li>$+$ - octave up.</li>

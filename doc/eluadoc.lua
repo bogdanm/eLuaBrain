@@ -14,7 +14,7 @@ local htmld
 -- List here all the sections for which we're generating the documentation
 local doc_sections_html = { "arch_platform", "refman_gen", "refman_ps_lm3s", "refman_ps_str9", "refman_ps_mbed", "refman_ps_mizar32", "refman_ps_stm32" }
 local doc_sections_target = { "refman_gen", "refman_ps_stm32" }
-local target_doc_modules =  { "elua", "cpu", "pd", "bit", "pack", "uart", "spi", "pio", "pwm", "i2c", "tmr", "term", "can", "nrf", "adc", "snd" }
+local target_doc_modules =  { "elua", "cpu", "pd", "bit", "pack", "uart", "spi", "pio", "pwm", "i2c", "tmr", "term", "can", "nrf", "adc", "snd", "net" }
 
 -- List here all the components of each section
 local components = 
@@ -84,7 +84,7 @@ local function format_string( str, keepnl )
   if not htmld then str = str:gsub( "<li>(.-)</li>", "  - %1" ) end
 
   -- In target mode remove all HTML tags
-  if not hrmld then str = str:gsub( "<br />", "" ) end
+  if not htmld then str = str:gsub( "<br%s-/>", "" ) end
   if not htmld then str = str:gsub( "<(%S-)>", function( t ) return t:sub( 1, 1 ) == "<" and "<" .. t .. ">" or "" end ) end
 
   -- Translate 'special' HTML chars to their equivalents
@@ -214,7 +214,7 @@ local function build_file( fname, section )
         temp = target_desc or temp
         -- data.mod_desc = data.mod_desc .. CLBLUE .. s.name .. ":\n" .. CRESET .. temp .. "\n"
         data.mod_desc = data.mod_desc .. CLBLUE .. s.name .. ":\n" .. CRESET
-        local t2 = s.text
+        local t2 = format_string( s.text )
         if t2:sub( -1, -1 ) ~= "\n" then t2 = t2 .. "\n" end
         for l in t2:gmatch( "([^\n]-)\n" ) do data.mod_desc = data.mod_desc .. "  " .. CLCYAN .. l .. "\n" .. CRESET end
         data.mod_desc = data.mod_desc .. temp .. "\n"
@@ -236,7 +236,7 @@ local function build_file( fname, section )
       end
       local funcname = namefromsig( f.sig )
       if not funcname then
-        return false, string.format( "'%s' should contain the function name between '*' chars", f.sig )
+        return false, string.format( "'%s' should contain the function name between '#' chars", f.sig )
       end
       df.name = funcname
       df.desc = CLBLUE .. f.sig:gsub( "#(.-)#", CLYELLOW .. "%1" .. CLBLUE ) .. "\n  " .. CRESET .. dot( format_string( f.target_desc or f.desc ) ) .. "\n"
