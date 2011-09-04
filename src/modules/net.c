@@ -81,14 +81,14 @@ static int net_set_buffer( lua_State *L )
   return 0;
 }
 
-// Lua: set_split( sock, [split_char])
+// Lua: res = set_split( sock, [split_char])
 // Defaults to 'no split' if not specified
 static int net_set_split( lua_State *L )
 {
   sock_t *s = sock_check( L );
   int schar = luaL_optinteger( L, 2, ELUA_NET_NO_SPLIT );
 
-  lua_pushinteger( L, elua_net_set_split( s->sock, schar ) );
+  lua_pushboolean( L, elua_net_set_split( s->sock, schar ) );
   return 1;
 }
 
@@ -304,7 +304,7 @@ static int net_expect( lua_State *L )
   se = luaL_checklstring( L, 2, &len );
   timer_id = ( unsigned )luaL_optinteger( L, 3, 0 );
   timeout = ( unsigned )luaL_optinteger( L, 4, ELUA_NET_INF_TIMEOUT );
-  lua_pushinteger( L, elua_net_expect( s->sock, ( const u8* )se, len, timer_id, timeout ) );
+  lua_pushboolean( L, elua_net_expect( s->sock, ( const u8* )se, len, timer_id, timeout ) );
   return 1;
 }
 
