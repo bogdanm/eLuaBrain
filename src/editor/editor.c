@@ -157,11 +157,15 @@ static int editor_saveas_file()
 // Go to line
 static void editor_goto_line()
 {
-  char *line = edhw_read( "Go to line", "Enter line number", 6, edutils_number_validator );
-  int newl = atoi( line );
+  char *line;
+  int newl;
 
+  if( edutils_is_flag_set( ed_crt_buffer, EDFLAG_SELECT ) )
+    return;
+  line = edhw_read( "Go to line", "Enter line number", 6, edutils_number_validator );
   if( !line )
     return;
+  newl = atoi( line );
   free( line );
   if( newl < 0 || newl > ed_crt_buffer->file_lines )
   {
@@ -200,8 +204,9 @@ static void editor_help()
   printf( "Press F4 to enter block selection mode. In this mode the editor will highlight the lines that are selected. Press F4 again to end block selection mode. " );
   printf( "After pressing F4 the second time, the selected block of text is kept in memory in the block buffer. " );
   printf( "To paste it, press CTRL+V. This will also clear the block buffer. " );
-  printf( "To clear the block buffer without pasting press CTRL+F4.\n" );
-  printf( "\nPress any key to return to the editor.\n" );
+  printf( "To clear the block buffer without pasting press CTRL+F4. " );
+  printf( "While selecting a block, the 'go to line' command (F7) is disabled.\n" );
+  printf( "\nPress any key to return to the editor." );
   term_getch( TERM_INPUT_WAIT );
   edhw_init();
   edutils_show_screen();

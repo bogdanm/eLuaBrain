@@ -75,6 +75,8 @@ void vram_enable_paging( int enabled );
 void vram_set_last_line( int line );
 void vram_change_attr( unsigned x, unsigned y, unsigned len, int newfg, int newbg );
 void vram_set_mode( int mode );
+int vram_get_fg( unsigned x, unsigned y );
+int vram_get_bg( unsigned x, unsigned y );
 
 #endif
 

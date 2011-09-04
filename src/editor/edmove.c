@@ -82,7 +82,7 @@ void edmove_goto_line( int y )
   ed_cursory = y - newstart;
   if( newstart != ed_startline )
   {
-    ed_startline = newstart;
+    ed_startline = newstart; 
     edutils_show_screen();
   }
   edutils_display_status();
@@ -97,12 +97,17 @@ static void edmove_key_up()
   {
     if( ed_startline > 0 )
     {
-      ed_startline --;
+      ed_startline --;  
+      if( edutils_is_flag_set( ed_crt_buffer, EDFLAG_SELECT ) )
+        ed_lastsel = ed_cursory + ed_startline;
       edutils_show_screen();
     }
   }
   else
     ed_cursory --;
+  if( edutils_is_flag_set( ed_crt_buffer, EDFLAG_SELECT ) )
+    ed_lastsel = ed_cursory + ed_startline;
+  edutils_update_selection();
   edutils_display_status();
   edmove_cursor_check();
 }
@@ -120,12 +125,17 @@ static void edmove_key_down()
   {
     if( ed_nlines == EDITOR_LINES && ed_startline + EDITOR_LINES < ed_crt_buffer->file_lines )
     {
-      ed_startline ++;
+      ed_startline ++;  
+      if( edutils_is_flag_set( ed_crt_buffer, EDFLAG_SELECT ) )
+        ed_lastsel = ed_cursory + ed_startline;
       edutils_show_screen();
     }
   }
   else
     ed_cursory ++;
+  if( edutils_is_flag_set( ed_crt_buffer, EDFLAG_SELECT ) )
+    ed_lastsel = ed_cursory + ed_startline;
+  edutils_update_selection();
   edutils_display_status();
   edmove_cursor_check();
 }
@@ -138,9 +148,15 @@ static void edmove_key_pageup()
     ed_cursory = 0;
   else
   {
-    ed_startline = EMAX( 0, ed_startline - EDITOR_LINES );
-    edutils_show_screen();
+    ed_startline = EMAX( 0, ed_startline - EDITOR_LINES );    
+    if( edutils_is_flag_set( ed_crt_buffer, EDFLAG_SELECT ) )
+      ed_lastsel = ed_cursory + ed_startline;
+    edutils_show_screen();  
+
   }
+  if( edutils_is_flag_set( ed_crt_buffer, EDFLAG_SELECT ) )
+    ed_lastsel = ed_cursory + ed_startline;
+  edutils_update_selection();
   edutils_display_status();
   edmove_cursor_check();
 }
@@ -154,8 +170,13 @@ static void edmove_key_pagedown()
   else
   {
     ed_startline = EMIN( ed_startline + EDITOR_LINES, ed_crt_buffer->file_lines - EDITOR_LINES );
+    if( edutils_is_flag_set( ed_crt_buffer, EDFLAG_SELECT ) )
+      ed_lastsel = ed_cursory + ed_startline;
     edutils_show_screen();
   }
+  if( edutils_is_flag_set( ed_crt_buffer, EDFLAG_SELECT ) )
+    ed_lastsel = ed_cursory + ed_startline;
+  edutils_update_selection();
   edutils_display_status();
   edmove_cursor_check();
 }
@@ -232,10 +253,11 @@ static void edmove_toggle_select()
       ed_lastsel = temp;
     }
     edalloc_fill_selection( ed_crt_buffer );
-    for( temp = ed_firstsel; temp <= ed_lastsel; temp ++ )
-      if( ed_startline <= temp && temp <= ed_startline + EDITOR_LINES - 1 )
-        edutils_line_display( temp - ed_startline, temp );
+//    for( temp = ed_firstsel; temp <= ed_lastsel; temp ++ )
+//      if( ed_startline <= temp && temp <= ed_startline + EDITOR_LINES - 1 )
+//        edutils_line_display( temp - ed_startline, temp );
     edutils_display_status();
+    edutils_update_selection();
   }
   else if( ed_crt_buffer->file_lines > 0 )
   {
@@ -252,46 +274,6 @@ static void edmove_clear_selection()
 {
   edalloc_clear_selection( ed_crt_buffer );
   edutils_display_status();
-}
-
-// Key handling in selection mode
-static int edmove_handle_selkey( int c )
-{
-  int inity = ed_cursory;
-
-  switch( c )
-  {
-    case KC_UP:
-      if( ed_cursory > 0 )
-        ed_cursory --;
-      ed_lastsel = ed_cursory + ed_startline;
-      break;
-
-    case KC_DOWN:
-      if( ed_cursory < EDITOR_LINES - 1 )
-        ed_cursory ++;
-      ed_lastsel = ed_cursory + ed_startline;
-      break;
-
-    case KC_F4:
-      edmove_toggle_select();
-      return 1;
-
-    case KC_CTRL_F4:
-      edmove_toggle_select();
-      edmove_clear_selection();
-      return 1;
-
-    default:
-      return 0;
-  }
-  if( ed_cursory != inity )
-  {
-    edutils_line_display( inity, ed_startline + inity );
-    edutils_line_display( ed_cursory, ed_startline + ed_cursory );
-    edutils_display_status();
-  }
-  return 1;
 }
 
 // ****************************************************************************
@@ -328,8 +310,6 @@ void edmove_restore_cursor()
 // or 0 otherwise
 int edmove_handle_key( int c )
 {
-  if( edutils_is_flag_set( ed_crt_buffer, EDFLAG_SELECT ) )
-    return edmove_handle_selkey( c );
   switch( c )
   {
     case KC_UP:

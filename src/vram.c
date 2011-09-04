@@ -612,6 +612,20 @@ void vram_change_attr( unsigned x, unsigned y, unsigned len, int newfg, int newb
     }
 }
 
+int vram_get_fg( unsigned x, unsigned y )
+{
+  int attr = *VRAM_CHARADDR8( x, y );
+
+  return attr & 0x0F;
+}
+
+int vram_get_bg( unsigned x, unsigned y )
+{
+  int attr = *VRAM_CHARADDR8( x, y );
+
+  return ( attr >> 4 ) & 0x0F;
+}
+
 void vram_set_mode( int mode )
 {
   vram_mode = mode;

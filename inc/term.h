@@ -138,6 +138,8 @@ void term_enable_paging( int enabled );
 void term_set_last_line( int line );
 void term_change_attr( unsigned x, unsigned y, unsigned len, int newfg, int newbg );
 void term_set_mode( int mode );
+int term_get_fg( unsigned x, unsigned y );
+int term_get_bg( unsigned x, unsigned y );
 
 #define TERM_KEYCODES\
   _D( KC_UP ),\

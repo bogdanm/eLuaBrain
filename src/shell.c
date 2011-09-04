@@ -145,7 +145,7 @@ static void shell_help( char* args )
   printf( "  %srm <file> [-f] %s- removes the file, use '-f' to supress confirmation\n" TERM_RESET_COL, SHELLH_CMD, SHELLH_HELP );
   printf( "  %sreset%s - resets the terminal and clears the screen\n" TERM_RESET_COL, SHELLH_CMD, SHELLH_HELP );
 #ifdef BUILD_HELP  
-  printf( "  %sapihelp [topic] %s- help on eLua's API, lists all modules without arguments" TERM_RESET_COL, SHELLH_CMD, SHELLH_HELP );
+  printf( "  %sapihelp [topic] %s- help on eLua's API, lists all modules without arguments\n" TERM_RESET_COL, SHELLH_CMD, SHELLH_HELP );
 #endif
   printf( "You can also run a Lua file by giving its path (without using 'lua').\n" );
 }

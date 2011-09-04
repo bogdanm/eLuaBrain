@@ -94,7 +94,7 @@ void edutils_line_display( int scrline, int id )
   if( longline )
     edhw_longline( 1 );
   if( edutilsh_is_selected( id ) )
-    edhw_selectedline( 1 );
+    edhw_markselected( 1 );
   if( pline && ed_startx < strlen( pline ) )  
     for( i = 0; i < EMIN( strlen( pline ) - ed_startx, TERM_COLS ); i ++, nspaces -- )
       edhw_writechar( pline[ ed_startx + i ] );
@@ -103,7 +103,7 @@ void edutils_line_display( int scrline, int id )
   if( longline )
     edhw_longline( 0 );
   if( edutilsh_is_selected( id ) )
-    edhw_selectedline( 0 );
+    edhw_markselected( 0 );
 }
 
 // Display the current editor screen
@@ -125,6 +125,15 @@ void edutils_show_screen()
     edutils_set_flag( ed_crt_buffer, EDFLAG_DEL_LAST_LINE, 0 );
   }
   edutils_display_status();
+}
+
+// Update selection status on screen lines
+void edutils_update_selection()
+{
+  unsigned i;
+
+  for( i = ed_startline; i < ed_startline + ed_nlines; i ++ )
+    edhw_selectedline( i - ed_startline, edutilsh_is_selected( i ) );
 }
 
 // Input validator: number

@@ -80,7 +80,23 @@ void edhw_longline( int enable )
     term_set_color( TEXTCOL, TERM_COL_DONT_CHANGE );
 }
 
-void edhw_selectedline( int enable )
+void edhw_selectedline( int y, int enable )
+{
+  int crtbg = term_get_bg( 0, y );
+
+  if( enable )
+  {
+    if( crtbg != TERM_COL_WHITE )
+      term_change_attr( 0, y, TERM_COLS, TERM_COL_BLACK, TERM_COL_WHITE );
+  }
+  else
+  {
+    if( crtbg != TERM_COL_BLACK )
+      term_change_attr( 0, y, TERM_COLS, TEXTCOL, TERM_COL_BLACK );
+  }
+}
+
+void edhw_markselected( int enable )
 {
   if( enable )
     term_set_color( TERM_COL_BLACK, TERM_COL_WHITE );

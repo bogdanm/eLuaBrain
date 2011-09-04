@@ -189,6 +189,16 @@ void term_set_mode( int mode )
   vram_set_mode( mode );
 }
 
+int term_get_fg( unsigned x, unsigned y )
+{
+  return vram_get_fg( x, y );
+}
+
+int term_get_bg( unsigned x, unsigned y )
+{
+  return vram_get_bg( x, y );
+}
+
 #elif !defined( BUILD_TERM )
 
 void term_init( unsigned lines, unsigned cols, p_term_out term_out_func, 
