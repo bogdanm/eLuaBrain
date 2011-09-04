@@ -5,7 +5,7 @@
 
 #include "term.h"
 
-#define SHELL_WELCOMEMSG    "\neLua %s  Copyright (C) 2007-2010 www.eluaproject.org\n"
+#define SHELL_WELCOMEMSG    "\neLua %s (STMBrain version) Copyright (C) 2007-2011 www.eluaproject.net\n"
 #define SHELL_PROMPT        "brain> "
 #define SHELL_PROMPT_COLOR  TERM_FGCOL_LIGHT_RED 
 #define SHELL_COMMAND_COLOR TERM_FGCOL_LIGHT_GREEN
