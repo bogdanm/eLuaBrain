@@ -33,7 +33,6 @@
 #define BUILD_C_INT_HANDLERS
 #define BUILD_LUA_INT_HANDLERS
 #define BUILD_PS2
-#define ENABLE_ENC
 #define BUILD_ENC28J60
 #define BUILD_NRF
 #define BUILD_HELP

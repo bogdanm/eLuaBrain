@@ -1573,13 +1573,11 @@ static void eth_init()
 
 #define MIN_OPT_LEVEL 2
 #include "lrodefs.h"
-extern const LUA_REG_TYPE enc_map[];
 extern const LUA_REG_TYPE snd_map[];
 
 const LUA_REG_TYPE platform_map[] =
 {
 #if LUA_OPTIMIZE_MEMORY > 0
-  { LSTRKEY( "enc" ), LROVAL( enc_map ) },
   { LSTRKEY( "snd" ), LROVAL( snd_map ) },
 #endif
   { LNILKEY, LNILVAL }
@@ -1590,14 +1588,7 @@ LUALIB_API int luaopen_platform( lua_State *L )
 #if LUA_OPTIMIZE_MEMORY > 0
   return 0;
 #else // #if LUA_OPTIMIZE_MEMORY > 0
-  luaL_register( L, PS_LIB_TABLE_NAME, platform_map );
-
-  // Setup the new tables inside platform table
-  lua_newtable( L );
-  luaL_register( L, NULL, enc_map );
-  lua_setfield( L, -2, "enc" );
-
-  return 1;
+#error "the stm32 platform module doesn't work at LUA_OPTIMIZE_MEMORY == 0"
 #endif // #if LUA_OPTIMIZE_MEMORY > 0
 }
 
