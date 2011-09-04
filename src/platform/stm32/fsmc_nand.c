@@ -71,8 +71,8 @@ void FSMC_NAND_Init(void)
   GPIO_Init(GPIOD, &GPIO_InitStructure); 
 
 /* INT2 NAND pin configuration */  
-  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_6;   							 
-  GPIO_Init(GPIOG, &GPIO_InitStructure);
+//  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_6;   							 
+//  GPIO_Init(GPIOG, &GPIO_InitStructure);
 
   /*-- FSMC Configuration ------------------------------------------------------*/
   p.FSMC_SetupTime = 0x1;

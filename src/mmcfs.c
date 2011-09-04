@@ -320,7 +320,7 @@ static DM_DEVICE nand_device =
 
 const DM_DEVICE* mmcfs_init( unsigned i )
 {
-  if( i >= 2 )
+  if( i >= 1 )
     return NULL;
 
   if( i == 0 )
