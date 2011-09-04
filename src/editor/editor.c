@@ -222,8 +222,7 @@ static void editor_apihelp()
   term_clrscr();
   term_set_mode( TERM_MODE_COLS );
   term_enable_paging( TERM_PAGING_ON );
-   // [HELP]
-  help_init( "/rfs/eluadoc.bin" ); 
+  help_init( HELP_FILE_NAME ); 
   printf( "API help mode\n" );
   printf( "  Enter a topic to get help on, this can be a module name or a function name.\n" );
   printf( "  If nothing is entered, a list of all the available modules will be shown.\n" );

@@ -97,10 +97,9 @@ static int elua_help( lua_State *L )
 {
   const char *topic = NULL;
 
-  // [HELP]
   if( lua_type( L, 1 ) == LUA_TSTRING )
     topic = luaL_checkstring( L, 1 );
-  help_init( "/rfs/eluadoc.bin" ); 
+  help_init( HELP_FILE_NAME ); 
   term_set_mode( TERM_MODE_COLS );
   term_enable_paging( TERM_PAGING_ON );
   help_help( topic );
