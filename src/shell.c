@@ -700,6 +700,7 @@ static void shell_cp( char *args )
   const char *srcname = NULL;
   char *srcwc = NULL;
   shell_cp_state cs;
+  FILE *fp;
 
   // Collect all arguments
   if ( *args )
@@ -748,6 +749,15 @@ static void shell_cp( char *args )
     if( ( psrc = srcwc = shellh_pattern_from_fs( psrc ) ) == NULL )
       return;
     srctype = cmn_get_path_type( psrc, &srcname );
+  }
+  else if( srctype == PATH_TYPE_FILE ) // check if file exists
+  {
+    if( ( fp = fopen( psrc, "rb" ) ) == NULL )
+    {
+      printf( TERM_FGCOL_LIGHT_RED "Source file '%s' not found.\n" TERM_RESET_COL, psrc );
+      return;
+    }
+    fclose( fp );
   }
   // Check destination
   if( desttype == PATH_TYPE_INVALID || desttype == PATH_TYPE_WC )
