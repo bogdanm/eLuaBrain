@@ -505,7 +505,7 @@ void* vram_box( unsigned x, unsigned y, unsigned width, unsigned height, const c
 
   if( ( pbox = ( TERM_BOX* )malloc( sizeof( TERM_BOX ) ) ) == NULL )
     goto error;
-  memset( pbox, 0, sizeof( pbox ) );
+  memset( pbox, 0, sizeof( *pbox ) );
   if( flags & TERM_BOX_FLAG_CENTER ) // recompute x and y to center the box properly
   {
     x = ( VRAM_COLS - width ) / 2;
