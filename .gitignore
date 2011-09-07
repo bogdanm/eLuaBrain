@@ -21,3 +21,4 @@ luarpc
 *~
 *.*~
 luac.cross*
+*.s#*
