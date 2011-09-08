@@ -22,3 +22,5 @@ luarpc
 *.*~
 luac.cross*
 *.s#*
+~*.doc
+
