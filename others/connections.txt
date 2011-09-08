@@ -48,7 +48,7 @@ Module pin  CPU pin
 6 WOL
 7 INT       PG7
 8 CLKOUT
-9 RST
+9 RST       PA13
 10 3V3
 
 Other pins:
