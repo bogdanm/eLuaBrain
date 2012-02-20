@@ -21,6 +21,7 @@
 #include "vram.h"
 #include "fsmc_sram.h"
 #include "enc28j60.h"
+#include "sircs.h"
 
 // Platform specific includes
 #include "stm32f10x.h"
@@ -106,6 +107,10 @@ int platform_init()
   }
   
   FSMC_SRAM_Init();
+
+  sircs_init();    
+  // Set CAN REMAP to 01 to disable CAN TX (silicon bug workaround)
+  AFIO->MAPR = ( AFIO->MAPR & ~0x00006000 ) | ( ( 0x01 ) << 13 );
 
   cmn_platform_init();
 
@@ -1574,11 +1579,14 @@ static void eth_init()
 #define MIN_OPT_LEVEL 2
 #include "lrodefs.h"
 extern const LUA_REG_TYPE snd_map[];
+extern const LUA_REG_TYPE sircs_map[];
+extern int luaopen_sircs( lua_State *L );
 
 const LUA_REG_TYPE platform_map[] =
 {
 #if LUA_OPTIMIZE_MEMORY > 0
   { LSTRKEY( "snd" ), LROVAL( snd_map ) },
+  { LSTRKEY( "ir" ), LROVAL( sircs_map ) },
 #endif
   { LNILKEY, LNILVAL }
 };
@@ -1586,6 +1594,7 @@ const LUA_REG_TYPE platform_map[] =
 LUALIB_API int luaopen_platform( lua_State *L )
 {
 #if LUA_OPTIMIZE_MEMORY > 0
+  luaopen_sircs( L );
   return 0;
 #else // #if LUA_OPTIMIZE_MEMORY > 0
 #error "the stm32 platform module doesn't work at LUA_OPTIMIZE_MEMORY == 0"
